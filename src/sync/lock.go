@@ -31,7 +31,7 @@ func (this *TryLock) Lock() {
 	this.lock <- empty{}
 }
 
-func (this *Semaphore) Trylock() bool {
+func (this *TryLock) Trylock() bool {
 	select {
 	case this.lock <- empty{}:
 		return true
@@ -40,6 +40,6 @@ func (this *Semaphore) Trylock() bool {
 	}
 }
 
-func (this *Semaphore) Unlock() {
+func (this *TryLock) Unlock() {
 	<-this.lock
 }
