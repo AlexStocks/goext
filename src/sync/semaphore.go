@@ -21,12 +21,12 @@ func (this *Semaphore) Post() {
 	<-this.lock
 }
 
-func (this *Semaphore) Release() {
-	var num = cap(this.lock) - len(this.lock)
-	for i := 0; i < num; i++ {
-		<-this.lock
-	}
-}
+// func (this *Semaphore) Release() {
+// 	var num = cap(this.lock) - len(this.lock)
+// 	for i := 0; i < num; i++ {
+// 		<-this.lock
+// 	}
+// }
 
 func (this *Semaphore) Wait() {
 	this.lock <- empty{}
