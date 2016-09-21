@@ -1,15 +1,8 @@
 /* log_test.go - test for log.go */
-/*
-modification history
---------------------
-2014/3/7, by Zhang Miao, create
-2014/3/11, by Zhang Miao, modify
-*/
 package log
 
 import (
 	"testing"
-	// "time"
 )
 
 func TestNewLogger(t *testing.T) {
@@ -29,5 +22,4 @@ func TestNewLogger(t *testing.T) {
 	}
 
 	logger.Close()
-	// time.Sleep(100 * time.Millisecond)
 }
