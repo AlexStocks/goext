@@ -88,7 +88,8 @@ func NewLogger(conf Conf) (Logger, error) {
 
 func NewLoggerWithConfFile(logDir string, conf string) (Logger, error) {
 	var (
-		err error
+		err    error
+		logger log4go.Logger
 	)
 
 	if err = gx_os.CreateDir(logDir); err != nil {
@@ -96,7 +97,8 @@ func NewLoggerWithConfFile(logDir string, conf string) (Logger, error) {
 		return Logger{}, err
 	}
 
-	return Logger{log4go.NewLogger().LoadConfiguration(conf)}, nil
+	logger = log4go.NewLogger()
+	return Logger{(&logger).LoadConfiguration(conf)}, nil
 }
 
 func comLogFileName(appName string, dir string, err bool) string {
