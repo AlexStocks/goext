@@ -6,7 +6,8 @@ import (
 )
 
 func TestNewLogger(t *testing.T) {
-	var conf = Conf{Name: "test", Dir: "./log/", Level: "DEBUG", Console: false, Daily: true, BackupNum: 2}
+	// var conf = Conf{Name: "test", Dir: "./log/", Level: "DEBUG", Console: false, Daily: true, BackupNum: 2}
+	var conf = Conf{Name: "test", Dir: "./log/", Level: "Info", Console: false, Daily: true, BackupNum: 2}
 
 	var (
 		err    error
@@ -16,10 +17,11 @@ func TestNewLogger(t *testing.T) {
 		t.Errorf("NewLogger(conf{%#v}) = error{%#v}", conf, err)
 	}
 
-	for i := 0; i < 10; i++ {
-		logger.Warn("warning msg: %d", i)
-		logger.Info("info msg: %d", i)
-	}
+	logger.Debug("Debug")
+	logger.Info("Info")
+	logger.Warn("Warn")
+	logger.Error("Error")
+	logger.Critic("Critic")
 
 	logger.Close()
 }

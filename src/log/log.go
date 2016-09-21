@@ -50,7 +50,7 @@ func NewLogger(conf Conf) (Logger, error) {
 
 	logger = log4go.NewLogger()
 	if conf.Console {
-		logger = logger.AddFilter("stdout", logLevel(conf.Level), log4go.NewConsoleLogWriter())
+		logger.AddFilter("stdout", logLevel(conf.Level), log4go.NewConsoleLogWriter())
 	}
 
 	// create file writer for all log level
@@ -66,7 +66,7 @@ func NewLogger(conf Conf) (Logger, error) {
 	if 0 < conf.BackupNum {
 		fileLogger.SetRotateMaxBackup(conf.BackupNum)
 	}
-	logger = logger.AddFilter("log", logLevel(conf.Level), fileLogger)
+	logger.AddFilter("log", logLevel(conf.Level), fileLogger)
 
 	// create file writer for warning & fatal & critical
 	fileName = comLogFileName(conf.Name, conf.Dir, true)
@@ -81,7 +81,7 @@ func NewLogger(conf Conf) (Logger, error) {
 	if 0 < conf.BackupNum {
 		fileLogger.SetRotateMaxBackup(conf.BackupNum)
 	}
-	logger = logger.AddFilter("wflog", log4go.WARNING, fileLogger)
+	logger.AddFilter("wflog", log4go.WARNING, fileLogger)
 
 	return Logger{logger}, nil
 }
@@ -123,6 +123,8 @@ func logLevel(str string) log4go.Level {
 	case "ERROR":
 		return log4go.ERROR
 	case "CRITIC":
+		return log4go.CRITICAL
+	case "CRITICAL":
 		return log4go.CRITICAL
 	default:
 		return log4go.INFO
