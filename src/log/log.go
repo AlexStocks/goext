@@ -1,0 +1,130 @@
+// Copyright 2016 AlexStocks(https://github.com/AlexStocks).
+// All rights reserved.  Use of this source code is
+// governed by a BSD-style license.
+// package log is based on log4go.
+
+package log
+
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+)
+
+import (
+	gx_os "github.com/AlexStocks/goext/src/os"
+	"github.com/AlexStocks/log4go"
+)
+
+const (
+	logSuffix   = ".log"
+	wfLogSuffix = ".wf.log"
+)
+
+type Conf struct {
+	Name      string // application name
+	Dir       string // logger directory
+	Level     string // minimum log level
+	Console   bool   // whether output log to console
+	Daily     bool   // whether rotate log file at mid-night every day
+	BackupNum int    // log file backup number. the oldest is deleted.
+}
+
+type Logger struct {
+	log4go.Logger
+}
+
+// init a logger
+func NewLogger(conf Conf) (Logger, error) {
+	var (
+		err        error
+		fileName   string
+		logger     log4go.Logger
+		fileLogger *log4go.FileLogWriter
+	)
+
+	if err = gx_os.CreateDir(conf.Dir); err != nil {
+		log4go.Error("goext.os.CreateDir(%s) = error{%#v}", conf.Dir, err)
+		return Logger{logger}, err
+	}
+
+	logger = log4go.NewLogger()
+	if conf.Console {
+		logger = logger.AddFilter("stdout", logLevel(conf.Level), log4go.NewConsoleLogWriter())
+	}
+
+	// create file writer for all log level
+	fileName = comLogFileName(conf.Name, conf.Dir, false)
+	fileLogger = log4go.NewFileLogWriter(fileName, true)
+	if fileLogger == nil {
+		return Logger{logger}, fmt.Errorf("log4go.NewFileLogWriter(%s) = nil", fileName)
+	}
+	fileLogger.SetFormat(log4go.FORMAT_DEFAULT)
+	if conf.Daily {
+		fileLogger.SetRotateDaily(true)
+	}
+	if 0 < conf.BackupNum {
+		fileLogger.SetRotateMaxBackup(conf.BackupNum)
+	}
+	logger = logger.AddFilter("log", logLevel(conf.Level), fileLogger)
+
+	// create file writer for warning & fatal & critical
+	fileName = comLogFileName(conf.Name, conf.Dir, true)
+	fileLogger = log4go.NewFileLogWriter(fileName, true)
+	if fileLogger == nil {
+		return Logger{logger}, fmt.Errorf("log4go.NewFileLogWriter(%s) = nil", fileName)
+	}
+	fileLogger.SetFormat(log4go.FORMAT_DEFAULT)
+	if conf.Daily {
+		fileLogger.SetRotateDaily(true)
+	}
+	if 0 < conf.BackupNum {
+		fileLogger.SetRotateMaxBackup(conf.BackupNum)
+	}
+	logger = logger.AddFilter("wflog", log4go.WARNING, fileLogger)
+
+	return Logger{logger}, nil
+}
+
+func NewLoggerWithConfFile(logDir string, conf string) (Logger, error) {
+	var (
+		err error
+	)
+
+	if err = gx_os.CreateDir(logDir); err != nil {
+		log4go.Error("goext.os.CreateDir(%s) = error{%#v}", logDir, err)
+		return Logger{}, err
+	}
+
+	return Logger{log4go.NewLogger().LoadConfiguration(conf)}, nil
+}
+
+func comLogFileName(appName string, dir string, err bool) string {
+	strings.TrimSuffix(dir, "/")
+
+	if err {
+		// log level warning, error, critical
+		return filepath.Join(dir, appName+wfLogSuffix)
+	}
+
+	return filepath.Join(dir, appName+logSuffix)
+}
+
+func logLevel(str string) log4go.Level {
+	switch strings.ToUpper(str) {
+	case "DEBUG":
+		return log4go.DEBUG
+	case "TRACE":
+		return log4go.TRACE
+	case "INFO":
+		return log4go.INFO
+	case "WARN":
+		return log4go.WARNING
+	case "ERROR":
+		return log4go.ERROR
+	case "CRITIC":
+		return log4go.CRITICAL
+	default:
+		return log4go.INFO
+	}
+}
