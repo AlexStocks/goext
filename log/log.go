@@ -12,7 +12,7 @@ import (
 )
 
 import (
-	gx_os "github.com/AlexStocks/goext/src/os"
+	gx_os "github.com/AlexStocks/goext/os"
 	"github.com/AlexStocks/log4go"
 )
 
