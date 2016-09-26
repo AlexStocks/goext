@@ -2,8 +2,8 @@
 // All rights reserved.  Use of this source code is
 // governed by a BSD-style license.
 
-// Package time encapsulates some golang.time functions
-package time
+// Package gxtime encapsulates some golang.time functions
+package gxtime
 
 import (
 	"time"

@@ -6,7 +6,7 @@
 # FILE    : mysql.go
 ******************************************************/
 
-package driver
+package gxdriver
 
 import (
 	"const/path"

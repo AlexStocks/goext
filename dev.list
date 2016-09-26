@@ -5,6 +5,11 @@
 ## dev list ##
 ---
 
+- 2016/09/26
+	> add CountWatch in goext/time
+	>
+	> add HostAddress in goext/net
+
 - 2016/09/22
 	> add multiple loggers test for goext/log
 

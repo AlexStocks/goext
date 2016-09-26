@@ -1,5 +1,5 @@
 /* log_test.go - test for log.go */
-package log
+package gxlog
 
 import (
 	"testing"

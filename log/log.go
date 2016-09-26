@@ -1,9 +1,10 @@
 // Copyright 2016 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
 // governed by a BSD-style license.
-// package log is based on log4go.
 
-package log
+// package gxlog is based on log4go.
+
+package gxlog
 
 import (
 	"fmt"
