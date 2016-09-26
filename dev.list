@@ -10,7 +10,9 @@
 	>
 	> add HostAddress in goext/net
 	>
-	> add goext/math/rand RandString & RanddigitString & UUID
+	> add RandString & RanddigitString & UUID for goext/math/rand
+	>
+	> add Wheel for goext/time
 
 - 2016/09/22
 	> add multiple loggers test for goext/log
