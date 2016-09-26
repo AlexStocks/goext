@@ -9,6 +9,8 @@
 	> add CountWatch in goext/time
 	>
 	> add HostAddress in goext/net
+	>
+	> add goext/math/rand RandString&RanddigitString
 
 - 2016/09/22
 	> add multiple loggers test for goext/log

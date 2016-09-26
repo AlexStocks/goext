@@ -5,8 +5,11 @@
 package xorlist_test
 
 import (
-	"container/xorlist"
 	"fmt"
+)
+
+import (
+	"github.com/AlexStocks/goext/container/xorlist"
 )
 
 func Example() {
