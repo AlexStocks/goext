@@ -5,6 +5,11 @@
 ## dev list ##
 ---
 
+- 2016/09/27
+    > add uuid in strings
+    >
+    > add ReadTxt in io/ioutil
+
 - 2016/09/26
 	> add CountWatch in goext/time
 	>
