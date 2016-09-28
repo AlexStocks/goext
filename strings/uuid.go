@@ -1,7 +1,8 @@
 // Copyright 2016 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
 // governed by a BSD-style license.
-
+//
+// 2016/09/23
 // Package gxstrings implements string related utilities.
 
 package gxstrings
