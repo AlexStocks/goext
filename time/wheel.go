@@ -21,8 +21,8 @@ type Wheel struct {
 	ticker *time.Ticker
 	index  int
 	ring   []chan empty
-	done   chan empty
-	once   sync.Once
+	// done   chan empty
+	once sync.Once
 }
 
 func NewWheel(span time.Duration, buckets int) *Wheel {
@@ -43,7 +43,7 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 		ticker: time.NewTicker(span),
 		index:  0,
 		ring:   make([](chan empty), buckets),
-		done:   make(chan empty),
+		// done:   make(chan empty),
 	}
 
 	for idx := range this.ring {
@@ -52,22 +52,33 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 
 	go func() {
 		var notify chan empty
-		for {
-			select {
-			case <-this.ticker.C:
-				this.Lock()
+		// for {
+		// 		select {
+		// 		case <-this.ticker.C:
+		// 			this.Lock()
 
-				notify = this.ring[this.index]
-				this.ring[this.index] = make(chan empty)
-				this.index = (this.index + 1) % len(this.ring)
+		// 			notify = this.ring[this.index]
+		// 			this.ring[this.index] = make(chan empty)
+		// 			this.index = (this.index + 1) % len(this.ring)
 
-				this.Unlock()
+		// 			this.Unlock()
 
-				close(notify)
-			case <-this.done:
-				this.ticker.Stop()
-				return
-			}
+		// 			close(notify)
+		// 		case <-this.done:
+		// 			this.ticker.Stop()
+		//			return
+		//		}
+		//	}
+		for range this.ticker.C {
+			this.Lock()
+
+			notify = this.ring[this.index]
+			this.ring[this.index] = make(chan empty)
+			this.index = (this.index + 1) % len(this.ring)
+
+			this.Unlock()
+
+			close(notify)
 		}
 	}()
 
@@ -75,14 +86,15 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 }
 
 func (this *Wheel) Stop() {
-	select {
-	case <-this.done:
-		// this.done is a blocked channel. if it has not been closed, the default branch will be invoked.
-		return
+	// 	select {
+	// 	case <-this.done:
+	// 		// this.done is a blocked channel. if it has not been closed, the default branch will be invoked.
+	// 		return
 
-	default:
-		this.once.Do(func() { close(this.done) })
-	}
+	// 	default:
+	// 		this.once.Do(func() { close(this.done) })
+	// 	}
+	this.once.Do(func() { this.ticker.Stop() })
 }
 
 func (this *Wheel) After(timeout time.Duration) <-chan empty {

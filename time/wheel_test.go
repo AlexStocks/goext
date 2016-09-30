@@ -18,7 +18,7 @@ func TestNewWheel(t *testing.T) {
 		case <-wheel.After(TimeMillisecondDuration(1000)):
 			fmt.Println("loop:", index)
 			index++
-			if index > 10 {
+			if index > 22 {
 				return
 			}
 		}
