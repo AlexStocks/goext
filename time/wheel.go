@@ -3,6 +3,7 @@
 // governed by a BSD-style license.
 
 // Package gxtime encapsulates some golang.time functions
+// ref: https://github.com/AlexStocks/go-practice/blob/master/time/siddontang_time_wheel.go
 package gxtime
 
 import (
