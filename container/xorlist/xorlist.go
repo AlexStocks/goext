@@ -18,7 +18,8 @@
 //	for e := l.Back(); e != nil; n, e = e, e.Prev(n) {
 //		// do something with e.Value
 //	}
-package xorlist
+
+package gxxorlist
 
 import "unsafe"
 

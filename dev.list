@@ -5,6 +5,11 @@
 ## dev list ##
 ---
 
+- 2016/10/01
+    > add goext/bitmap
+    >
+    > optimize goext/time timer by bitmap
+
 - 2016/09/27
     > add uuid in strings
     >
