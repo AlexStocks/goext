@@ -12,10 +12,6 @@ import (
 	"time"
 )
 
-import (
-	"github.com/AlexStocks/goext/container/bitmap"
-)
-
 type empty struct{}
 
 type Wheel struct {
@@ -25,7 +21,6 @@ type Wheel struct {
 	ticker *time.Ticker
 	index  int
 	ring   []chan empty
-	bitmap gxbitmap.Bitmap
 	once   sync.Once
 }
 
@@ -47,11 +42,6 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 		ticker: time.NewTicker(span),
 		index:  0,
 		ring:   make([](chan empty), buckets),
-		bitmap: gxbitmap.NewBitmap(buckets),
-	}
-
-	for idx := range this.ring {
-		this.ring[idx] = make(chan empty)
 	}
 
 	go func() {
@@ -62,18 +52,14 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 			this.Lock()
 
 			// fmt.Println("index:", this.index, ", value:", this.bitmap.Get(this.index))
-			if this.bitmap.Get(this.index) != 0 {
-				notify = this.ring[this.index]
-				this.ring[this.index] = make(chan empty) // create a new channel when its bit pos is nonzero.
-				this.bitmap.Clear(this.index)
-			}
+			notify = this.ring[this.index]
+			this.ring[this.index] = nil
 			this.index = (this.index + 1) % len(this.ring)
 
 			this.Unlock()
 
 			if notify != nil {
 				close(notify)
-				notify = nil
 			}
 		}
 		// fmt.Println("timer costs:", cw.Count()/1e9, "s")
@@ -98,9 +84,11 @@ func (this *Wheel) After(timeout time.Duration) <-chan empty {
 
 	this.Lock()
 	pos = (this.index + pos) % len(this.ring)
+	if this.ring[pos] == nil {
+		this.ring[pos] = make(chan empty)
+	}
 	// fmt.Println("pos:", pos)
 	c := this.ring[pos]
-	this.bitmap.Set(pos)
 	this.Unlock()
 
 	return c
