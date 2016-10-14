@@ -27,11 +27,11 @@ func HostAddress2(host string, port string) string {
 	return net.JoinHostPort(host, port)
 }
 
-func WSHostAddress2(host string, port string) string {
+func WSHostAddress2(host string, port string, path string) string {
 	return "ws://" + net.JoinHostPort(host, port) + path
 }
 
-func WSSHostAddress2(host string, port string) string {
+func WSSHostAddress2(host string, port string, path string) string {
 	return "wss://" + net.JoinHostPort(host, port) + path
 }
 
