@@ -30,9 +30,14 @@ func TimeNanosecondDuration(n int) time.Duration {
 // @hour:  0 ~ 23
 // @minute: 0 ~ 59
 func YMD(year int, month int, day int, hour int, minute int, sec int) int {
-	return int(time.Date(year, time.Month(month), day-1, hour-1, minute, sec, 0, time.UTC).Unix())
+	return int(time.Date(year, time.Month(month), day, hour, minute, sec, 0, time.Local).Unix())
 }
 
-func PrintTime(sec int, nsec int) string {
+// @YMD in UTC timezone
+func YMDUTC(year int, month int, day int, hour int, minute int, sec int) int {
+	return int(time.Date(year, time.Month(month), day, hour, minute, sec, 0, time.UTC).Unix())
+}
+
+func YMDPrint(sec int, nsec int) string {
 	return time.Unix(int64(sec), int64(nsec)).Format("2006-01-02 15:04:05.99999")
 }
