@@ -5,7 +5,8 @@
 ## dev list ##
 ---
 
-- 2016/10/22
+- 2016/10/23
+    > move github.com/AlexStocks/pool to github.com/AlexStocks/goext/sync/pool
 
 - 2016/10/14
     > add goext/time/YMD
