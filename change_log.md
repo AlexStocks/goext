@@ -5,6 +5,15 @@
 ## dev list ##
 ---
 
+- 2017/01/12
+    > move github.com/AlexStocks/dubbogo/common/net.go to github.com/AlexStocks/goext/net/ip.go
+    >
+    > move github.com/AlexStocks/dubbogo/common/misc.go(Contains, ArrayRemoveAt, RandStringBytesMaskImprSrc) to github.com/AlexStocks/goext/strings/strings.go
+    >
+    > move github.com/AlexStocks/dubbogo/common/misc.go(Future) to github.com/AlexStocks/goext/time/time.go
+    >
+    > move github.com/AlexStocks/dubbogo/common/misc.go(Goid) to github.com/AlexStocks/goext/runtime/mprof.go(GoID)
+
 - 2016/10/23
     > move github.com/AlexStocks/pool to github.com/AlexStocks/goext/sync/pool
 
