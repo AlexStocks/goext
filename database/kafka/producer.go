@@ -21,6 +21,7 @@ import (
 // Producer is interface for sending messages to Kafka.
 type Producer interface {
 	SendMessage(topic string, key interface{}, message interface{}) (int32, int64, error)
+	SendBytes(topic string, key []byte, message []byte) (int32, int64, error)
 	Close()
 }
 
@@ -79,6 +80,25 @@ func (p *producer) SendMessage(topic string, key interface{}, message interface{
 
 		keyEncoder = sarama.ByteEncoder(keyByte)
 		// keyEncoder = sarama.StringEncoder(key)
+		producerMessage.Key = keyEncoder
+	}
+	partition, offset, err = p.Producer.SendMessage(&producerMessage)
+	if err != nil {
+		return -1, -1, fmt.Errorf("cannot send message %v: %v", message, err)
+	}
+
+	return partition, offset, nil
+}
+
+func (p *producer) SendBytes(topic string, key []byte, message []byte) (partition int32, offset int64, err error) {
+	var keyEncoder, valueEncoder sarama.Encoder
+	valueEncoder = sarama.ByteEncoder(message)
+	var producerMessage = sarama.ProducerMessage{
+		Topic: topic,
+		Value: valueEncoder,
+	}
+	if key != nil {
+		keyEncoder = sarama.ByteEncoder(key)
 		producerMessage.Key = keyEncoder
 	}
 	partition, offset, err = p.Producer.SendMessage(&producerMessage)
