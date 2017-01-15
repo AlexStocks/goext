@@ -9,6 +9,8 @@ package gxlog
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 )
 
 import (
@@ -40,9 +42,17 @@ var (
 	reset = []byte{'\033', '[', '0', 'm'}
 )
 
+func funcFileLine() string {
+	funcName, file, line, _ := runtime.Caller(3)
+	return "[" + runtime.FuncForPC(funcName).Name() +
+		": " + filepath.Base(file) +
+		": " + fmt.Sprintf("%d", line) +
+		"] "
+}
+
 func CPrintf(color []byte, format string, args ...interface{}) {
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		fmt.Fprintf(os.Stdout, string(color)+fmt.Sprintf(format, args...)+string(reset))
+		fmt.Fprintf(os.Stdout, string(color)+funcFileLine()+fmt.Sprintf(format, args...)+string(reset))
 	} else {
 		fmt.Fprintf(os.Stdout, fmt.Sprintf(format, args...))
 	}
@@ -50,7 +60,7 @@ func CPrintf(color []byte, format string, args ...interface{}) {
 
 func CPrintfln(color []byte, format string, args ...interface{}) {
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		fmt.Fprintf(os.Stdout, string(color)+fmt.Sprintf(format, args...)+string(reset)+"\n")
+		fmt.Fprintf(os.Stdout, string(color)+funcFileLine()+fmt.Sprintf(format, args...)+string(reset)+"\n")
 	} else {
 		fmt.Fprintf(os.Stdout, fmt.Sprintf(format, args...)+"\n")
 	}
@@ -58,7 +68,7 @@ func CPrintfln(color []byte, format string, args ...interface{}) {
 
 func CEPrintf(color []byte, format string, args ...interface{}) {
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		fmt.Fprintf(os.Stderr, string(color)+fmt.Sprintf(format, args...)+string(reset))
+		fmt.Fprintf(os.Stderr, string(color)+funcFileLine()+fmt.Sprintf(format, args...)+string(reset))
 	} else {
 		fmt.Fprintf(os.Stderr, fmt.Sprintf(format, args...))
 	}
@@ -66,7 +76,7 @@ func CEPrintf(color []byte, format string, args ...interface{}) {
 
 func CEPrintfln(color []byte, format string, args ...interface{}) {
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		fmt.Fprintf(os.Stderr, string(color)+fmt.Sprintf(format, args...)+string(reset)+"\n")
+		fmt.Fprintf(os.Stderr, string(color)+funcFileLine()+fmt.Sprintf(format, args...)+string(reset)+"\n")
 	} else {
 		fmt.Fprintf(os.Stderr, fmt.Sprintf(format, args...)+"\n")
 	}
