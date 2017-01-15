@@ -9,8 +9,6 @@ package gxlog
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"runtime"
 )
 
 import (
@@ -19,7 +17,8 @@ import (
 
 var (
 	// Normal colors
-	NORMAL   = []byte{'\033', '0', 'm'}
+	// NORMAL   = []byte{'\033', '0', 'm'}
+	NORMAL   = []byte{'\033', '0'}
 	NBlack   = []byte{'\033', '[', '3', '0', 'm'}
 	NRed     = []byte{'\033', '[', '3', '1', 'm'}
 	NGreen   = []byte{'\033', '[', '3', '2', 'm'}
@@ -41,14 +40,6 @@ var (
 
 	reset = []byte{'\033', '[', '0', 'm'}
 )
-
-func funcFileLine() string {
-	funcName, file, line, _ := runtime.Caller(3)
-	return "[" + runtime.FuncForPC(funcName).Name() +
-		": " + filepath.Base(file) +
-		": " + fmt.Sprintf("%d", line) +
-		"] "
-}
 
 func CPrintf(color []byte, format string, args ...interface{}) {
 	if isatty.IsTerminal(os.Stdout.Fd()) {

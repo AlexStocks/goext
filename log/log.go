@@ -9,7 +9,9 @@ package gxlog
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"time"
 )
 
 import (
@@ -132,4 +134,14 @@ func logLevel(str string) log4go.Level {
 	default:
 		return log4go.INFO
 	}
+}
+
+func funcFileLine() string {
+	tm := time.Unix(time.Now().Unix(), 0)
+	funcName, file, line, _ := runtime.Caller(3)
+	return "[" + tm.Format("2006-01-02/15:04:05 ") +
+		runtime.FuncForPC(funcName).Name() +
+		": " + filepath.Base(file) +
+		": " + fmt.Sprintf("%d", line) +
+		"] "
 }
