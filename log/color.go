@@ -4,7 +4,7 @@
 
 // package gxlog is based on log4go.
 // color.go provides colorful terminal log output functions.
-package gocolor
+package gxlog
 
 import (
 	"fmt"
