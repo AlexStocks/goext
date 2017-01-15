@@ -5,6 +5,11 @@
 ## dev list ##
 ---
 
+- 2017/01/14
+    > add database/kafka to encapsulate kafka producer/consumer functions
+    >
+    > add math/rand/red_packet.go to provide tencent red packet algorithm
+
 - 2017/01/12
     > move github.com/AlexStocks/dubbogo/common/net.go to github.com/AlexStocks/goext/net/ip.go
     >

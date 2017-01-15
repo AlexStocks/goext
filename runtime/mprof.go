@@ -1,4 +1,4 @@
-// Copyright 2016 ~ 2017 AlexStocks(https://github.com/AlexStocks).
+// Copyright 2017 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
 // governed by a BSD-style license.
 
