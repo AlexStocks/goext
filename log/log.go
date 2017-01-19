@@ -15,7 +15,7 @@ import (
 )
 
 import (
-	gx_os "github.com/AlexStocks/goext/os"
+	gxos "github.com/AlexStocks/goext/os"
 	"github.com/AlexStocks/log4go"
 )
 
@@ -46,7 +46,7 @@ func NewLogger(conf Conf) (Logger, error) {
 		fileLogger *log4go.FileLogWriter
 	)
 
-	if err = gx_os.CreateDir(conf.Dir); err != nil {
+	if err = gxos.CreateDir(conf.Dir); err != nil {
 		log4go.Error("goext.os.CreateDir(%s) = error{%#v}", conf.Dir, err)
 		return Logger{logger}, err
 	}
@@ -89,19 +89,9 @@ func NewLogger(conf Conf) (Logger, error) {
 	return Logger{logger}, nil
 }
 
-func NewLoggerWithConfFile(logDir string, conf string) (Logger, error) {
-	var (
-		err    error
-		logger log4go.Logger
-	)
-
-	if err = gx_os.CreateDir(logDir); err != nil {
-		log4go.Error("goext.os.CreateDir(%s) = error{%#v}", logDir, err)
-		return Logger{}, err
-	}
-
-	logger = log4go.NewLogger()
-	return Logger{(&logger).LoadConfiguration(conf)}, nil
+func NewLoggerWithConfFile(conf string) Logger {
+	logger := log4go.NewLogger()
+	return Logger{(&logger).LoadConfiguration(conf)}
 }
 
 func comLogFileName(appName string, dir string, err bool) string {

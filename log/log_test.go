@@ -28,16 +28,11 @@ func TestNewLogger(t *testing.T) {
 
 func TestNewLoggerWithConfFile(t *testing.T) {
 	var (
-		err    error
-		dir    string
 		conf   string
 		logger Logger
 	)
-	dir = "./log"
 	conf = "log_test.xml"
-	if logger, err = NewLoggerWithConfFile(dir, conf); err != nil {
-		t.Errorf("NewLoggerWithConfFile(dir{%s}, conf{%#v}) = error{%#v}", dir, conf, err)
-	}
+	logger = NewLoggerWithConfFile(conf)
 
 	// And now we're ready!
 	logger.Finest("This will only go to those of you really cool UDP kids!  If you change enabled=true.")
