@@ -6,7 +6,7 @@
 ---
 
 - 2017/01/14
-    > add database/kafka to encapsulate kafka producer/consumer functions
+    > add log/kafka to encapsulate kafka producer/consumer functions
     >
     > add math/rand/red_packet.go to provide tencent red packet algorithm
 
