@@ -13,7 +13,6 @@ import (
 
 import (
 	// "github.com/Shopify/sarama"
-	"fmt"
 	"github.com/wvanbergen/kazoo-go"
 )
 
@@ -23,7 +22,7 @@ func GetBrokerList(zkHosts string) ([]string, error) {
 		zkNodes []string
 	)
 
-	fmt.Println("zkHosts:", zkHosts)
+	// fmt.Println("zkHosts:", zkHosts)
 	zkNodes, config.Chroot = kazoo.ParseConnectionString(zkHosts)
 	kz, err := kazoo.NewKazoo(zkNodes, config)
 	if err != nil {
@@ -33,7 +32,6 @@ func GetBrokerList(zkHosts string) ([]string, error) {
 	defer kz.Close()
 
 	brokerList, err := kz.BrokerList()
-	fmt.Println("brokerList:", brokerList)
 	// fmt.Printf("broker list:%#v\n", brokerList)
 	if err != nil {
 		log.Fatal("[ERROR] Failed to retrieve Kafka broker list from zookeeper:", err)
