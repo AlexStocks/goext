@@ -46,6 +46,7 @@ type (
 
 // NewConsumer constructs a Consumer.
 // @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
+// NewConsumer 之所以不能直接以brokers当做参数，是因为用到了consumer group，各个消费者的信息要存到zk中
 func NewConsumer(clientID string, zookeeper string, topicList string, consumerGroup string, cb MessageCallback) (*Consumer, error) {
 	c := &Consumer{
 		consumerGroup: clientID,
