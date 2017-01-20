@@ -8,51 +8,57 @@ package gxkafka
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
-
-	"log"
 	"strings"
-	"syscall"
+	"sync"
 )
 
 import (
+	"github.com/AlexStocks/goext/strings"
 	"github.com/Shopify/sarama"
+	Log "github.com/alecthomas/log4go"
 	"github.com/wvanbergen/kafka/consumergroup"
 	"github.com/wvanbergen/kazoo-go"
 )
-
-// MessageCallback is a short notation of a callback function for incoming Kafka message.
-type MessageCallback func(msg *sarama.ConsumerMessage) error
-
-type Consumer struct {
-	CGName         string
-	ZkAddressNodes string
-	Topics         string
-}
-
-type topic struct {
-	Name            string
-	MessageCallback MessageCallback
-	Consuming       bool
-}
 
 const (
 	OFFSETS_PROCESSING_TIMEOUT_SECONDS = 10e9
 	OFFSETS_COMMIT_INTERVAL            = 10e9
 )
 
-func NewConsumer(cgName, topicList, zkAddressList string) (Consumer, error) {
-	c := Consumer{}
+// MessageCallback is a short notation of a callback function for incoming Kafka message.
+type (
+	MessageCallback func(msg *sarama.ConsumerMessage) error
 
-	if cgName == "" {
-		return c, fmt.Errorf(" consumer group name cannot be empty")
+	empty struct{}
+
+	Consumer struct {
+		consumerGroup string
+		zookeeper     string
+		topics        string
+		clientID      string
+		cb            MessageCallback
+
+		cg   *consumergroup.ConsumerGroup
+		done chan empty
+		wg   sync.WaitGroup
+	}
+)
+
+// NewConsumer constructs a Consumer.
+// @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
+func NewConsumer(clientID string, zookeeper string, topicList string, consumerGroup string, cb MessageCallback) (*Consumer, error) {
+	c := &Consumer{
+		consumerGroup: clientID,
+		zookeeper:     zookeeper,
+		topics:        topicList,
+		clientID:      clientID,
+		cb:            cb,
+		done:          make(chan empty),
 	}
 
-	c = Consumer{
-		CGName:         cgName,
-		ZkAddressNodes: zkAddressList,
-		Topics:         topicList,
+	if consumerGroup == "" || topicList == "" || zookeeper == "" || cb == nil {
+		return c, fmt.Errorf("@consumerGroup:%s, @topicList:%s, @zookeeper:%s, @cb:%v",
+			consumerGroup, topicList, zookeeper, cb)
 	}
 
 	return c, nil
@@ -60,52 +66,56 @@ func NewConsumer(cgName, topicList, zkAddressList string) (Consumer, error) {
 
 // Start runs the process of consuming. It is blocking.
 func (c *Consumer) Start() error {
-	var kafkaTopics []string
-	var zkNodes []string
+	var (
+		err         error
+		kafkatopics []string
+		zkNodes     []string
+		config      *consumergroup.Config
+	)
 
-	var config = consumergroup.NewConfig()
-	config.ClientID = "kafka-consumer1"
+	config = consumergroup.NewConfig()
+
 	// 这个属性仅仅影响第一次启动时候获取value的offset，
 	// 后面再次启动的时候如果其他conf不变则会根据上次commit的offset开始获取value
+	config.ClientID = c.clientID
 	config.Offsets.Initial = sarama.OffsetNewest
 	config.Offsets.ProcessingTimeout = OFFSETS_PROCESSING_TIMEOUT_SECONDS
 	config.Offsets.CommitInterval = OFFSETS_COMMIT_INTERVAL
-	zkNodes, config.Zookeeper.Chroot = kazoo.ParseConnectionString(c.ZkAddressNodes)
-	kafkaTopics = strings.Split(c.Topics, ",")
-	cg, err := consumergroup.JoinConsumerGroup(c.CGName, kafkaTopics, zkNodes, config)
+	zkNodes, config.Zookeeper.Chroot = kazoo.ParseConnectionString(c.zookeeper)
+	kafkatopics = strings.Split(c.topics, ",")
+	c.cg, err = consumergroup.JoinConsumerGroup(c.consumerGroup, kafkatopics, zkNodes, config)
 	if err != nil {
 		return err
 	}
-	// defer cg.Close()
 
-	runConsumer(cg)
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		c.run()
+	}()
+
 	return nil
 }
 
-func runConsumer(cg *consumergroup.ConsumerGroup) {
-	// Trap SIGINT to trigger a shutdown.
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, os.Kill, syscall.SIGHUP, syscall.SIGTERM)
+func (c *Consumer) run() {
+	var (
+		err        error
+		eventCount int32
+		offsets    map[string]map[int32]int64
+		messageKey string
+	)
 
-	go func() {
-		for err := range cg.Errors() {
-			log.Println(err)
-		}
-	}()
-
-	var eventCount int32 = 0
-	var offsets = make(map[string]map[int32]int64)
-	var messageKey string
+	offsets = make(map[string]map[int32]int64)
 	for {
 		select {
-		case message := <-cg.Messages():
+		case message := <-c.cg.Messages():
 			if offsets[message.Topic] == nil {
 				offsets[message.Topic] = make(map[int32]int64)
 			}
 
 			eventCount += 1
 			if offsets[message.Topic][message.Partition] != 0 && offsets[message.Topic][message.Partition] != message.Offset-1 {
-				log.Printf("Unexpected offset on %s:%d. Expected %d, found %d, diff %d.\n",
+				Log.Warn("Unexpected offset on %s:%d. Expected %d, found %d, diff %d.\n",
 					message.Topic, message.Partition, offsets[message.Topic][message.Partition]+1,
 					message.Offset, message.Offset-offsets[message.Topic][message.Partition]+1)
 			}
@@ -113,25 +123,50 @@ func runConsumer(cg *consumergroup.ConsumerGroup) {
 			// Simulate processing time
 			messageKey = string(message.Key)
 			if len(messageKey) != 0 && messageKey != "\"\"" {
-				log.Printf("idx:%d, messge{key:%v, topic:%v, partition:%v, offset:%v, value:%v}\n",
-					eventCount, messageKey, message.Topic, message.Partition, message.Offset, string(message.Value))
+				Log.Info("idx:%d, messge{key:%v, topic:%v, partition:%v, offset:%v, value:%v}\n",
+					eventCount, messageKey, message.Topic, message.Partition, message.Offset, gxstrings.String(message.Value))
 			} else {
-				log.Printf("idx:%d, messge{topic:%v, partition:%v, offset:%v, value:%v}\n",
-					eventCount, message.Topic, message.Partition, message.Offset, string(message.Value))
+				Log.Info("idx:%d, messge{topic:%v, partition:%v, offset:%v, value:%v}\n",
+					eventCount, message.Topic, message.Partition, message.Offset, gxstrings.String(message.Value))
+			}
+
+			// message -> PushNotification
+			if err = c.cb(message); err != nil {
+				Log.Warn("Consumer.callback(kafka message{topic:%s, key:%s, value:%s}) = error(%s)",
+					message.Topic, gxstrings.String(message.Key), gxstrings.String(message.Value), err)
+
+				// 出错则直接提交offset，记录下log
+				offsets[message.Topic][message.Partition] = message.Offset
+				c.Commit(message)
+
+				break
 			}
 
 			offsets[message.Topic][message.Partition] = message.Offset
-			if err := cg.CommitUpto(message); err != nil {
-				log.Printf("[%s] Consuming message: %v", message.Topic, err)
-			}
+		case errMsg := <-c.cg.Errors():
+			Log.Error("kafka consumer error:%s", errMsg)
 
-		case <-signals:
-			if err := cg.Close(); err != nil {
-				sarama.Logger.Println("Error closing the consumer", err)
-				// log.Warnf("Error closing the consumer", err)
+		case <-c.done:
+			if err := c.cg.Close(); err != nil {
+				Log.Warn("Error closing the consumer:%v", err)
 			}
 
 			return
 		}
 	}
+}
+
+func (c *Consumer) Commit(message *sarama.ConsumerMessage) {
+	if err := c.cg.CommitUpto(message); err != nil {
+		Log.Error("Consuming message {%v-%v-%v}, commit error:%v",
+			message.Topic, gxstrings.String(message.Key), gxstrings.String(message.Value), err)
+	} else {
+		Log.Info("Consuming message {%v-%v-%v}, commit over!",
+			message.Topic, gxstrings.String(message.Key), gxstrings.String(message.Value))
+	}
+}
+
+func (c *Consumer) Stop() {
+	close(c.done)
+	c.wg.Wait()
 }

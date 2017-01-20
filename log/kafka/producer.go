@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"log"
 	"strings"
 )
 
@@ -18,30 +17,42 @@ import (
 	"github.com/Shopify/sarama"
 )
 
+const (
+	HASH = iota + 1
+	RANDOM
+)
+
 // Producer is interface for sending messages to Kafka.
 type Producer interface {
 	SendMessage(topic string, key interface{}, message interface{}) (int32, int64, error)
 	SendBytes(topic string, key []byte, message []byte) (int32, int64, error)
-	Close()
+	Stop()
 }
 
 type producer struct {
+	// topic    string  // 此处不存储topic，不能把producer和某个topic绑定，否则就不能给其他topic发送消息。
 	Producer sarama.SyncProducer
 }
 
-// NewProducer returns a new SyncProducer for give brokers addresses.
-func NewProducer(brokers string, partitionMethod string, waitForAllAck bool) (Producer, error) {
+// NewProducer constructs a new SyncProducer for give brokers addresses.
+// @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
+func NewProducer(clientID string, brokers string, partitionMethod int, waitForAllAck bool) (Producer, error) {
+	if clientID == "" || brokers == "" {
+		return producer{}, fmt.Errorf("@clientID:%s, @brokers:%s", clientID, brokers)
+	}
+
 	var partitionerConstructor sarama.PartitionerConstructor
 	switch partitionMethod {
-	case "hash":
+	case HASH:
 		partitionerConstructor = sarama.NewHashPartitioner
-	case "random":
+	case RANDOM:
 		partitionerConstructor = sarama.NewRandomPartitioner
 	default:
-		log.Fatalf("Partition method %s not supported.", partitionMethod)
+		return producer{}, fmt.Errorf("Partition method %d not supported.", partitionMethod)
 	}
 
 	var kafkaConfig = sarama.NewConfig()
+	kafkaConfig.ClientID = clientID
 	kafkaConfig.Producer.Return.Successes = true
 	kafkaConfig.Producer.Return.Errors = true
 	kafkaConfig.Producer.Partitioner = partitionerConstructor
@@ -57,10 +68,25 @@ func NewProducer(brokers string, partitionMethod string, waitForAllAck bool) (Pr
 		return nil, err
 	}
 
-	return &producer{Producer: kafkaProducer}, nil
+	return producer{Producer: kafkaProducer}, nil
 }
 
-func (p *producer) SendMessage(topic string, key interface{}, message interface{}) (partition int32, offset int64, err error) {
+// NewProducerWithZk returns a new SyncProducer for give brokers addresses.
+// @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
+func NewProducerWithZk(clientID string, zookeeper string, partitionMethod int, waitForAllAck bool) (Producer, error) {
+	var (
+		err     error
+		brokers []string
+	)
+
+	if brokers, err = GetBrokerList(zookeeper); err != nil {
+		return producer{}, nil
+	}
+
+	return NewProducer(clientID, strings.Join(brokers, ","), partitionMethod, waitForAllAck)
+}
+
+func (p producer) SendMessage(topic string, key interface{}, message interface{}) (partition int32, offset int64, err error) {
 	msg, err := json.Marshal(message)
 	if err != nil {
 		return -1, -1, fmt.Errorf("cannot marshal message %v: %v", message, err)
@@ -90,7 +116,7 @@ func (p *producer) SendMessage(topic string, key interface{}, message interface{
 	return partition, offset, nil
 }
 
-func (p *producer) SendBytes(topic string, key []byte, message []byte) (partition int32, offset int64, err error) {
+func (p producer) SendBytes(topic string, key []byte, message []byte) (partition int32, offset int64, err error) {
 	var keyEncoder, valueEncoder sarama.Encoder
 	valueEncoder = sarama.ByteEncoder(message)
 	var producerMessage = sarama.ProducerMessage{
@@ -109,6 +135,6 @@ func (p *producer) SendBytes(topic string, key []byte, message []byte) (partitio
 	return partition, offset, nil
 }
 
-func (p *producer) Close() {
+func (p producer) Stop() {
 	p.Producer.Close()
 }
