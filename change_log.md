@@ -5,6 +5,9 @@
 ## dev list ##
 ---
 
+- 2017/01/20
+    > modify log/kafka/consumer.go
+
 - 2017/01/14
     > add log/kafka to encapsulate kafka producer/consumer functions
     >
