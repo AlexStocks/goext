@@ -17,7 +17,15 @@ func init() {
 }
 
 type Message struct {
-	Content string "json:`content`"
+	EventName string `json:"event_name,omitempty"`
+	Timestamp int64  `json:"timestamp,omitempty"`
+	IP        string `json:"ip,omitempty"`
+	PlanID    int64  `json:"plan_id,omitempty"`
+	UUID      string `json:"uuid,omitempty"`
+	OS        int    `json:"os,omitempty"`
+	AppID     int    `json:"app_id,omitempty"`
+	Token     string `json:"token,omitempty"`
+	Status    string `json:"status,omitempty"`
 }
 
 func TestKafkaProducer(t *testing.T) {
@@ -37,9 +45,19 @@ func TestKafkaProducer(t *testing.T) {
 	}
 	defer producer.Stop()
 
+	message.EventName = "event"
+	message.Timestamp = time.Now().Unix()
+	message.IP = "127.0.0.1"
+	message.PlanID = 123
+	message.UUID = "a-b-c-d-e"
+	message.OS = 2
+	message.AppID = 1
+	message.Token = "1234"
+	message.Status = "good"
+
 	for i := 0; i < 10; i++ {
-		message.Content = "hello:" + strconv.Itoa(i)
-		partition, offset, err = producer.SendMessage(topic, message.Content, message)
+		message.UUID = "hello:" + strconv.Itoa(i)
+		partition, offset, err = producer.SendMessage(topic, message.UUID, message)
 		if err != nil {
 			t.Fatalf("FAILED to produce message:%v, err:%v", message, err)
 		}
