@@ -24,7 +24,7 @@ import (
 type (
 	// Consumer will invoke @ProduceMessageCallback when got message
 	ConsumerMessageCallback func(*sarama.ConsumerMessage) error
-	// AsyncProducer will invoke @ProduceMessageCallback when got sucess message response
+	// AsyncProducer will invoke @ProduceMessageCallback when got sucess message response.
 	ProducerMessageCallback func(*sarama.ProducerMessage)
 	// AsyncProducer will invoke @ProduceErrorCallback when got error message response
 	ProducerErrorCallback func(*sarama.ProducerError)
