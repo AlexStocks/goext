@@ -5,6 +5,9 @@
 ## dev list ##
 ---
 
+- 2017/01/22
+    > add asynchronous kafka producer in log/kafka/producer.go
+
 - 2017/01/20
     > modify log/kafka/consumer.go
 

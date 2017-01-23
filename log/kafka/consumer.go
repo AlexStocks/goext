@@ -27,16 +27,18 @@ const (
 
 // MessageCallback is a short notation of a callback function for incoming Kafka message.
 type (
-	MessageCallback func(msg *sarama.ConsumerMessage) error
+	Consumer interface {
+		Start() error
+		Commit(*sarama.ConsumerMessage)
+		Stop()
+	}
 
-	empty struct{}
-
-	Consumer struct {
+	consumer struct {
 		consumerGroup string
 		zookeeper     string
 		topics        string
 		clientID      string
-		cb            MessageCallback
+		cb            ConsumerMessageCallback
 
 		cg   *consumergroup.ConsumerGroup
 		done chan empty
@@ -44,11 +46,17 @@ type (
 	}
 )
 
-// NewConsumer constructs a Consumer.
+// NewConsumer constructs a consumer.
 // @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
 // NewConsumer 之所以不能直接以brokers当做参数，是因为用到了consumer group，各个消费者的信息要存到zk中
-func NewConsumer(clientID string, zookeeper string, topicList string, consumerGroup string, cb MessageCallback) (*Consumer, error) {
-	c := &Consumer{
+func NewConsumer(
+	clientID string,
+	zookeeper string,
+	topicList string,
+	consumerGroup string,
+	cb ConsumerMessageCallback) (Consumer, error) {
+
+	c := &consumer{
 		consumerGroup: clientID,
 		zookeeper:     zookeeper,
 		topics:        topicList,
@@ -66,7 +74,7 @@ func NewConsumer(clientID string, zookeeper string, topicList string, consumerGr
 }
 
 // Start runs the process of consuming. It is blocking.
-func (c *Consumer) Start() error {
+func (c *consumer) Start() error {
 	var (
 		err         error
 		kafkatopics []string
@@ -98,7 +106,7 @@ func (c *Consumer) Start() error {
 	return nil
 }
 
-func (c *Consumer) run() {
+func (c *consumer) run() {
 	var (
 		err        error
 		eventCount int32
@@ -133,7 +141,7 @@ func (c *Consumer) run() {
 
 			// message -> PushNotification
 			if err = c.cb(message); err != nil {
-				Log.Warn("Consumer.callback(kafka message{topic:%s, key:%s, value:%s}) = error(%s)",
+				Log.Warn("consumer.callback(kafka message{topic:%s, key:%s, value:%s}) = error(%s)",
 					message.Topic, gxstrings.String(message.Key), gxstrings.String(message.Value), err)
 
 				// 出错则直接提交offset，记录下log
@@ -157,7 +165,7 @@ func (c *Consumer) run() {
 	}
 }
 
-func (c *Consumer) Commit(message *sarama.ConsumerMessage) {
+func (c *consumer) Commit(message *sarama.ConsumerMessage) {
 	if err := c.cg.CommitUpto(message); err != nil {
 		Log.Error("Consuming message {%v-%v-%v}, commit error:%v",
 			message.Topic, gxstrings.String(message.Key), gxstrings.String(message.Value), err)
@@ -167,7 +175,7 @@ func (c *Consumer) Commit(message *sarama.ConsumerMessage) {
 	}
 }
 
-func (c *Consumer) Stop() {
+func (c *consumer) Stop() {
 	close(c.done)
 	c.wg.Wait()
 }

@@ -13,7 +13,23 @@ import (
 
 import (
 	// "github.com/Shopify/sarama"
+	"github.com/Shopify/sarama"
 	"github.com/wvanbergen/kazoo-go"
+)
+
+// type ProducerError struct {
+// 	Msg *ProducerMessage
+// 	Err error
+// }
+type (
+	// Consumer will invoke @ProduceMessageCallback when got message
+	ConsumerMessageCallback func(*sarama.ConsumerMessage) error
+	// AsyncProducer will invoke @ProduceMessageCallback when got sucess message response
+	ProducerMessageCallback func(*sarama.ProducerMessage)
+	// AsyncProducer will invoke @ProduceErrorCallback when got error message response
+	ProducerErrorCallback func(*sarama.ProducerError)
+
+	empty struct{}
 )
 
 func GetBrokerList(zkHosts string) ([]string, error) {
