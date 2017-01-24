@@ -72,6 +72,10 @@ func TestKafkaProducer(t *testing.T) {
 
 // go test -bench=. -run=BenchmarkProducer_SendMessage
 // 2000000000	         0.11 ns/op
+
+// go test -v -bench BenchmarkProducer_SendMessage -run=^a
+// 1000000000	         0.66 ns/op
+// github.com/AlexStocks/goext/log/kafka	12.042s
 func BenchmarkProducer_SendMessage(b *testing.B) {
 	var (
 		id    = "producer-client-id"
@@ -196,7 +200,9 @@ func TestAsyncKafkaProducer(t *testing.T) {
 		enqueued, successes, failures, float64(messageNum)/(float64(messageDuration)/float64(time.Second)))
 }
 
-// 2000000000	         0.01 ns/op
+// go test -v -bench BenchmarkAsyncProducer_SendMessage -run=^a
+// 2000000000	         0.05 ns/op
+// ok  	github.com/AlexStocks/goext/log/kafka	1.071s
 func BenchmarkAsyncProducer_SendMessage(b *testing.B) {
 	var (
 		id           = "producer-client-id"

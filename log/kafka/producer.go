@@ -12,6 +12,7 @@ import (
 
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -151,10 +152,6 @@ func (p *producer) Stop() {
 // Async Producer
 //////////////////////////////////////////////////////////
 
-const (
-	waitTime = 2e9
-)
-
 // Producer is interface for sending messages to Kafka.
 type AsyncProducer interface {
 	SendMessage(topic string, key interface{}, message interface{}, metadata interface{}) error
@@ -168,6 +165,10 @@ type asyncProducer struct {
 	producer sarama.AsyncProducer
 	sucMsgCb ProducerMessageCallback
 	errMsgCb ProducerErrorCallback
+
+	msgNum  int64
+	sucNum  int64
+	failNum int64
 
 	done chan empty
 	wg   sync.WaitGroup
@@ -279,6 +280,7 @@ func (p *asyncProducer) SendMessage(
 	}
 
 	p.producer.Input() <- producerMessage
+	atomic.AddInt64(&(p.msgNum), 1)
 
 	return nil
 }
@@ -295,6 +297,7 @@ func (p *asyncProducer) SendBytes(
 		Value:    sarama.ByteEncoder(message),
 		Metadata: metadata,
 	}
+	atomic.AddInt64(&(p.msgNum), 1)
 }
 
 func (p *asyncProducer) Start() {
@@ -312,8 +315,10 @@ func (p *asyncProducer) Start() {
 			select {
 			case errMsg = <-p.producer.Errors():
 				p.errMsgCb(errMsg)
+				atomic.AddInt64(&(p.failNum), 1)
 			case msg = <-p.producer.Successes():
 				p.sucMsgCb(msg)
+				atomic.AddInt64(&(p.sucNum), 1)
 			case <-p.done:
 				break LOOP
 			}
@@ -322,13 +327,29 @@ func (p *asyncProducer) Start() {
 }
 
 func (p *asyncProducer) Stop() {
+	var (
+		all, suc, fail int64
+		waitTime       time.Duration
+	)
+
+	waitTime = time.Duration(1e8)
 LOOP:
 	for {
-		if len(p.producer.Errors()) == 0 && len(p.producer.Successes()) == 0 {
+		all = atomic.LoadInt64(&(p.msgNum))
+		suc = atomic.LoadInt64(&(p.sucNum))
+		fail = atomic.LoadInt64(&(p.failNum))
+		// fmt.Printf("all:%d, suc:%d, fail:%d\n", all, suc, fail)
+		// if len(p.producer.Errors()) == 0 && len(p.producer.Successes()) == 0 {
+		if all == (suc + fail) {
+			Log.Info("all:%d, suc:%d, fail:%d\n", all, suc, fail)
 			close(p.done)
 			break LOOP
 		}
 		time.Sleep(waitTime)
+		waitTime += time.Duration(1e8)
+		if time.Duration(2e9) < waitTime {
+			waitTime = time.Duration(2e9)
+		}
 	}
 
 	p.wg.Wait()
