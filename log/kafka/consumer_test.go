@@ -27,8 +27,8 @@ func TestKafkaConsumer(t *testing.T) {
 		topic    = "test1"
 		group    = "test"
 		err      error
-		consumer *Consumer
-		cb       MessageCallback
+		consumer Consumer
+		cb       ConsumerMessageCallback
 	)
 
 	cb = func(message *sarama.ConsumerMessage) error {

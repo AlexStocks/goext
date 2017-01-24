@@ -9,6 +9,7 @@ import (
 )
 
 import (
+	"github.com/AlexStocks/goext/log"
 	"github.com/Shopify/sarama"
 )
 
@@ -33,6 +34,7 @@ func TestKafkaProducer(t *testing.T) {
 		id        = "producer-client-id"
 		zk        = "127.0.0.1:2181/kafka"
 		topic     = "test1"
+		num       int
 		err       error
 		partition int32
 		offset    int64
@@ -55,7 +57,8 @@ func TestKafkaProducer(t *testing.T) {
 	message.Token = "1234"
 	message.Status = "good"
 
-	for i := 0; i < 10; i++ {
+	num = 10
+	for i := 0; i < num; i++ {
 		message.UUID = "hello:" + strconv.Itoa(i)
 		partition, offset, err = producer.SendMessage(topic, message.UUID, message)
 		if err != nil {
@@ -65,4 +68,190 @@ func TestKafkaProducer(t *testing.T) {
 			message, partition, offset)
 		time.Sleep(1e9)
 	}
+}
+
+// go test -bench=. -run=BenchmarkProducer_SendMessage
+// 2000000000	         0.11 ns/op
+func BenchmarkProducer_SendMessage(b *testing.B) {
+	var (
+		id    = "producer-client-id"
+		zk    = "127.0.0.1:2181/kafka"
+		topic = "test1"
+		num   int
+		err   error
+		// partition int32
+		// offset    int64
+		producer Producer
+		message  Message
+	)
+
+	b.StopTimer()
+	if producer, err = NewProducerWithZk(id, zk, HASH, true); err != nil {
+		b.Errorf("NewProducerWithZk(id:%s, zk:%s) = err{%v}", id, zk, err)
+	}
+	defer producer.Stop()
+
+	message.EventName = "event"
+	message.Timestamp = time.Now().Unix()
+	message.IP = "127.0.0.1"
+	message.PlanID = 123
+	message.UUID = "a-b-c-d-e"
+	message.OS = 2
+	message.AppID = 1
+	message.Token = "1234"
+	message.Status = "good"
+
+	b.StartTimer()
+	num = 1000
+	for i := 0; i < num; i++ {
+		message.UUID = "hello:" + strconv.Itoa(i)
+		// partition, offset, err = producer.SendMessage(topic, message.UUID, message)
+		_, _, err = producer.SendMessage(topic, message.UUID, message)
+		if err != nil {
+			b.Fatalf("FAILED to produce message:%v, err:%v", message, err)
+		}
+		// b.Logf("send telemetry message:%#v, kafka partition:%d, kafka offset:%d",
+		// 	message, partition, offset)
+		// time.Sleep(1e9)
+	}
+	b.StopTimer()
+	gxlog.CDebug("finished!!!!!!!!!!!!!!!!!!!")
+}
+
+type MessageMetadata struct {
+	EnqueuedAt time.Time
+}
+
+func (mm *MessageMetadata) Latency() time.Duration {
+	return time.Since(mm.EnqueuedAt)
+}
+
+func TestAsyncKafkaProducer(t *testing.T) {
+	var (
+		id              = "producer-client-id"
+		zk              = "127.0.0.1:2181/kafka"
+		topic           = "test1"
+		err             error
+		latency         time.Duration
+		totalLatency    time.Duration
+		messageNum      int
+		enqueued        int
+		successes       int
+		failures        int
+		rate            float64
+		messageStart    time.Time
+		messageDuration time.Duration
+		msgCallback     ProducerMessageCallback
+		errCallback     ProducerErrorCallback
+		producer        AsyncProducer
+		message         Message
+	)
+
+	msgCallback = func(message *sarama.ProducerMessage) {
+		log.Printf("send msg{%v, %v} response{topic:%s, partition:%d, offset:%d}\n",
+			message.Key, message.Value, message.Topic, message.Partition, message.Offset)
+		totalLatency += message.Metadata.(*MessageMetadata).Latency()
+		successes++
+	}
+
+	errCallback = func(err *sarama.ProducerError) {
+		log.Printf("send msg:%v failed. error:%v\n", err.Msg, err.Error())
+		failures++
+	}
+
+	if producer, err = NewAsyncProducerWithZk(id, zk, HASH, true, msgCallback, errCallback); err != nil {
+		t.Errorf("NewAsyncProducerWithZk(zk:%s) = err{%v}", zk, err)
+	}
+	producer.Start()
+
+	message.EventName = "event"
+	message.Timestamp = time.Now().Unix()
+	message.IP = "127.0.0.1"
+	message.PlanID = 123
+	message.UUID = "a-b-c-d-e"
+	message.OS = 2
+	message.AppID = 1
+	message.Token = "1234"
+	message.Status = "good"
+
+	messageNum = 10
+	messageStart = time.Now()
+	for i := 0; i < messageNum; i++ {
+		message.UUID = "hello:" + strconv.Itoa(i)
+		if err = producer.SendMessage(topic, message.UUID, message, &MessageMetadata{EnqueuedAt: time.Now()}); err != nil {
+			t.Fatalf("FAILED to produce message:%v, err:%v", message, err)
+		}
+		enqueued++
+		time.Sleep(1e9)
+	}
+
+	producer.Stop()
+	// 发送消息的速率
+	messageDuration = time.Since(messageStart)
+	rate = float64(successes) / (float64(messageDuration) / float64(time.Second))
+	latency = totalLatency / time.Duration(successes)
+	log.Printf("Success{Rate: %0.2f/s; latency: %0.2fms}\n",
+		rate, float64(latency)/float64(time.Millisecond))
+	log.Printf("Enqueued: %d; Produced: %d; Failed: %d; Send rate %0.2fm/s.\n",
+		enqueued, successes, failures, float64(messageNum)/(float64(messageDuration)/float64(time.Second)))
+}
+
+// 2000000000	         0.01 ns/op
+func BenchmarkAsyncProducer_SendMessage(b *testing.B) {
+	var (
+		id           = "producer-client-id"
+		zk           = "127.0.0.1:2181/kafka"
+		topic        = "test1"
+		err          error
+		totalLatency time.Duration
+		messageNum   int
+		enqueued     int
+		successes    int
+		failures     int
+		msgCallback  ProducerMessageCallback
+		errCallback  ProducerErrorCallback
+		producer     AsyncProducer
+		message      Message
+	)
+
+	b.StopTimer()
+	msgCallback = func(message *sarama.ProducerMessage) {
+		// log.Printf("send msg{%v, %v} response{topic:%s, partition:%d, offset:%d}\n",
+		//	message.Key, message.Value, message.Topic, message.Partition, message.Offset)
+		totalLatency += message.Metadata.(*MessageMetadata).Latency()
+		successes++
+	}
+
+	errCallback = func(err *sarama.ProducerError) {
+		log.Printf("send msg:%v failed. error:%v\n", err.Msg, err.Error())
+		failures++
+	}
+
+	if producer, err = NewAsyncProducerWithZk(id, zk, HASH, true, msgCallback, errCallback); err != nil {
+		b.Errorf("NewAsyncProducerWithZk(zk:%s) = err{%v}", zk, err)
+	}
+	producer.Start()
+
+	message.EventName = "event"
+	message.Timestamp = time.Now().Unix()
+	message.IP = "127.0.0.1"
+	message.PlanID = 123
+	message.UUID = "a-b-c-d-e"
+	message.OS = 2
+	message.AppID = 1
+	message.Token = "1234"
+	message.Status = "good"
+
+	b.StartTimer()
+	messageNum = 1000
+	for i := 0; i < messageNum; i++ {
+		message.UUID = "hello:" + strconv.Itoa(i)
+		if err = producer.SendMessage(topic, message.UUID, message, &MessageMetadata{EnqueuedAt: time.Now()}); err != nil {
+			b.Fatalf("FAILED to produce message:%v, err:%v", message, err)
+		}
+		enqueued++
+	}
+
+	producer.Stop()
+	b.StopTimer()
 }

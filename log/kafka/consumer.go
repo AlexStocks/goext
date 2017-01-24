@@ -111,7 +111,7 @@ func (c *consumer) run() {
 		err        error
 		eventCount int32
 		offsets    map[string]map[int32]int64
-		messageKey string
+		// messageKey string
 	)
 
 	offsets = make(map[string]map[int32]int64)
@@ -130,14 +130,14 @@ func (c *consumer) run() {
 			}
 
 			// Simulate processing time
-			messageKey = string(message.Key)
-			if len(messageKey) != 0 && messageKey != "\"\"" {
-				Log.Info("idx:%d, messge{key:%v, topic:%v, partition:%v, offset:%v, value:%v}\n",
-					eventCount, messageKey, message.Topic, message.Partition, message.Offset, gxstrings.String(message.Value))
-			} else {
-				Log.Info("idx:%d, messge{topic:%v, partition:%v, offset:%v, value:%v}\n",
-					eventCount, message.Topic, message.Partition, message.Offset, gxstrings.String(message.Value))
-			}
+			// messageKey = string(message.Key)
+			// if len(messageKey) != 0 && messageKey != "\"\"" {
+			// 	Log.Debug("idx:%d, messge{key:%v, topic:%v, partition:%v, offset:%v, value:%v}\n",
+			// 		eventCount, messageKey, message.Topic, message.Partition, message.Offset, gxstrings.String(message.Value))
+			// } else {
+			// 	Log.Debug("idx:%d, messge{topic:%v, partition:%v, offset:%v, value:%v}\n",
+			// 		eventCount, message.Topic, message.Partition, message.Offset, gxstrings.String(message.Value))
+			// }
 
 			// message -> PushNotification
 			if err = c.cb(message); err != nil {
@@ -169,10 +169,11 @@ func (c *consumer) Commit(message *sarama.ConsumerMessage) {
 	if err := c.cg.CommitUpto(message); err != nil {
 		Log.Error("Consuming message {%v-%v-%v}, commit error:%v",
 			message.Topic, gxstrings.String(message.Key), gxstrings.String(message.Value), err)
-	} else {
-		Log.Info("Consuming message {%v-%v-%v}, commit over!",
-			message.Topic, gxstrings.String(message.Key), gxstrings.String(message.Value))
 	}
+	// else {
+	// 	Log.Debug("Consuming message {%v-%v-%v}, commit over!",
+	// 		message.Topic, gxstrings.String(message.Key), gxstrings.String(message.Value))
+	// }
 }
 
 func (c *consumer) Stop() {
