@@ -7,14 +7,14 @@ import (
 	"time"
 )
 
-type empty struct{}
+type Empty struct{}
 
 type Semaphore struct {
-	lock chan empty
+	lock chan Empty
 }
 
 func NewSemaphore(parallelNum int) *Semaphore {
-	return &Semaphore{lock: make(chan empty, parallelNum)}
+	return &Semaphore{lock: make(chan Empty, parallelNum)}
 }
 
 func (this *Semaphore) Post() {
@@ -29,12 +29,12 @@ func (this *Semaphore) Post() {
 // }
 
 func (this *Semaphore) Wait() {
-	this.lock <- empty{}
+	this.lock <- Empty{}
 }
 
 func (this *Semaphore) TryWait() bool {
 	select {
-	case this.lock <- empty{}:
+	case this.lock <- Empty{}:
 		return true
 	default:
 		return false
@@ -44,9 +44,9 @@ func (this *Semaphore) TryWait() bool {
 // @timeout is in nanoseconds
 func (this *Semaphore) TimeWait(timeout int) bool {
 	select {
-	case this.lock <- empty{}:
+	case this.lock <- Empty{}:
 		return true
-	case time.After(time.Duration(timeout * time.Nanosecond)):
+	case time.After(time.Duration(timeout * int(time.Nanosecond))):
 		return false
 	}
 }

@@ -12,7 +12,9 @@ import (
 	"time"
 )
 
-type empty struct{}
+import (
+	"github.com/AlexStocks/goext/sync"
+)
 
 type Wheel struct {
 	sync.Mutex
@@ -20,7 +22,7 @@ type Wheel struct {
 	period time.Duration
 	ticker *time.Ticker
 	index  int
-	ring   []chan empty
+	ring   []chan gxsync.Empty
 	once   sync.Once
 }
 
@@ -41,11 +43,11 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 		period: span * (time.Duration(buckets)),
 		ticker: time.NewTicker(span),
 		index:  0,
-		ring:   make([](chan empty), buckets),
+		ring:   make([](chan gxsync.Empty), buckets),
 	}
 
 	go func() {
-		var notify chan empty
+		var notify chan gxsync.Empty
 		// var cw CountWatch
 		// cw.Start()
 		for range this.ticker.C {
@@ -72,7 +74,7 @@ func (this *Wheel) Stop() {
 	this.once.Do(func() { this.ticker.Stop() })
 }
 
-func (this *Wheel) After(timeout time.Duration) <-chan empty {
+func (this *Wheel) After(timeout time.Duration) <-chan gxsync.Empty {
 	if timeout >= this.period {
 		panic("@timeout over ring's life period")
 	}
@@ -85,7 +87,7 @@ func (this *Wheel) After(timeout time.Duration) <-chan empty {
 	this.Lock()
 	pos = (this.index + pos) % len(this.ring)
 	if this.ring[pos] == nil {
-		this.ring[pos] = make(chan empty)
+		this.ring[pos] = make(chan gxsync.Empty)
 	}
 	// fmt.Println("pos:", pos)
 	c := this.ring[pos]

@@ -8,9 +8,9 @@
 package gxstrings
 
 import (
-	"unicode/utf8"
 	"math/rand"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -23,6 +23,7 @@ const (
 var (
 	src = rand.NewSource(time.Now().UnixNano())
 )
+
 // get utf8 character numbers
 func StringLength(s string) int {
 	return utf8.RuneCountInString(s)
@@ -34,7 +35,7 @@ func Contains(s []string, e string) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -53,7 +54,7 @@ func ArrayRemoveAt(a interface{}, i int) {
 	if i < 0 {
 		return
 	}
-	
+
 	if array, ok := a.(*[]int); ok {
 		if len(*array) <= i {
 			return
@@ -87,8 +88,6 @@ func RandStringBytesMaskImprSrc(n int) string {
 		cache >>= letterIdxBits
 		remain--
 	}
-	
+
 	return string(b)
 }
-
-

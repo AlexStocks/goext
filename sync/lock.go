@@ -20,20 +20,20 @@ package gxsync
 // }
 
 type TryLock struct {
-	lock chan empty
+	lock chan Empty
 }
 
 func NewTryLock() *TryLock {
-	return &TryLock{lock: make(chan empty, 1)}
+	return &TryLock{lock: make(chan Empty, 1)}
 }
 
 func (this *TryLock) Lock() {
-	this.lock <- empty{}
+	this.lock <- Empty{}
 }
 
 func (this *TryLock) Trylock() bool {
 	select {
-	case this.lock <- empty{}:
+	case this.lock <- Empty{}:
 		return true
 	default:
 		return false

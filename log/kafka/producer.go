@@ -17,6 +17,7 @@ import (
 )
 
 import (
+	"github.com/AlexStocks/goext/sync"
 	"github.com/Shopify/sarama"
 	Log "github.com/alecthomas/log4go"
 )
@@ -170,7 +171,7 @@ type asyncProducer struct {
 	sucNum  int64
 	failNum int64
 
-	done chan empty
+	done chan gxsync.Empty
 	wg   sync.WaitGroup
 }
 
@@ -220,7 +221,7 @@ func NewAsyncProducer(
 		producer: kafkaProducer,
 		sucMsgCb: successfulMessageCallback,
 		errMsgCb: errorCallback,
-		done:     make(chan empty),
+		done:     make(chan gxsync.Empty),
 	}, nil
 }
 

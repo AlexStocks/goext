@@ -28,8 +28,6 @@ type (
 	ProducerMessageCallback func(*sarama.ProducerMessage)
 	// AsyncProducer will invoke @ProduceErrorCallback when got error message response
 	ProducerErrorCallback func(*sarama.ProducerError)
-
-	empty struct{}
 )
 
 func GetBrokerList(zkHosts string) ([]string, error) {

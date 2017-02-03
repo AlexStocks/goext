@@ -14,6 +14,7 @@ import (
 
 import (
 	"github.com/AlexStocks/goext/strings"
+	"github.com/AlexStocks/goext/sync"
 	"github.com/Shopify/sarama"
 	Log "github.com/alecthomas/log4go"
 	"github.com/wvanbergen/kafka/consumergroup"
@@ -41,7 +42,7 @@ type (
 		cb            ConsumerMessageCallback
 
 		cg   *consumergroup.ConsumerGroup
-		done chan empty
+		done chan gxsync.Empty
 		wg   sync.WaitGroup
 	}
 )
@@ -62,7 +63,7 @@ func NewConsumer(
 		topics:        topicList,
 		clientID:      clientID,
 		cb:            cb,
-		done:          make(chan empty),
+		done:          make(chan gxsync.Empty),
 	}
 
 	if consumerGroup == "" || topicList == "" || zookeeper == "" || cb == nil {
