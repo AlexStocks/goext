@@ -5,6 +5,11 @@
 ## dev list ##
 ---
 
+- 2017/02/07
+    > add broadcaster sync/broadcast.go
+	>
+	> do not use this again and modify all
+
 - 2017/01/22
     > add asynchronous kafka producer in log/kafka/producer.go
 

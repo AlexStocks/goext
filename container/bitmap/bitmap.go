@@ -1,5 +1,5 @@
 // Copyright 2016 AlexStocks(https://github.com/AlexStocks).
-// All rights reserved.  Use of this source code is
+// All rights reserved.  Use of b source code is
 // governed by a BSD-style license.
 
 // 2016/10/01
@@ -26,30 +26,30 @@ func NewBitmap(size int) Bitmap {
 	return Bitmap{data: make([]byte, s), size: s << 3}
 }
 
-func (this *Bitmap) Set(pos int) error {
-	if pos > this.size || pos < 0 {
-		return fmt.Errorf("@pos{%d}, this.size{%d}", pos, this.size)
+func (b *Bitmap) Set(pos int) error {
+	if pos > b.size || pos < 0 {
+		return fmt.Errorf("@pos{%d}, b.size{%d}", pos, b.size)
 	}
 
-	this.data[pos>>3] |= 0x01 << (uint(pos) & 0x07)
+	b.data[pos>>3] |= 0x01 << (uint(pos) & 0x07)
 
 	return nil
 }
 
-func (this *Bitmap) Clear(pos int) error {
-	if pos > this.size || pos < 0 {
-		return fmt.Errorf("@pos{%d}, this.size{%d}", pos, this.size)
+func (b *Bitmap) Clear(pos int) error {
+	if pos > b.size || pos < 0 {
+		return fmt.Errorf("@pos{%d}, b.size{%d}", pos, b.size)
 	}
 
-	this.data[pos>>3] &^= 0x01 << (uint(pos) & 0x07)
+	b.data[pos>>3] &^= 0x01 << (uint(pos) & 0x07)
 
 	return nil
 }
 
-func (this *Bitmap) Get(pos int) int {
-	if pos > this.size || pos < 0 {
+func (b *Bitmap) Get(pos int) int {
+	if pos > b.size || pos < 0 {
 		return 0
 	}
 
-	return int((this.data[pos>>3] >> (uint(pos) & 0x07)) & 0x01)
+	return int((b.data[pos>>3] >> (uint(pos) & 0x07)) & 0x01)
 }

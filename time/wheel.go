@@ -1,5 +1,5 @@
 // Copyright 2016 AlexStocks(https://github.com/AlexStocks).
-// All rights reserved.  Use of this source code is
+// All rights reserved.  Use of w source code is
 // governed by a BSD-style license.
 
 // Package gxtime encapsulates some golang.time functions
@@ -28,7 +28,7 @@ type Wheel struct {
 
 func NewWheel(span time.Duration, buckets int) *Wheel {
 	var (
-		this *Wheel
+		w *Wheel
 	)
 
 	if span == 0 {
@@ -38,7 +38,7 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 		panic("@bucket == 0")
 	}
 
-	this = &Wheel{
+	w = &Wheel{
 		span:   span,
 		period: span * (time.Duration(buckets)),
 		ticker: time.NewTicker(span),
@@ -50,15 +50,15 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 		var notify chan gxsync.Empty
 		// var cw CountWatch
 		// cw.Start()
-		for range this.ticker.C {
-			this.Lock()
+		for range w.ticker.C {
+			w.Lock()
 
-			// fmt.Println("index:", this.index, ", value:", this.bitmap.Get(this.index))
-			notify = this.ring[this.index]
-			this.ring[this.index] = nil
-			this.index = (this.index + 1) % len(this.ring)
+			// fmt.Println("index:", w.index, ", value:", w.bitmap.Get(w.index))
+			notify = w.ring[w.index]
+			w.ring[w.index] = nil
+			w.index = (w.index + 1) % len(w.ring)
 
-			this.Unlock()
+			w.Unlock()
 
 			if notify != nil {
 				close(notify)
@@ -67,31 +67,31 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 		// fmt.Println("timer costs:", cw.Count()/1e9, "s")
 	}()
 
-	return this
+	return w
 }
 
-func (this *Wheel) Stop() {
-	this.once.Do(func() { this.ticker.Stop() })
+func (w *Wheel) Stop() {
+	w.once.Do(func() { w.ticker.Stop() })
 }
 
-func (this *Wheel) After(timeout time.Duration) <-chan gxsync.Empty {
-	if timeout >= this.period {
+func (w *Wheel) After(timeout time.Duration) <-chan gxsync.Empty {
+	if timeout >= w.period {
 		panic("@timeout over ring's life period")
 	}
 
-	var pos = int(timeout / this.span)
+	var pos = int(timeout / w.span)
 	if 0 < pos {
 		pos--
 	}
 
-	this.Lock()
-	pos = (this.index + pos) % len(this.ring)
-	if this.ring[pos] == nil {
-		this.ring[pos] = make(chan gxsync.Empty)
+	w.Lock()
+	pos = (w.index + pos) % len(w.ring)
+	if w.ring[pos] == nil {
+		w.ring[pos] = make(chan gxsync.Empty)
 	}
 	// fmt.Println("pos:", pos)
-	c := this.ring[pos]
-	this.Unlock()
+	c := w.ring[pos]
+	w.Unlock()
 
 	return c
 }
