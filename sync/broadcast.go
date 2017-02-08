@@ -12,70 +12,81 @@ var (
 	ErrBroadcastClosed = fmt.Errorf("broadcast closed!")
 )
 
-type broadcast struct {
-	c chan broadcast // 指向下一个broadcast node
-	v interface{}
+type node struct {
+	next  chan node
+	value interface{}
 }
 
 type Broadcaster struct {
-	// private fields:
-	Listenc chan chan (chan broadcast)
-	Sendc   chan<- interface{}
+	registry chan chan (chan node)
+	data     chan<- interface{}
 }
 
 type Receiver struct {
-	// private fields:
-	C chan broadcast
+	R chan node
 }
 
 // create a new broadcaster object.
 func NewBroadcaster() Broadcaster {
-	listenc := make(chan (chan (chan broadcast)))
-	sendc := make(chan interface{})
+	registry := make(chan (chan (chan node)))
+	data := make(chan interface{})
 	go func() {
-		currc := make(chan broadcast, 1)
+		var (
+			value    interface{}
+			cursor   chan node
+			tmp_node chan node
+			reader   chan chan node
+		)
+		cursor = make(chan node, 1)
+		// gxlog.CError("first cursor:%#value\n", cursor)
 		for {
 			select {
-			case v := <-sendc:
-				if v == nil {
-					currc <- broadcast{}
+			case value = <-data:
+				if value == nil {
+					cursor <- node{}
+					// gxlog.CError("last cursor:%#value\n", cursor)
 					return
 				}
-				c := make(chan broadcast, 1)
-				b := broadcast{c: c, v: v}
-				currc <- b
-				currc = c
-			case r := <-listenc:
-				r <- currc
+				tmp_node = make(chan node, 1)
+				// b := node{next: node, value: value}
+				// gxlog.CError("value:%#value, b:%#value, node:%#value, cursor:%#value\n", value, b, node, cursor)
+				// cursor <- b
+				cursor <- node{next: tmp_node, value: value}
+				cursor = tmp_node
+				// gxlog.CError("cursor:%#value\n", cursor)
+			case reader = <-registry:
+				reader <- cursor
+				// gxlog.CError("new reader:%#value", reader)
 			}
 		}
 	}()
 	return Broadcaster{
-		Listenc: listenc,
-		Sendc:   sendc,
+		registry: registry,
+		data:     data,
 	}
 }
 
-// start listening to the broadcasts.
+// start listening to the nodes.
 func (b Broadcaster) Listen() Receiver {
-	c := make(chan chan broadcast, 0)
-	b.Listenc <- c
-	return Receiver{<-c}
+	r := make(chan chan node, 0)
+	// gxlog.CError("new reader channel:%#value", node)
+	b.registry <- r
+	return Receiver{<-r}
 }
 
-// broadcast a value to all listeners.
-func (b Broadcaster) Write(v interface{}) (rerr error) {
+// node a value to all listeners.
+func (b Broadcaster) Write(value interface{}) (rerr error) {
 	defer func() {
 		if e := recover(); e != nil {
-			rerr = fmt.Errorf("panic error:%v", e)
+			rerr = fmt.Errorf("panic error:%value", e)
 		}
 	}()
 
-	if v == nil {
-		close(b.Sendc) // close之后，<- sendc返回(nil, false)
+	if value == nil {
+		close(b.data)
 		return
 	}
-	b.Sendc <- v
+	b.data <- value
 
 	return
 }
@@ -85,14 +96,16 @@ func (b Broadcaster) Close() { b.Write(nil) }
 // read a value that has been broadcast,
 // waiting until one is available if necessary.
 func (r *Receiver) Read() (interface{}, error) {
-	b := <-r.C
-	v := b.v
-	r.C <- b
-	r.C = b.c // 指向链表的下一个节点
+	b := <-r.R
+	value := b.value
+	r.R <- b
+	// gxlog.CDebug("b:%#value, r:%#value", b, r)
+	r.R = b.next
+	// gxlog.CDebug("new r:%#value", r)
 
-	if v == nil {
+	if value == nil {
 		return nil, ErrBroadcastClosed
 	}
 
-	return v, nil
+	return value, nil
 }

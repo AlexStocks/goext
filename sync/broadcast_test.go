@@ -7,9 +7,11 @@ import (
 // go test -v -run TestBroadcast
 func TestBroadcast(t *testing.T) {
 	b := NewBroadcaster()
+	// gxlog.CError("nodeer:%#value", b)
 
 	// case 1 : one reader
 	r := b.Listen()
+	// gxlog.CError("listen reader:%#value\n", r)
 
 	b.Write("hello")
 
@@ -19,6 +21,7 @@ func TestBroadcast(t *testing.T) {
 
 	// case 2: two readers
 	r1 := b.Listen()
+	// gxlog.CError("listen reader:%#value\n", r1)
 
 	b.Write(123)
 
