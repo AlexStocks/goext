@@ -2,6 +2,7 @@
 // All rights reserved.  Use of this source code is
 // governed by a BSD-style license.
 
+// ref: https://rogpeppe.wordpress.com/2009/12/01/concurrent-idioms-1-broadcasting-values-in-go-with-linked-channels/
 package gxsync
 
 import (
