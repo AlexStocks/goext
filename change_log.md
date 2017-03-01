@@ -5,6 +5,11 @@
 ## dev list ##
 ---
 
+- 2017/03/01
+    > bug fix: use github.com/bsm/sarama-cluster to construct consumer group on kafka v0.10 instead of github.com/wvanbergen/kafka
+	>
+	> bug fix: use right license file
+
 - 2017/02/07
     > add broadcaster sync/broadcast.go
 	>

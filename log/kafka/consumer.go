@@ -8,7 +8,6 @@ package gxkafka
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 )
 
@@ -17,7 +16,7 @@ import (
 	"github.com/AlexStocks/goext/sync"
 	"github.com/Shopify/sarama"
 	Log "github.com/alecthomas/log4go"
-	"github.com/wvanbergen/kafka/consumergroup"
+	cluster "github.com/bsm/sarama-cluster"
 	"github.com/wvanbergen/kazoo-go"
 )
 
@@ -36,12 +35,13 @@ type (
 
 	consumer struct {
 		consumerGroup string
-		zookeeper     string
-		topics        string
+		brokers       []string
+		topics        []string
 		clientID      string
 		cb            ConsumerMessageCallback
 
-		cg   *consumergroup.ConsumerGroup
+		// cg   *consumergroup.ConsumerGroup
+		cg   *cluster.Consumer
 		done chan gxsync.Empty
 		wg   sync.WaitGroup
 	}
@@ -49,52 +49,95 @@ type (
 
 // NewConsumer constructs a consumer.
 // @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
-// NewConsumer 之所以不能直接以brokers当做参数，是因为用到了consumer group，各个消费者的信息要存到zk中
+// NewConsumer 之所以不能直接以brokers当做参数，是因为/wvanderbergen/kafka/consumer用到了consumer group，
+// 各个消费者的信息要存到zk中
 func NewConsumer(
 	clientID string,
-	zookeeper string,
-	topicList string,
+	brokers []string,
+	topicList []string,
 	consumerGroup string,
-	cb ConsumerMessageCallback) (Consumer, error) {
+	cb ConsumerMessageCallback,
+) (Consumer, error) {
 
-	c := &consumer{
+	if consumerGroup == "" || len(brokers) == 0 || len(topicList) == 0 || cb == nil {
+		return nil, fmt.Errorf("@consumerGroup:%s, @brokers:%s, @topicList:%s, cb:%v",
+			consumerGroup, brokers, topicList, cb)
+	}
+
+	return &consumer{
 		consumerGroup: clientID,
-		zookeeper:     zookeeper,
+		brokers:       brokers,
 		topics:        topicList,
 		clientID:      clientID,
 		cb:            cb,
 		done:          make(chan gxsync.Empty),
-	}
+	}, nil
+}
 
-	if consumerGroup == "" || topicList == "" || zookeeper == "" || cb == nil {
-		return c, fmt.Errorf("@consumerGroup:%s, @topicList:%s, @zookeeper:%s, @cb:%v",
+func NewConsumerWithZk(
+	clientID string,
+	zookeeper string,
+	topicList []string,
+	consumerGroup string,
+	cb ConsumerMessageCallback,
+) (Consumer, error) {
+
+	if consumerGroup == "" || len(topicList) == 0 || zookeeper == "" || cb == nil {
+		return nil, fmt.Errorf("@consumerGroup:%s, @topicList:%s, @zookeeper:%s, @cb:%v",
 			consumerGroup, topicList, zookeeper, cb)
 	}
 
-	return c, nil
+	var (
+		err     error
+		kz      *kazoo.Kazoo
+		zkNodes []string
+		brokers []string
+		config  *kazoo.Config
+	)
+
+	config = kazoo.NewConfig()
+	zkNodes, config.Chroot = kazoo.ParseConnectionString(zookeeper)
+	if kz, err = kazoo.NewKazoo(zkNodes, config); err != nil {
+		return nil, err
+	}
+	if brokers, err = kz.BrokerList(); err != nil {
+		return nil, err
+	}
+	kz.Close()
+
+	return &consumer{
+		consumerGroup: consumerGroup,
+		brokers:       brokers,
+		topics:        topicList,
+		clientID:      clientID,
+		cb:            cb,
+		done:          make(chan gxsync.Empty),
+	}, nil
 }
 
 // Start runs the process of consuming. It is blocking.
 func (c *consumer) Start() error {
 	var (
-		err         error
-		kafkatopics []string
-		zkNodes     []string
-		config      *consumergroup.Config
+		err    error
+		config *cluster.Config
 	)
 
-	config = consumergroup.NewConfig()
-
-	// 这个属性仅仅影响第一次启动时候获取value的offset，
-	// 后面再次启动的时候如果其他conf不变则会根据上次commit的offset开始获取value
+	config = cluster.NewConfig()
 	config.ClientID = c.clientID
-	config.Offsets.Initial = sarama.OffsetNewest
-	config.Offsets.ProcessingTimeout = OFFSETS_PROCESSING_TIMEOUT_SECONDS
-	config.Offsets.CommitInterval = OFFSETS_COMMIT_INTERVAL
-	zkNodes, config.Zookeeper.Chroot = kazoo.ParseConnectionString(c.zookeeper)
-	kafkatopics = strings.Split(c.topics, ",")
-	c.cg, err = consumergroup.JoinConsumerGroup(c.consumerGroup, kafkatopics, zkNodes, config)
-	if err != nil {
+	config.Group.Return.Notifications = true
+	config.Consumer.Return.Errors = true
+	// 这个属性仅仅影响第一次启动时候获取value的offset，
+	// 后面再次启动的时候如果其他config不变则会根据上次commit的offset开始获取value
+	// config.Consumer.Offsets.Initial = sarama.OffsetOldest
+	config.Consumer.Offsets.Initial = sarama.OffsetNewest
+	config.Consumer.MaxProcessingTime = OFFSETS_PROCESSING_TIMEOUT_SECONDS
+	// config.Consumer.Offsets.CommitInterval = OFFSETS_COMMIT_INTERVAL
+	// The retention duration for committed offsets. If zero, disabled
+	// (in which case the `offsets.retention.minutes` option on the
+	// broker will be used).
+	config.Consumer.Offsets.Retention = 0
+	fmt.Printf("consumer group:%s\n", c.consumerGroup)
+	if c.cg, err = cluster.NewConsumer(c.brokers, c.consumerGroup, c.topics, config); err != nil {
 		return err
 	}
 
@@ -102,6 +145,7 @@ func (c *consumer) Start() error {
 	go func() {
 		defer c.wg.Done()
 		c.run()
+		Log.Info("consumer message processing goroutine done!")
 	}()
 
 	return nil
@@ -113,6 +157,7 @@ func (c *consumer) run() {
 		eventCount int32
 		offsets    map[string]map[int32]int64
 		// messageKey string
+		note *cluster.Notification
 	)
 
 	offsets = make(map[string]map[int32]int64)
@@ -153,8 +198,12 @@ func (c *consumer) run() {
 			}
 
 			offsets[message.Topic][message.Partition] = message.Offset
-		case errMsg := <-c.cg.Errors():
-			Log.Error("kafka consumer error:%s", errMsg)
+
+		case err = <-c.cg.Errors():
+			Log.Error("kafka consumer error:%+v", err)
+
+		case note = <-c.cg.Notifications():
+			Log.Info("kafka consumer Rebalanced: %+v", note)
 
 		case <-c.done:
 			if err := c.cg.Close(); err != nil {
@@ -167,14 +216,9 @@ func (c *consumer) run() {
 }
 
 func (c *consumer) Commit(message *sarama.ConsumerMessage) {
-	if err := c.cg.CommitUpto(message); err != nil {
-		Log.Error("Consuming message {%v-%v-%v}, commit error:%v",
-			message.Topic, gxstrings.String(message.Key), gxstrings.String(message.Value), err)
-	}
-	// else {
+	c.cg.MarkOffset(message, "")
 	// 	Log.Debug("Consuming message {%v-%v-%v}, commit over!",
 	// 		message.Topic, gxstrings.String(message.Key), gxstrings.String(message.Value))
-	// }
 }
 
 func (c *consumer) Stop() {
