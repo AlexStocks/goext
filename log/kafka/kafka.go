@@ -48,7 +48,7 @@ func GetBrokerList(zkHosts string) ([]string, error) {
 	brokerList, err := kz.BrokerList()
 	// fmt.Printf("broker list:%#v\n", brokerList)
 	if err != nil {
-		log.Fatal("[ERROR] Failed to retrieve Kafka broker list from zookeeper:", err)
+		log.Fatal("[ERROR] Failed to retrieve Kafka broker list from zookeeper{%s}, error{%s}", zkNodes, err)
 		return nil, err
 	}
 

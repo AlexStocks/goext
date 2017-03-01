@@ -136,7 +136,6 @@ func (c *consumer) Start() error {
 	// (in which case the `offsets.retention.minutes` option on the
 	// broker will be used).
 	config.Consumer.Offsets.Retention = 0
-	fmt.Printf("consumer group:%s\n", c.consumerGroup)
 	if c.cg, err = cluster.NewConsumer(c.brokers, c.consumerGroup, c.topics, config); err != nil {
 		return err
 	}

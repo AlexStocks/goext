@@ -21,7 +21,7 @@ func init() {
 // 默认情况下，Kafka根据传递消息的key来进行分区的分配，即hash(key) % numPartitions,默认情况下，
 // Kafka根据传递消息的key来进行分区的分配，即hash(key) % numPartitions,Kafka几乎就是随机找一个分区发送无key的消息，
 // 然后把这个分区号加入到缓存中以备后面直接使用
-func TestKafkaConsumerWith(t *testing.T) {
+func TestKafkaConsumer(t *testing.T) {
 	var (
 		id       = "consumer-client-id"
 		broker   = "127.0.0.1:9092"
