@@ -65,7 +65,7 @@ func NewConsumer(
 	}
 
 	return &consumer{
-		consumerGroup: clientID,
+		consumerGroup: consumerGroup,
 		brokers:       brokers,
 		topics:        topicList,
 		clientID:      clientID,
