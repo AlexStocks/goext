@@ -5,6 +5,9 @@
 ## dev list ##
 ---
 
+- 2017/03/06
+    > improvement: change Log repo to mysql log4go
+	
 - 2017/03/01
     > bug fix: use github.com/bsm/sarama-cluster to construct consumer group on kafka v0.10 instead of github.com/wvanbergen/kafka
 	>

@@ -14,8 +14,8 @@ import (
 import (
 	"github.com/AlexStocks/goext/strings"
 	"github.com/AlexStocks/goext/sync"
+	Log "github.com/AlexStocks/log4go"
 	"github.com/Shopify/sarama"
-	Log "github.com/alecthomas/log4go"
 	cluster "github.com/bsm/sarama-cluster"
 	"github.com/wvanbergen/kazoo-go"
 )

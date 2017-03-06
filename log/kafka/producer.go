@@ -18,8 +18,8 @@ import (
 
 import (
 	"github.com/AlexStocks/goext/sync"
+	Log "github.com/AlexStocks/log4go"
 	"github.com/Shopify/sarama"
-	Log "github.com/alecthomas/log4go"
 )
 
 const (
