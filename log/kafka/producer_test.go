@@ -32,8 +32,8 @@ type Message struct {
 func TestKafkaProducer(t *testing.T) {
 	var (
 		id        = "producer-client-id"
-		zk        = "127.0.0.1:2181/kafka"
 		topic     = "test1"
+		brokers   = []string{"127.0.0.1:9092"}
 		num       int
 		err       error
 		partition int32
@@ -42,8 +42,8 @@ func TestKafkaProducer(t *testing.T) {
 		message   Message
 	)
 
-	if producer, err = NewProducerWithZk(id, zk, HASH, true); err != nil {
-		t.Errorf("NewProducerWithZk(id:%s, zk:%s) = err{%v}", id, zk, err)
+	if producer, err = NewProducer(id, brokers, HASH, true); err != nil {
+		t.Errorf("NewProducerWithZk(id:%s, brokers:%s) = err{%v}", id, brokers, err)
 	}
 	defer producer.Stop()
 
@@ -78,11 +78,11 @@ func TestKafkaProducer(t *testing.T) {
 // github.com/AlexStocks/goext/log/kafka	12.042s
 func BenchmarkProducer_SendMessage(b *testing.B) {
 	var (
-		id    = "producer-client-id"
-		zk    = "127.0.0.1:2181/kafka"
-		topic = "test1"
-		num   int
-		err   error
+		id      = "producer-client-id"
+		topic   = "test1"
+		brokers = []string{"127.0.0.1:9092"}
+		num     int
+		err     error
 		// partition int32
 		// offset    int64
 		producer Producer
@@ -90,8 +90,8 @@ func BenchmarkProducer_SendMessage(b *testing.B) {
 	)
 
 	b.StopTimer()
-	if producer, err = NewProducerWithZk(id, zk, HASH, true); err != nil {
-		b.Errorf("NewProducerWithZk(id:%s, zk:%s) = err{%v}", id, zk, err)
+	if producer, err = NewProducer(id, brokers, HASH, true); err != nil {
+		b.Errorf("NewProducerWithZk(id:%s, brokers:%s) = err{%v}", id, brokers, err)
 	}
 	defer producer.Stop()
 
@@ -133,8 +133,8 @@ func (mm *MessageMetadata) Latency() time.Duration {
 func TestAsyncKafkaProducer(t *testing.T) {
 	var (
 		id              = "producer-client-id"
-		zk              = "127.0.0.1:2181/kafka"
 		topic           = "test1"
+		brokers         = []string{"127.0.0.1:9092"}
 		err             error
 		latency         time.Duration
 		totalLatency    time.Duration
@@ -163,8 +163,8 @@ func TestAsyncKafkaProducer(t *testing.T) {
 		failures++
 	}
 
-	if producer, err = NewAsyncProducerWithZk(id, zk, HASH, true, msgCallback, errCallback); err != nil {
-		t.Errorf("NewAsyncProducerWithZk(zk:%s) = err{%v}", zk, err)
+	if producer, err = NewAsyncProducer(id, brokers, HASH, true, msgCallback, errCallback); err != nil {
+		t.Errorf("NewAsyncProducerWithZk(zk:%s) = err{%v}", brokers, err)
 	}
 	producer.Start()
 
@@ -214,6 +214,7 @@ func BenchmarkAsyncProducer_SendMessage(b *testing.B) {
 		enqueued     int
 		successes    int
 		failures     int
+		brokers      []string
 		msgCallback  ProducerMessageCallback
 		errCallback  ProducerErrorCallback
 		producer     AsyncProducer
@@ -233,7 +234,11 @@ func BenchmarkAsyncProducer_SendMessage(b *testing.B) {
 		failures++
 	}
 
-	if producer, err = NewAsyncProducerWithZk(id, zk, HASH, true, msgCallback, errCallback); err != nil {
+	if brokers, err = GetBrokerList(zk); err != nil {
+		b.Fatalf("Failed to get broker list: %v", err)
+	}
+
+	if producer, err = NewAsyncProducer(id, brokers, HASH, true, msgCallback, errCallback); err != nil {
 		b.Errorf("NewAsyncProducerWithZk(zk:%s) = err{%v}", zk, err)
 	}
 	producer.Start()

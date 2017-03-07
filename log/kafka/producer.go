@@ -9,8 +9,6 @@ package gxkafka
 import (
 	"encoding/json"
 	"fmt"
-
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -46,8 +44,8 @@ type producer struct {
 
 // NewProducer constructs a new SyncProducer for give brokers addresses.
 // @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
-func NewProducer(clientID string, brokers string, partitionMethod int, waitForAllAck bool) (Producer, error) {
-	if clientID == "" || brokers == "" {
+func NewProducer(clientID string, brokers []string, partitionMethod int, waitForAllAck bool) (Producer, error) {
+	if clientID == "" || brokers == nil || len(brokers) == 0 {
 		return &producer{}, fmt.Errorf("@clientID:%s, @brokers:%s", clientID, brokers)
 	}
 
@@ -72,28 +70,12 @@ func NewProducer(clientID string, brokers string, partitionMethod int, waitForAl
 		kafkaConfig.Producer.RequiredAcks = sarama.WaitForLocal
 	}
 
-	var brokerList []string = strings.Split(brokers, ",")
-	kafkaProducer, err := sarama.NewSyncProducer(brokerList, kafkaConfig)
+	kafkaProducer, err := sarama.NewSyncProducer(brokers, kafkaConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &producer{producer: kafkaProducer}, nil
-}
-
-// NewProducerWithZk returns a new SyncProducer for give brokers addresses.
-// @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
-func NewProducerWithZk(clientID string, zookeeper string, partitionMethod int, waitForAllAck bool) (Producer, error) {
-	var (
-		err     error
-		brokers []string
-	)
-
-	if brokers, err = GetBrokerList(zookeeper); err != nil {
-		return &producer{}, err
-	}
-
-	return NewProducer(clientID, strings.Join(brokers, ","), partitionMethod, waitForAllAck)
 }
 
 func (p *producer) SendMessage(topic string, key interface{}, message interface{}) (partition int32, offset int64, err error) {
@@ -179,14 +161,14 @@ type asyncProducer struct {
 // @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
 func NewAsyncProducer(
 	clientID string,
-	brokers string,
+	brokers []string,
 	partitionMethod int,
 	waitForAllAck bool,
 	successfulMessageCallback ProducerMessageCallback,
 	errorCallback ProducerErrorCallback,
 ) (AsyncProducer, error) {
 
-	if clientID == "" || brokers == "" {
+	if clientID == "" || brokers == nil || len(brokers) == 0 {
 		return &asyncProducer{}, fmt.Errorf("@clientID:%s, @brokers:%s", clientID, brokers)
 	}
 
@@ -211,8 +193,7 @@ func NewAsyncProducer(
 		kafkaConfig.Producer.RequiredAcks = sarama.WaitForLocal
 	}
 
-	var brokerList []string = strings.Split(brokers, ",")
-	kafkaProducer, err := sarama.NewAsyncProducer(brokerList, kafkaConfig)
+	kafkaProducer, err := sarama.NewAsyncProducer(brokers, kafkaConfig)
 	if err != nil {
 		return nil, err
 	}
