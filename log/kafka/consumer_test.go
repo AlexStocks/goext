@@ -34,16 +34,14 @@ func TestKafkaConsumer(t *testing.T) {
 		cb       ConsumerMessageCallback
 	)
 
-	cb = func(message *sarama.ConsumerMessage) error {
-		fmt.Printf("receive kafka message %#v\n", message)
+	cb = func(message *sarama.ConsumerMessage, preOffset int64) {
+		fmt.Printf("receive kafka message %#v\n, preOffset:%d", message, preOffset)
 		consumer.Commit(message)
-
-		return nil
 	}
 
 	brokers = strings.Split(broker, ",")
 	topics = strings.Split(topic, ",")
-	consumer, err = NewConsumer(id, brokers, topics, group, cb)
+	consumer, err = NewConsumer(id, brokers, topics, group, cb, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to initialize Kafka consumer: %v", err)
 	}
@@ -77,20 +75,23 @@ func TestKafkaConsumerWithZk(t *testing.T) {
 		topic    = "test1"
 		group    = "go-consumer-group-zk"
 		err      error
+		brokers  []string
 		topics   []string
 		consumer Consumer
 		cb       ConsumerMessageCallback
 	)
 
-	cb = func(message *sarama.ConsumerMessage) error {
-		fmt.Printf("receive kafka message %#v\n", message)
+	cb = func(message *sarama.ConsumerMessage, preOffset int64) {
+		fmt.Printf("receive kafka message %#v\n, preOffset:%d", message, preOffset)
 		consumer.Commit(message)
+	}
 
-		return nil
+	if brokers, err = GetBrokerList(zk); err != nil {
+		t.Fatalf("Failed to get broker list: %v", err)
 	}
 
 	topics = strings.Split(topic, ",")
-	consumer, err = NewConsumerWithZk(id, zk, topics, group, cb)
+	consumer, err = NewConsumer(id, brokers, topics, group, cb, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to initialize Kafka consumer: %v", err)
 	}

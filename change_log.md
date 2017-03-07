@@ -5,9 +5,16 @@
 ## dev list ##
 ---
 
+- 2017/03/07
+    > improvement: change ConsumerMessageCallback parameter list and delete its return value.
+    >
+    > improvement: add ConsumerErrorCallback and ConsumerNotificationCallback for kafka consumer
+    >
+    > improvement: delete NewConsuemrWithZk and NewProducerWithZk
+
 - 2017/03/06
-    > improvement: change Log repo to mysql log4go
-	
+    > improvement: change Log repo to my log4go
+
 - 2017/03/01
     > bug fix: use github.com/bsm/sarama-cluster to construct consumer group on kafka v0.10 instead of github.com/wvanbergen/kafka
 	>

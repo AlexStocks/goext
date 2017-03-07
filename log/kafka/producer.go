@@ -225,30 +225,6 @@ func NewAsyncProducer(
 	}, nil
 }
 
-// NewAsyncProducerWithZk returns a new AsyncProducer for give brokers addresses.
-// @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
-func NewAsyncProducerWithZk(
-	clientID string,
-	zookeeper string,
-	partitionMethod int,
-	waitForAllAck bool,
-	successfulMessageCallback ProducerMessageCallback,
-	errorCallback ProducerErrorCallback,
-) (AsyncProducer, error) {
-
-	var (
-		err     error
-		brokers []string
-	)
-
-	if brokers, err = GetBrokerList(zookeeper); err != nil {
-		return &asyncProducer{}, err
-	}
-
-	return NewAsyncProducer(clientID, strings.Join(brokers, ","), partitionMethod,
-		waitForAllAck, successfulMessageCallback, errorCallback)
-}
-
 func (p *asyncProducer) SendMessage(
 	topic string,
 	key interface{},

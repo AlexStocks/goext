@@ -12,12 +12,10 @@ import (
 )
 
 import (
-	"github.com/AlexStocks/goext/strings"
 	"github.com/AlexStocks/goext/sync"
 	Log "github.com/AlexStocks/log4go"
 	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
-	"github.com/wvanbergen/kazoo-go"
+	sc "github.com/bsm/sarama-cluster"
 )
 
 const (
@@ -38,17 +36,28 @@ type (
 		brokers       []string
 		topics        []string
 		clientID      string
-		cb            ConsumerMessageCallback
+		msgCb         ConsumerMessageCallback
+		errCb         ConsumerErrorCallback
+		ntfCb         ConsumerNotificationCallback
 
 		// cg   *consumergroup.ConsumerGroup
-		cg   *cluster.Consumer
+		cg   *sc.Consumer
 		done chan gxsync.Empty
 		wg   sync.WaitGroup
 	}
 )
 
+func dftConsumerErrorCallback(err error) {
+	Log.Error("kafka consumer error:%+v", err)
+}
+
+func dtfConsumerNotificationCallback(note *sc.Notification) {
+	Log.Info("kafka consumer Rebalanced: %+v", note)
+}
+
 // NewConsumer constructs a consumer.
 // @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
+// the following explanation is deprecated.(2017-03-07)
 // NewConsumer 之所以不能直接以brokers当做参数，是因为/wvanderbergen/kafka/consumer用到了consumer group，
 // 各个消费者的信息要存到zk中
 func NewConsumer(
@@ -56,12 +65,22 @@ func NewConsumer(
 	brokers []string,
 	topicList []string,
 	consumerGroup string,
-	cb ConsumerMessageCallback,
+	msgCb ConsumerMessageCallback,
+	errCb ConsumerErrorCallback,
+	ntfCb ConsumerNotificationCallback,
 ) (Consumer, error) {
 
-	if consumerGroup == "" || len(brokers) == 0 || len(topicList) == 0 || cb == nil {
-		return nil, fmt.Errorf("@consumerGroup:%s, @brokers:%s, @topicList:%s, cb:%v",
-			consumerGroup, brokers, topicList, cb)
+	if consumerGroup == "" || len(brokers) == 0 || len(topicList) == 0 || msgCb == nil {
+		return nil, fmt.Errorf("@consumerGroup:%s, @brokers:%s, @topicList:%s, msgCb:%v",
+			consumerGroup, brokers, topicList, msgCb)
+	}
+
+	if errCb == nil {
+		errCb = dftConsumerErrorCallback
+	}
+
+	if ntfCb == nil {
+		ntfCb = dtfConsumerNotificationCallback
 	}
 
 	return &consumer{
@@ -69,48 +88,9 @@ func NewConsumer(
 		brokers:       brokers,
 		topics:        topicList,
 		clientID:      clientID,
-		cb:            cb,
-		done:          make(chan gxsync.Empty),
-	}, nil
-}
-
-func NewConsumerWithZk(
-	clientID string,
-	zookeeper string,
-	topicList []string,
-	consumerGroup string,
-	cb ConsumerMessageCallback,
-) (Consumer, error) {
-
-	if consumerGroup == "" || len(topicList) == 0 || zookeeper == "" || cb == nil {
-		return nil, fmt.Errorf("@consumerGroup:%s, @topicList:%s, @zookeeper:%s, @cb:%v",
-			consumerGroup, topicList, zookeeper, cb)
-	}
-
-	var (
-		err     error
-		kz      *kazoo.Kazoo
-		zkNodes []string
-		brokers []string
-		config  *kazoo.Config
-	)
-
-	config = kazoo.NewConfig()
-	zkNodes, config.Chroot = kazoo.ParseConnectionString(zookeeper)
-	if kz, err = kazoo.NewKazoo(zkNodes, config); err != nil {
-		return nil, err
-	}
-	if brokers, err = kz.BrokerList(); err != nil {
-		return nil, err
-	}
-	kz.Close()
-
-	return &consumer{
-		consumerGroup: consumerGroup,
-		brokers:       brokers,
-		topics:        topicList,
-		clientID:      clientID,
-		cb:            cb,
+		msgCb:         msgCb,
+		errCb:         errCb,
+		ntfCb:         ntfCb,
 		done:          make(chan gxsync.Empty),
 	}, nil
 }
@@ -119,12 +99,13 @@ func NewConsumerWithZk(
 func (c *consumer) Start() error {
 	var (
 		err    error
-		config *cluster.Config
+		config *sc.Config
 	)
 
-	config = cluster.NewConfig()
+	config = sc.NewConfig()
 	config.ClientID = c.clientID
 	config.Group.Return.Notifications = true
+	// receive consumer error. just log it.
 	config.Consumer.Return.Errors = true
 	// 这个属性仅仅影响第一次启动时候获取value的offset，
 	// 后面再次启动的时候如果其他config不变则会根据上次commit的offset开始获取value
@@ -136,7 +117,7 @@ func (c *consumer) Start() error {
 	// (in which case the `offsets.retention.minutes` option on the
 	// broker will be used).
 	config.Consumer.Offsets.Retention = 0
-	if c.cg, err = cluster.NewConsumer(c.brokers, c.consumerGroup, c.topics, config); err != nil {
+	if c.cg, err = sc.NewConsumer(c.brokers, c.consumerGroup, c.topics, config); err != nil {
 		return err
 	}
 
@@ -152,11 +133,9 @@ func (c *consumer) Start() error {
 
 func (c *consumer) run() {
 	var (
-		err        error
-		eventCount int32
-		offsets    map[string]map[int32]int64
-		// messageKey string
-		note *cluster.Notification
+		err     error
+		offsets map[string]map[int32]int64
+		note    *sc.Notification
 	)
 
 	offsets = make(map[string]map[int32]int64)
@@ -167,42 +146,25 @@ func (c *consumer) run() {
 				offsets[message.Topic] = make(map[int32]int64)
 			}
 
-			eventCount += 1
-			if offsets[message.Topic][message.Partition] != 0 && offsets[message.Topic][message.Partition] != message.Offset-1 {
+			if offsets[message.Topic][message.Partition] != 0 &&
+				offsets[message.Topic][message.Partition] != message.Offset-1 {
+
 				Log.Warn("Unexpected offset on %s:%d. Expected %d, found %d, diff %d.\n",
 					message.Topic, message.Partition, offsets[message.Topic][message.Partition]+1,
 					message.Offset, message.Offset-offsets[message.Topic][message.Partition]+1)
 			}
 
-			// Simulate processing time
-			// messageKey = string(message.Key)
-			// if len(messageKey) != 0 && messageKey != "\"\"" {
-			// 	Log.Debug("idx:%d, messge{key:%v, topic:%v, partition:%v, offset:%v, value:%v}\n",
-			// 		eventCount, messageKey, message.Topic, message.Partition, message.Offset, gxstrings.String(message.Value))
-			// } else {
-			// 	Log.Debug("idx:%d, messge{topic:%v, partition:%v, offset:%v, value:%v}\n",
-			// 		eventCount, message.Topic, message.Partition, message.Offset, gxstrings.String(message.Value))
-			// }
-
 			// message -> PushNotification
-			if err = c.cb(message); err != nil {
-				Log.Warn("consumer.callback(kafka message{topic:%s, key:%s, value:%s}) = error(%s)",
-					message.Topic, gxstrings.String(message.Key), gxstrings.String(message.Value), err)
-
-				// 出错则直接提交offset，记录下log
-				offsets[message.Topic][message.Partition] = message.Offset
-				c.Commit(message)
-
-				break
-			}
-
+			c.msgCb(message, offsets[message.Topic][message.Partition])
 			offsets[message.Topic][message.Partition] = message.Offset
 
+		// Errors returns a read channel of errors that occur during offset management, if
+		// enabled. By default, errors are logged and not returned over this channel.
 		case err = <-c.cg.Errors():
-			Log.Error("kafka consumer error:%+v", err)
+			c.errCb(err)
 
 		case note = <-c.cg.Notifications():
-			Log.Info("kafka consumer Rebalanced: %+v", note)
+			c.ntfCb(note)
 
 		case <-c.done:
 			if err := c.cg.Close(); err != nil {
