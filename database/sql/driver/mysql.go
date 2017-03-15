@@ -11,12 +11,15 @@ import (
 	"const/path"
 	"database/sql"
 	"errors"
-	_ "github.com/go-mysql-driver"
 	"log"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+)
+
+import (
+	_ "github.com/go-sql-driver/mysql"
 )
 
 var db map[string]*sql.DB
