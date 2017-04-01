@@ -7,6 +7,7 @@
 
 - 2017/04/02
     * feature: add log/elasticsearch
+    * improvement: add gxstrings:CheckByteArray
 
 - 2017/03/07
     * improvement: change ConsumerMessageCallback parameter list and delete its return value.

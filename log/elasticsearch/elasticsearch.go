@@ -85,16 +85,30 @@ func (ec EsClient) DeleteEsIndex(index string) error {
 	return nil
 }
 
+// InsertWithDocId 插入@msg
+// !!! 如果@msg的类型是string 或者 []byte，则被当做Json String类型直接存进去
 func (ec EsClient) Insert(index string, typ string, msg interface{}) error {
 	var (
-		err error
-		ctx context.Context
+		err      error
+		ok       bool
+		msgBytes []byte
+		ctx      context.Context
 	)
 
 	// https://github.com/olivere/elastic/issues/127
 	// Elasticsearch can create an identifier for you, automatically.
 	// _, err = ec.Index().Index(index).Type(typ).Id(1).BodyJson(msg).Do()
-	_, err = ec.Index().Index(index).Type(typ).BodyJson(msg).DoC(ctx)
+	switch msg.(type) {
+	case string:
+		_, err = ec.Index().Index(index).Type(typ).BodyString(msg.(string)).DoC(ctx)
+	default:
+		if msgBytes, ok = msg.([]byte); ok {
+			_, err = ec.Index().Index(index).Type(typ).BodyString(string(msgBytes)).DoC(ctx)
+
+		} else {
+			_, err = ec.Index().Index(index).Type(typ).BodyJson(msg).DoC(ctx)
+		}
+	}
 	if err != nil {
 		// Handle error
 		return errors.Wrapf(err, "Insert(index:%s, type:%s, msg:%#v)", index, typ, msg)
@@ -106,13 +120,26 @@ func (ec EsClient) Insert(index string, typ string, msg interface{}) error {
 // Search
 // Waiting for es5.x's future sql feature
 
+// InsertWithDocId 插入@msg时候指定@docID
+// !!! 如果@msg的类型是string 或者 []byte，则被当做Json String类型直接存进去
 func (ec EsClient) InsertWithDocId(index string, typ string, docID string, msg interface{}) error {
 	var (
-		err error
-		ctx context.Context
+		err      error
+		ok       bool
+		msgBytes []byte
+		ctx      context.Context
 	)
 
-	_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyJson(msg).DoC(ctx)
+	switch msg.(type) {
+	case string:
+		_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyString(msg.(string)).DoC(ctx)
+	default:
+		if msgBytes, ok = msg.([]byte); ok {
+			_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyString(string(msgBytes)).DoC(ctx)
+		} else {
+			_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyJson(msg).DoC(ctx)
+		}
+	}
 	if err != nil {
 		// Handle error
 		return errors.Wrapf(err, "Insert(index:%s, type:%s, docID:%s, msg:%#v)", index, typ, docID, msg)

@@ -34,3 +34,15 @@ func TestSlice2(t *testing.T) {
 	b = append(b, "hello world"...)
 	println(String(b)) // output: hello worldhello world
 }
+
+func TestCheckByteArray(t *testing.T) {
+	var s = "hello"
+	var flag bool
+	if flag = CheckByteArray([]byte(s)); !flag {
+		t.Fatalf("CheckByteArray([]byte(%s)) failed")
+	}
+
+	if flag = CheckByteArray(s); flag {
+		t.Fatalf("CheckByteArray(%s) failed")
+	}
+}

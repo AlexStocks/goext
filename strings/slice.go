@@ -8,6 +8,7 @@
 package gxstrings
 
 import (
+	"fmt"
 	"reflect"
 	"unsafe"
 )
@@ -28,3 +29,24 @@ func Slice(s string) (b []byte) {
 	pbytes.Cap = pstring.Len
 	return
 }
+
+var (
+	typeOfBytes = reflect.TypeOf([]byte(nil))
+)
+
+func CheckByteArray(v interface{}) bool {
+	vv := reflect.ValueOf(v)
+	switch vv.Kind() {
+	case reflect.Slice:
+		if vv.Type() == typeOfBytes {
+			return true
+		}
+	}
+
+	return false
+}
+
+// func CheckByteArray(v interface{}) bool {
+// 	_, ok := v.([]byte)
+//  return ok
+// }

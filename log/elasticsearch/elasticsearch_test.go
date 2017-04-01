@@ -1,6 +1,7 @@
 package gxelasticsearch
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -19,7 +20,22 @@ type Doc struct {
 	Message string `json:"message"`
 }
 
-func TestEsClient(t *testing.T) {
+// go test -v -run Insert
+// === RUN   TestEsClient_Insert
+// --- PASS: TestEsClient_Insert (1.94s)
+// === RUN   TestEsClient_InsertWithString
+// --- PASS: TestEsClient_InsertWithString (1.87s)
+// PASS
+// ok  	github.com/AlexStocks/goext/log/elasticsearch	3.824s
+
+// go test -v -run Insert$
+// === RUN   TestEsClient_Insert
+// --- PASS: TestEsClient_Insert (1.93s)
+// PASS
+// ok  	github.com/AlexStocks/goext/log/elasticsearch	1.942s
+// go test -v -run Insert$
+// 此处如果不加$, 则
+func TestEsClient_Insert(t *testing.T) {
 	var (
 		err    error
 		esConf EsConf
@@ -33,9 +49,6 @@ func TestEsClient(t *testing.T) {
 		ReplicaNum:      0,
 		RefreshInterval: 1,
 		EsHosts: []string{
-			// "http://10.116.27.4:5858",
-			// "http://10.66.130.221:5858",
-			// "http://10.66.130.228:5858",
 			"http://119.81.218.90:5858",
 		},
 		PushIndex: "dokidoki-push-test",
@@ -46,6 +59,12 @@ func TestEsClient(t *testing.T) {
 	client, err = CreateEsClient(esConf.EsHosts)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Delete the index again
+	err = client.DeleteEsIndex(esConf.PushIndex)
+	if err != nil {
+		t.Log(err)
 	}
 
 	// Create an index
@@ -84,10 +103,78 @@ func TestEsClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
+}
+
+// go test -v -run InsertWithString
+func TestEsClient_InsertWithString(t *testing.T) {
+	var (
+		err       error
+		esConf    EsConf
+		client    EsClient
+		doc       Doc
+		docString []byte
+		key       string
+	)
+
+	esConf = EsConf{
+		ShardNum:        5,
+		ReplicaNum:      0,
+		RefreshInterval: 1,
+		EsHosts: []string{
+			"http://119.81.218.90:5858",
+		},
+		PushIndex: "dokidoki-push-test",
+		PushType:  "gopush",
+	}
+
+	// Create a client
+	client, err = CreateEsClient(esConf.EsHosts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Delete the index again
-	// time.Sleep(30e9)
-	// err = client.DeleteEsIndex(esConf.PushIndex)
-	// if err != nil {
-	//     t.Fatal(err)
-	// }
+	err = client.DeleteEsIndex(esConf.PushIndex)
+	if err != nil {
+		t.Log(err)
+	}
+
+	// Create an index
+	err = client.CreateEsIndex(esConf.PushIndex, esConf.ShardNum, esConf.ReplicaNum, esConf.RefreshInterval)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add some documents
+	doc = Doc{
+		Subject: "Invitation",
+		Message: "Would you like to visit me in Berlin in October?",
+	}
+	docString, _ = json.Marshal(doc)
+	err = client.Insert(esConf.PushIndex, esConf.PushType, docString)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc = Doc{
+		Subject: "doc-subject1",
+		Message: "doc-msg1",
+	}
+	key = doc.Subject
+	docString, _ = json.Marshal(doc)
+	err = client.InsertWithDocId(esConf.PushIndex, esConf.PushType, key, docString)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 此处由于key不变，这个doc值会覆盖上面的doc值
+	doc = Doc{
+		Subject: "doc-subject2",
+		Message: "doc-msg2",
+	}
+	docString, _ = json.Marshal(doc)
+	err = client.InsertWithDocId(esConf.PushIndex, esConf.PushType, key, string(docString))
+	if err != nil {
+		t.Fatal(err)
+	}
 }
