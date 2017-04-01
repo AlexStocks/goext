@@ -8,24 +8,28 @@
 package gxdriver
 
 import (
-	"const/path"
 	"database/sql"
 	"errors"
 	"log"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 import (
+	"github.com/AlexStocks/goext/strings"
 	_ "github.com/go-sql-driver/mysql"
 )
 
-var db map[string]*sql.DB
+var (
+	dbLock    sync.Mutex
+	dbConnMap map[string]*sql.DB
+)
 
 func init() {
-	db = make(map[string]*sql.DB)
+	dbConnMap = make(map[string]*sql.DB)
 }
 
 /*
@@ -61,57 +65,40 @@ func NewQueryInstance(schema string) *MySql {
 	return _newMySqlInstance(schema, "Slave")
 }
 
-//实例化一个mysql实例
-//@param string schema 数据库连接方案
-//@param string conntype 数据库连接类型，范围: Master, Slave
+//@param string schema
+//@param string conntype [Master, Slave]
 func _newMySqlInstance(schema string, conntype string) *MySql {
-	if !InList(conntype, []string{"Master", "Slave"}) {
-		panic("function common.NewSqlInstance's second argument must be Master or Slave.")
+	if !gxstrings.Contains([]string{"Master", "Slave"}, conntype) {
+		panic("function common.NewSqlInstance's second argument must be 'Master' or 'Slave'.")
 	}
 
-	var key string = BuildKeyMd5(schema, conntype)
-	_, ok := db[key]
+	var key string = schema + conntype
+	dbLock.Lock()
+	_, ok := dbConnMap[key]
+	dbLock.Unlock()
 	if !ok {
 		//建立一个新连接到mysql
 		connect(schema, conntype)
 	}
-	return &MySql{db: db[key], dbschema: schema, optype: conntype, activetime: time.Now().Unix()}
+	return &MySql{db: dbConnMap[key], dbschema: schema, optype: conntype, activetime: time.Now().Unix()}
 }
 
 //建立数据库连接
 //@param string schema 连接DB方案
 //@param string conntype 连接类型，是分Master和Slave类型
 func connect(schema string, contype string) {
-	type item struct {
-		Master string
-		Slave  []string
-	}
-	var v map[string]item
-
-	//获取DB连接配置文件
-	if err := LoadJson(path.CONFIG_PATH+"db.json", &v); err != nil {
-		log.Fatalln(err.Error())
-	}
-	conf, ok := v[schema]
-	if !ok {
-		log.Fatalln("Database configuration file error. Lost schema[" + schema + "] node.")
-	}
-	var dataSourceName string
-	var key string = BuildKeyMd5(schema, contype)
-	if contype == "Master" {
-		dataSourceName = conf.Master
-	} else {
-		dataSourceName = conf.Slave[Rand(0, len(conf.Slave)-1)]
-	}
+	var key string = schema + contype
 
 	//开始连接DB
-	dbinit, err := sql.Open("mysql", dataSourceName)
+	conn, err := sql.Open("mysql", schema)
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
 
 	//将DB连接放入一个全局变量中
-	db[key] = dbinit
+	dbLock.Lock()
+	dbConnMap[key] = conn
+	dbLock.Unlock()
 }
 
 //检查MySql实例的连接是否还在活跃时间范围内
@@ -134,7 +121,7 @@ func (m *MySql) checkActive() {
 		if err != nil {
 			log.Fatalln(err.Error())
 		}
-		if !Empty(result) {
+		if result != nil && len(result) != 0 {
 			timeout, err := strconv.Atoi(result[0]["Value"])
 			if err != nil {
 				log.Fatalln(err.Error())
@@ -146,8 +133,10 @@ func (m *MySql) checkActive() {
 	if now-m.activetime > m.waittimeout-2 {
 		//此时认为数据库连接已经超时了，重新进行一次连接
 		connect(m.dbschema, m.optype)
-		var key string = BuildKeyMd5(m.dbschema, m.optype)
-		m.db = db[key]
+		var key string = m.dbschema + m.optype
+		dbLock.Lock()
+		m.db = dbConnMap[key]
+		dbLock.Unlock()
 	}
 
 	//设置当前时间为最新活跃点
@@ -321,6 +310,14 @@ func (m *MySql) GetDictionary(table string, args ...interface{}) (map[string]str
 	return m.GetRow(querysql, arguments...)
 }
 
+func Empty(a []string) bool {
+	if a == nil || len(a) == 0 {
+		return true
+	}
+
+	return false
+}
+
 func (m *MySql) buildSql(table string, fields []string, conditions map[string]interface{}, orderby, limit string) (string, []interface{}) {
 	//拼接field部分
 	var fieldstr string = "*"
@@ -329,7 +326,7 @@ func (m *MySql) buildSql(table string, fields []string, conditions map[string]in
 	}
 
 	//order by
-	if !Empty(orderby) {
+	if orderby != "" {
 		orderby = " ORDER BY " + orderby
 	}
 
@@ -337,12 +334,16 @@ func (m *MySql) buildSql(table string, fields []string, conditions map[string]in
 	where, arguments := m.buildWhere(conditions)
 
 	//limit
-	if !Empty(limit) {
+	if limit != "" {
 		limit = " LIMIT " + limit
 	}
 	querysql := "SELECT " + fieldstr + " FROM " + table + where + orderby + limit
 	m.checkSQL(querysql)
 	return querysql, arguments
+}
+
+func StringToList(s string) []string {
+	return strings.Split(s, ",")
 }
 
 //通过条件的k-v形式获取SQL中的where子句部分
@@ -466,7 +467,7 @@ func (m *MySql) Insert(table string, data map[string]interface{}) (int64, error)
 			delete(data, key)
 		}
 	}
-	if Empty(data) {
+	if data == nil || len(data) == 0 {
 		return 0, errors.New("insert data invalid.")
 	}
 
@@ -496,7 +497,7 @@ func (m *MySql) Update(table string, data map[string]interface{}, conditions map
 	}
 
 	//检查过滤后的数据是否为空
-	if Empty(data) {
+	if data == nil || len(data) == 0 {
 		return 0, errors.New("update data invalid")
 	}
 
@@ -511,7 +512,7 @@ func (m *MySql) Update(table string, data map[string]interface{}, conditions map
 
 	//拼装where子句
 	where, arguments := m.buildWhere(conditions)
-	if !Empty(arguments) {
+	if arguments != nil && len(arguments) != 0 {
 		args = append(args, arguments...)
 	}
 
