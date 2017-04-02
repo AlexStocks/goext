@@ -101,17 +101,22 @@ func (ec EsClient) Insert(index string, typ string, msg interface{}) error {
 	switch msg.(type) {
 	case string:
 		_, err = ec.Index().Index(index).Type(typ).BodyString(msg.(string)).DoC(ctx)
+		if err != nil {
+			return errors.Wrapf(err, "Insert(index:%s, type:%s, msg:%s)", index, typ, msg)
+		}
+
 	default:
 		if msgBytes, ok = msg.([]byte); ok {
 			_, err = ec.Index().Index(index).Type(typ).BodyString(string(msgBytes)).DoC(ctx)
-
+			if err != nil {
+				return errors.Wrapf(err, "Insert(index:%s, type:%s, msg:%s)", index, typ, (string)(msgBytes))
+			}
 		} else {
 			_, err = ec.Index().Index(index).Type(typ).BodyJson(msg).DoC(ctx)
+			if err != nil {
+				return errors.Wrapf(err, "Insert(index:%s, type:%s, msg:%#v)", index, typ, msg)
+			}
 		}
-	}
-	if err != nil {
-		// Handle error
-		return errors.Wrapf(err, "Insert(index:%s, type:%s, msg:%#v)", index, typ, msg)
 	}
 
 	return nil
@@ -133,16 +138,22 @@ func (ec EsClient) InsertWithDocId(index string, typ string, docID string, msg i
 	switch msg.(type) {
 	case string:
 		_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyString(msg.(string)).DoC(ctx)
+		if err != nil {
+			return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%s)", index, typ, docID, msg)
+		}
+
 	default:
 		if msgBytes, ok = msg.([]byte); ok {
 			_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyString(string(msgBytes)).DoC(ctx)
+			if err != nil {
+				return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%s)", index, typ, docID, (string)(msgBytes))
+			}
 		} else {
 			_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyJson(msg).DoC(ctx)
+			if err != nil {
+				return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%#v)", index, typ, docID, msg)
+			}
 		}
-	}
-	if err != nil {
-		// Handle error
-		return errors.Wrapf(err, "Insert(index:%s, type:%s, docID:%s, msg:%#v)", index, typ, docID, msg)
 	}
 
 	return nil
