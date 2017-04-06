@@ -46,3 +46,25 @@ func TestCheckByteArray(t *testing.T) {
 		t.Fatalf("CheckByteArray(%s) failed")
 	}
 }
+
+// // go test -v -bench BenchmarkCheckByteArray1$ -run=^a
+// func BenchmarkCheckByteArray1(b *testing.B) {
+// 	var s = []byte("hello")
+// 	for i := 0; i < b.N; i++ {
+// 		CheckByteArray1(s)
+// 	}
+// }
+//
+// // go test -v -bench BenchmarkCheckByteArray2$ -run=^a
+// func BenchmarkCheckByteArray2(b *testing.B) {
+// 	var s = []byte("hello")
+// 	for i := 0; i < b.N; i++ {
+// 		CheckByteArray2(s)
+// 	}
+// }
+//
+// go test -bench=. -run=CheckByteArray$
+// BenchmarkCheckByteArray-4    	20000000	        60.6 ns/op
+// BenchmarkCheckByteArray2-4   	2000000000	         1.02 ns/op
+// PASS
+// ok  	github.com/AlexStocks/goext/strings	3.427s

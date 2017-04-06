@@ -8,7 +8,6 @@
 package gxstrings
 
 import (
-	"fmt"
 	"reflect"
 	"unsafe"
 )
@@ -35,18 +34,23 @@ var (
 )
 
 func CheckByteArray(v interface{}) bool {
-	vv := reflect.ValueOf(v)
-	switch vv.Kind() {
-	case reflect.Slice:
-		if vv.Type() == typeOfBytes {
-			return true
-		}
-	}
-
-	return false
+	_, ok := v.([]byte)
+	return ok
 }
 
-// func CheckByteArray(v interface{}) bool {
+// func CheckByteArray1(v interface{}) bool {
+// 	vv := reflect.ValueOf(v)
+// 	switch vv.Kind() {
+// 	case reflect.Slice:
+// 		if vv.Type() == typeOfBytes {
+// 			return true
+// 		}
+// 	}
+//
+// 	return false
+// }
+
+// func CheckByteArray2(v interface{}) bool {
 // 	_, ok := v.([]byte)
-//  return ok
+// 	return ok
 // }
