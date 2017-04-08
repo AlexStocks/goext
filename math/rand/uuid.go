@@ -14,7 +14,7 @@ import (
 // refer to https://github.com/gorilla/feeds/blob/master/uuid.go
 type UUID [16]byte
 
-// create a new uuid v4
+// Constructs a new V4 (random) UUID.
 func NewUUID() *UUID {
 	u := &UUID{}
 	_, err := rand.Read(u[:16])
