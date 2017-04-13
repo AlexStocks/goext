@@ -154,6 +154,24 @@ func NewSet(s ...interface{}) Set {
 	return &set
 }
 
+// Creates and returns a reference to a set from keys of @m.
+func NewSetFromMapKey(m map[interface{}]interface{}) Set {
+	set := newThreadSafeSet()
+	for key := range m {
+		set.Add(key)
+	}
+	return &set
+}
+
+// Creates and returns a reference to a set from values of @m.
+func NewSetFromMapValue(m map[interface{}]interface{}) Set {
+	set := newThreadSafeSet()
+	for _, item := range m {
+		set.Add(item)
+	}
+	return &set
+}
+
 // Creates and returns a new set with the given elements
 func NewSetWith(elts ...interface{}) Set {
 	return NewSetFromSlice(elts)
