@@ -5,6 +5,9 @@
 ## dev list ##
 ---
 
+- 2017/04/13
+	* add container/gxset
+
 - 2017/04/02
     * feature: add log/elasticsearch
     * improvement: add gxstrings:CheckByteArray
