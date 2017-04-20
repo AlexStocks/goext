@@ -60,6 +60,7 @@ func UnixString2Time(unix string) time.Time {
 	return time.Unix(i, 0)
 }
 
+// 注意把time转换成unix的时候有精度损失，只返回了秒值，没有用到纳秒值
 func Time2Unix(t time.Time) int64 {
 	return t.Unix()
 }
