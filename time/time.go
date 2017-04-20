@@ -1,4 +1,4 @@
-// Copyright 2016 AlexStocks(https://github.com/AlexStocks).
+// Copyright 2016 ~ 2017 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
 // governed by a BSD-style license.
 
@@ -6,6 +6,7 @@
 package gxtime
 
 import (
+	"strconv"
 	"time"
 )
 
@@ -44,4 +45,21 @@ func YMDPrint(sec int, nsec int) string {
 
 func Future(sec int, f func()) {
 	time.AfterFunc(TimeSecondDuration(sec), f)
+}
+
+func Unix2Time(unix int64) time.Time {
+	return time.Unix(unix, 0)
+}
+
+func UnixString2Time(unix string) time.Time {
+	i, err := strconv.ParseInt(unix, 10, 64)
+	if err != nil {
+		panic(err)
+	}
+
+	return time.Unix(i, 0)
+}
+
+func Time2Unix(t time.Time) int64 {
+	return t.Unix()
 }

@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/04/20
+   > feature
+   * add Time2Unix & Unix2Time & UnixString2Time in time
+
 - 2017/04/13
 	* add container/gxset
 
