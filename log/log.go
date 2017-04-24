@@ -3,7 +3,6 @@
 // governed by a BSD-style license.
 
 // package gxlog is based on log4go.
-
 package gxlog
 
 import (
