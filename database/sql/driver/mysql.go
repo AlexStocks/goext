@@ -20,7 +20,7 @@ import (
 )
 
 import (
-	// "github.com/AlexStocks/goext/log"
+	"github.com/AlexStocks/goext/log"
 	"github.com/AlexStocks/goext/strings"
 	mysql "github.com/go-sql-driver/mysql"
 )
@@ -49,11 +49,14 @@ type mysqlStmt struct {
 	ref   int32
 }
 
+// 程序退出的时候调用之
 func (stmt *mysqlStmt) Close() error {
+	gxlog.CInfo("Close()")
 	stmt.conn.stmtMutex.Lock()
 	defer stmt.conn.stmtMutex.Unlock()
 
 	if atomic.AddInt32(&stmt.ref, -1) == 0 {
+		gxlog.CInfo("really close")
 		delete(stmt.conn.stmtCache, stmt.query)
 		return stmt.Stmt.Close()
 	}
@@ -64,7 +67,7 @@ type MySQLDriver struct {
 }
 
 func (d MySQLDriver) Open(dsn string) (driver.Conn, error) {
-	// gxlog.CInfo("GettyMSDriver:Open(%s)", dsn)
+	gxlog.CInfo("GettyMSDriver:Open(%s)", dsn)
 	var driver mysql.MySQLDriver
 	conn, err := driver.Open(dsn)
 	if err != nil {
@@ -81,8 +84,9 @@ type mySQLConn struct {
 	stmtCache map[string]*mysqlStmt
 }
 
+// 这个函数应该在程序启动的时候被调用以创建全局prepared stmt句柄，在程序退出的时候调用(stmt *mysqlStmt) Close()
 func (m *mySQLConn) Prepare(query string) (driver.Stmt, error) {
-	// gxlog.CInfo("GettyMSDriver:Prepare(%s)", query)
+	gxlog.CInfo("GettyMSDriver:Prepare(%s)", query)
 	m.stmtMutex.RLock()
 	if stmt, exists := m.stmtCache[query]; exists {
 		// must update reference counter in lock scope
@@ -112,7 +116,7 @@ func (m *mySQLConn) Prepare(query string) (driver.Stmt, error) {
 }
 
 func (m *mySQLConn) Begin() (driver.Tx, error) {
-	// gxlog.CInfo("GettyMSDriver:Begin")
+	gxlog.CInfo("GettyMSDriver:Begin")
 	tx, err := m.Conn.Begin()
 	if err != nil {
 		return nil, err
@@ -126,7 +130,7 @@ type mysqlTx struct {
 }
 
 func (tx *mysqlTx) Commit() (err error) {
-	// gxlog.CInfo("GettyMSDriver:Commit")
+	gxlog.CInfo("GettyMSDriver:Commit")
 	return tx.tx.Commit()
 }
 
@@ -156,8 +160,8 @@ type MySQL struct {
 	txIndex     int     //事务记数器，只有当txIndex=0才会触发Begin动作，只有当txIndex=1才会触发Commit动作
 	role        string  //操作类型，分Master或Slave
 	schema      string  //数据库连接schema
-	activetime  int64   //上次建立连接的时间点，需要一种机制来检测客户端与mysql服务端连接的有效性
-	waittimeout int64   //mysql服务器空闲等待时长
+	active      int64   //上次建立连接的时间点，需要一种机制来检测客户端与mysql服务端连接的有效性
+	waitTimeout int64   //mysql服务器空闲等待时长
 	sync.Once
 }
 
@@ -208,10 +212,10 @@ func newMySQLInstance(schema string, role string) *MySQL {
 		dbConnMapLock.Unlock()
 	}
 	return &MySQL{
-		DB:         conn,
-		schema:     schema,
-		role:       role,
-		activetime: time.Now().Unix(),
+		DB:     conn,
+		schema: schema,
+		role:   role,
+		active: time.Now().Unix(),
 	}
 }
 
@@ -272,16 +276,18 @@ func (m *MySQL) FetchRows(rows *sql.Rows) ([]map[string]string, error) {
 }
 
 //检查MySQL实例的连接是否还在活跃时间范围内
+//! note: 这个函数的实际意义在于更新active时间，实际的sql.DB下面有一个连接池，
+// 完全没必要因为超时就更换conn对象。
 func (m *MySQL) CheckActive() {
 	var now int64 = time.Now().Unix()
 	if m.tx != nil {
 		//如果存在事务会话，则不再进行连接检查
-		m.activetime = now
+		m.active = now
 		return
 	}
 
-	//从MySQL的wait_timeout变量中定位waittimeout
-	if m.waittimeout == 0 {
+	//从MySQL的wait_timeout变量中定位waitTimeout
+	if m.waitTimeout == 0 {
 		rows, err := m.Query("SHOW VARIABLES LIKE 'wait_timeout'")
 		if err != nil {
 			panic(err)
@@ -297,11 +303,11 @@ func (m *MySQL) CheckActive() {
 			if err != nil {
 				panic(err)
 			}
-			m.waittimeout = int64(timeout)
+			m.waitTimeout = int64(timeout)
 		}
 	}
 
-	if now-m.activetime > m.waittimeout-2 {
+	if now-m.active > m.waitTimeout-2 {
 		//此时认为数据库连接已经超时了，重新进行一次连接
 		connect(m.schema, m.role)
 		var key string = m.schema + m.role
@@ -311,7 +317,7 @@ func (m *MySQL) CheckActive() {
 	}
 
 	//设置当前时间为最新活跃点
-	m.activetime = now
+	m.active = now
 }
 
 //保证修改、写入类的操作不在slave上执行
