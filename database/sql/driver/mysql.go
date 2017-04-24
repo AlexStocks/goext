@@ -11,7 +11,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -21,7 +20,7 @@ import (
 )
 
 import (
-	"github.com/AlexStocks/goext/log"
+	// "github.com/AlexStocks/goext/log"
 	"github.com/AlexStocks/goext/strings"
 	mysql "github.com/go-sql-driver/mysql"
 )
@@ -65,7 +64,7 @@ type MySQLDriver struct {
 }
 
 func (d MySQLDriver) Open(dsn string) (driver.Conn, error) {
-	gxlog.CInfo("GettyMSDriver:Open(%s)", dsn)
+	// gxlog.CInfo("GettyMSDriver:Open(%s)", dsn)
 	var driver mysql.MySQLDriver
 	conn, err := driver.Open(dsn)
 	if err != nil {
@@ -78,11 +77,12 @@ func (d MySQLDriver) Open(dsn string) (driver.Conn, error) {
 type mySQLConn struct {
 	driver.Conn
 	stmtMutex sync.RWMutex
+	// 缓存prepared stmt链接，在程序启动的时候全都创建好
 	stmtCache map[string]*mysqlStmt
 }
 
 func (m *mySQLConn) Prepare(query string) (driver.Stmt, error) {
-	gxlog.CInfo("GettyMSDriver:Prepare(%s)", query)
+	// gxlog.CInfo("GettyMSDriver:Prepare(%s)", query)
 	m.stmtMutex.RLock()
 	if stmt, exists := m.stmtCache[query]; exists {
 		// must update reference counter in lock scope
@@ -112,7 +112,7 @@ func (m *mySQLConn) Prepare(query string) (driver.Stmt, error) {
 }
 
 func (m *mySQLConn) Begin() (driver.Tx, error) {
-	gxlog.CInfo("GettyMSDriver:Begin")
+	// gxlog.CInfo("GettyMSDriver:Begin")
 	tx, err := m.Conn.Begin()
 	if err != nil {
 		return nil, err
@@ -126,7 +126,7 @@ type mysqlTx struct {
 }
 
 func (tx *mysqlTx) Commit() (err error) {
-	gxlog.CInfo("GettyMSDriver:Commit")
+	// gxlog.CInfo("GettyMSDriver:Commit")
 	return tx.tx.Commit()
 }
 
@@ -181,10 +181,10 @@ func (m *MySQL) Close() {
 		var key string = m.schema + m.role
 		dbConnMapLock.Lock()
 		db, ok := dbConnMap[key]
-		dbConnMapLock.Unlock()
 		if ok && db == m.DB {
 			delete(dbConnMap, key)
 		}
+		dbConnMapLock.Unlock()
 		m.DB = nil
 	})
 }
@@ -223,7 +223,7 @@ func connect(schema string, role string) {
 	//开始连接DB
 	conn, err := sql.Open(GettyMySQLDriver, schema)
 	if err != nil {
-		log.Fatalln(err.Error())
+		panic(err)
 	}
 
 	//将DB连接放入一个全局变量中
@@ -284,18 +284,18 @@ func (m *MySQL) CheckActive() {
 	if m.waittimeout == 0 {
 		rows, err := m.Query("SHOW VARIABLES LIKE 'wait_timeout'")
 		if err != nil {
-			log.Fatalln(err.Error())
+			panic(err)
 		}
 		defer rows.Close()
 
 		result, err := m.FetchRows(rows)
 		if err != nil {
-			log.Fatalln(err.Error())
+			panic(err)
 		}
 		if result != nil && len(result) != 0 {
 			timeout, err := strconv.Atoi(result[0]["Value"])
 			if err != nil {
-				log.Fatalln(err.Error())
+				panic(err)
 			}
 			m.waittimeout = int64(timeout)
 		}
