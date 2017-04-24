@@ -35,17 +35,17 @@ func TestSlice2(t *testing.T) {
 	println(String(b)) // output: hello worldhello world
 }
 
-func TestCheckByteArray(t *testing.T) {
-	var s = "hello"
-	var flag bool
-	if flag = CheckByteArray([]byte(s)); !flag {
-		t.Fatalf("CheckByteArray([]byte(%s)) failed")
-	}
-
-	if flag = CheckByteArray(s); flag {
-		t.Fatalf("CheckByteArray(%s) failed")
-	}
-}
+// func TestCheckByteArray(t *testing.T) {
+// 	var s = "hello"
+// 	var flag bool
+// 	if flag = CheckByteArray1([]byte(s)); !flag {
+// 		t.Fatalf("CheckByteArray([]byte(%s)) failed")
+// 	}
+//
+// 	if flag = CheckByteArray1(s); flag {
+// 		t.Fatalf("CheckByteArray(%s) failed")
+// 	}
+// }
 
 // // go test -v -bench BenchmarkCheckByteArray1$ -run=^a
 // func BenchmarkCheckByteArray1(b *testing.B) {

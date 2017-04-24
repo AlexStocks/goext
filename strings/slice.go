@@ -3,6 +3,7 @@
 // governed by a BSD-style license.
 //
 // http://blog.csdn.net/siddontang/article/details/23541587
+// reflect.StringHeader和reflect.SliceHeader的结构体只相差末尾一个字段(cap)
 // vitess代码，一种很hack的做法，string和slice的转换只需要拷贝底层的指针，而不是内存拷贝。
 
 package gxstrings
@@ -29,14 +30,21 @@ func Slice(s string) (b []byte) {
 	return
 }
 
-var (
-	typeOfBytes = reflect.TypeOf([]byte(nil))
-)
-
-func CheckByteArray(v interface{}) bool {
-	_, ok := v.([]byte)
-	return ok
+// returns &s[0], which is not allowed in go
+func StringPointer(s string) unsafe.Pointer {
+	p := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	return unsafe.Pointer(p.Data)
 }
+
+// returns &b[0], which is not allowed in go
+func BytePointer(b []byte) unsafe.Pointer {
+	p := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	return unsafe.Pointer(p.Data)
+}
+
+// var (
+// 	typeOfBytes = reflect.TypeOf([]byte(nil))
+// )
 
 // func CheckByteArray1(v interface{}) bool {
 // 	vv := reflect.ValueOf(v)

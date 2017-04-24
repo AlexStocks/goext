@@ -5,11 +5,22 @@
 ## dev list ##
 ---
 
+- 2017/04/24
+
+   > feature
+   * add pretty struct in log/pretty.go
+
+   > improvement
+   * add mysql prepared statement for gxdriver
+
 - 2017/04/20
+
    > feature
    * add Time2Unix & Unix2Time & UnixString2Time in time
 
 - 2017/04/13
+
+    > feature
 	* add container/gxset
 
 - 2017/04/02
