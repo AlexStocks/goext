@@ -20,9 +20,9 @@ import (
 )
 
 import (
-	"github.com/AlexStocks/goext/log"
+	// "github.com/AlexStocks/goext/log"
 	"github.com/AlexStocks/goext/strings"
-	mysql "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 )
 
 const (
@@ -51,12 +51,12 @@ type mysqlStmt struct {
 
 // 程序退出的时候调用之
 func (stmt *mysqlStmt) Close() error {
-	gxlog.CInfo("Close()")
+	// gxlog.CInfo("Close()")
 	stmt.conn.stmtMutex.Lock()
 	defer stmt.conn.stmtMutex.Unlock()
 
 	if atomic.AddInt32(&stmt.ref, -1) == 0 {
-		gxlog.CInfo("really close")
+		// gxlog.CInfo("really close")
 		delete(stmt.conn.stmtCache, stmt.query)
 		return stmt.Stmt.Close()
 	}
@@ -67,7 +67,7 @@ type MySQLDriver struct {
 }
 
 func (d MySQLDriver) Open(dsn string) (driver.Conn, error) {
-	gxlog.CInfo("GettyMSDriver:Open(%s)", dsn)
+	// gxlog.CInfo("GettyMSDriver:Open(%s)", dsn)
 	var driver mysql.MySQLDriver
 	conn, err := driver.Open(dsn)
 	if err != nil {
@@ -86,7 +86,7 @@ type mySQLConn struct {
 
 // 这个函数应该在程序启动的时候被调用以创建全局prepared stmt句柄，在程序退出的时候调用(stmt *mysqlStmt) Close()
 func (m *mySQLConn) Prepare(query string) (driver.Stmt, error) {
-	gxlog.CInfo("GettyMSDriver:Prepare(%s)", query)
+	// gxlog.CInfo("GettyMSDriver:Prepare(%s)", query)
 	m.stmtMutex.RLock()
 	if stmt, exists := m.stmtCache[query]; exists {
 		// must update reference counter in lock scope
@@ -116,7 +116,7 @@ func (m *mySQLConn) Prepare(query string) (driver.Stmt, error) {
 }
 
 func (m *mySQLConn) Begin() (driver.Tx, error) {
-	gxlog.CInfo("GettyMSDriver:Begin")
+	// gxlog.CInfo("GettyMSDriver:Begin")
 	tx, err := m.Conn.Begin()
 	if err != nil {
 		return nil, err
@@ -130,7 +130,7 @@ type mysqlTx struct {
 }
 
 func (tx *mysqlTx) Commit() (err error) {
-	gxlog.CInfo("GettyMSDriver:Commit")
+	// gxlog.CInfo("GettyMSDriver:Commit")
 	return tx.tx.Commit()
 }
 
