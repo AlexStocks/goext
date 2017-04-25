@@ -4,16 +4,15 @@
 
 // 2017-04-02 02:04
 // package gxelasticsearch provides a Elasticsearch driver
-
 package gxelasticsearch
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
 import (
-	"encoding/json"
 	"github.com/pkg/errors"
 	es "gopkg.in/olivere/elastic.v3"
 )
@@ -199,10 +198,10 @@ func (ec EsClient) BulkInsert(index string, typ string, arr []interface{}) error
 	ctx = context.Background()
 	rsp, err = bulk.DoC(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "BulkInsert(@arr:%#v)", arr)
+		return errors.Wrapf(err, "BulkInsert(@arr len:%d)", len(arr))
 	}
 	if rsp.Errors {
-		return fmt.Errorf("BulkInsert(@arr:%#v) = error:%#v ", arr, rsp.Failed())
+		return fmt.Errorf("BulkInsert(@arr len:%d), failed number:%#v, first fail reason:%#v", len(arr), len(rsp.Failed()), rsp.Failed()[0])
 	}
 
 	return nil
