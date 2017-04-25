@@ -14,6 +14,7 @@ import (
 
 import (
 	"github.com/AlexStocks/goext/log"
+	// Log "github.com/AlexStocks/log4go"
 	"github.com/pkg/errors"
 	es "gopkg.in/olivere/elastic.v3"
 )
@@ -202,6 +203,9 @@ func (ec EsClient) BulkInsert(index string, typ string, arr []interface{}) error
 		return errors.Wrapf(err, "BulkInsert(@arr len:%d)", len(arr))
 	}
 	if rsp.Errors {
+		// for i, f := range rsp.Failed() {
+		// 	Log.Warn("index:%d, fail:%s", i, gxlog.PrettyStruct(f))
+		// }
 		return fmt.Errorf("BulkInsert(@arr len:%d), failed number:%#v, first fail{reason:%#v, fail detail:%#v}",
 			len(arr), len(rsp.Failed()), gxlog.PrettyStruct(rsp.Failed()[0]))
 	}
