@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/04/25
+	> feature
+	* add elasticsearch bulk insert
+	
 - 2017/04/24
 
    > feature
