@@ -14,7 +14,6 @@ import (
 
 import (
 	"github.com/AlexStocks/goext/sync"
-	"github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/ioutils"
 )
 
 type Wheel struct {
