@@ -14,16 +14,18 @@ import (
 
 import (
 	"github.com/AlexStocks/goext/sync"
+	"github.com/fsouza/go-dockerclient/external/github.com/docker/docker/pkg/ioutils"
 )
 
 type Wheel struct {
-	sync.Mutex
+	sync.RWMutex
 	span   time.Duration
 	period time.Duration
 	ticker *time.Ticker
 	index  int
 	ring   []chan gxsync.Empty
 	once   sync.Once
+	now    time.Time
 }
 
 func NewWheel(span time.Duration, buckets int) *Wheel {
@@ -50,8 +52,9 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 		var notify chan gxsync.Empty
 		// var cw CountWatch
 		// cw.Start()
-		for range w.ticker.C {
+		for t := range w.ticker.C {
 			w.Lock()
+			w.now = t
 
 			// fmt.Println("index:", w.index, ", value:", w.bitmap.Get(w.index))
 			notify = w.ring[w.index]
@@ -94,4 +97,12 @@ func (w *Wheel) After(timeout time.Duration) <-chan gxsync.Empty {
 	w.Unlock()
 
 	return c
+}
+
+func (w *Wheel) Now() time.Time {
+	w.RLock()
+	now := w.now
+	w.RUnlock()
+
+	return now
 }

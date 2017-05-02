@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/05/02
+	> feature
+	* add gxtime.Wheel:Now()
+
 - 2017/04/25
 	> feature
 	* add elasticsearch bulk insert
