@@ -46,6 +46,7 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 		ticker: time.NewTicker(span),
 		index:  0,
 		ring:   make([](chan gxsync.Empty), buckets),
+		now:    time.Now(),
 	}
 
 	go func() {
