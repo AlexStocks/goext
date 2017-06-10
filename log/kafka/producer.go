@@ -44,8 +44,17 @@ type producer struct {
 
 // NewProducer constructs a new SyncProducer for give brokers addresses.
 // @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
-func NewProducer(clientID string, brokers []string, partitionMethod int, waitForAllAck bool) (Producer, error) {
-	if clientID == "" || brokers == nil || len(brokers) == 0 {
+// @compressionType pls note that the version of kafka should >= V0_10_0_0 if you wanna use CompressionLZ4.
+func NewProducer(
+	clientID string,
+	brokers []string,
+	partitionMethod int,
+	waitForAllAck bool,
+	compressionType sarama.CompressionCodec,
+) (Producer, error) {
+
+	if clientID == "" || brokers == nil || len(brokers) == 0 ||
+		compressionType < sarama.CompressionNone || sarama.CompressionLZ4 < compressionType {
 		return &producer{}, fmt.Errorf("@clientID:%s, @brokers:%s", clientID, brokers)
 	}
 
@@ -69,6 +78,7 @@ func NewProducer(clientID string, brokers []string, partitionMethod int, waitFor
 	} else {
 		kafkaConfig.Producer.RequiredAcks = sarama.WaitForLocal
 	}
+	kafkaConfig.Producer.Compression = compressionType
 
 	kafkaProducer, err := sarama.NewSyncProducer(brokers, kafkaConfig)
 	if err != nil {
@@ -159,17 +169,20 @@ type asyncProducer struct {
 
 // NewAsyncProducer constructs a new AsyncProducer for give brokers addresses.
 // @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
+// @compressionType pls note that the version of kafka should >= V0_10_0_0 if you wanna use CompressionLZ4.
 func NewAsyncProducer(
 	clientID string,
 	brokers []string,
 	partitionMethod int,
 	waitForAllAck bool,
+	compressionType sarama.CompressionCodec,
 	successfulMessageCallback ProducerMessageCallback,
 	errorCallback ProducerErrorCallback,
 ) (AsyncProducer, error) {
 
-	if clientID == "" || brokers == nil || len(brokers) == 0 {
-		return &asyncProducer{}, fmt.Errorf("@clientID:%s, @brokers:%s", clientID, brokers)
+	if clientID == "" || brokers == nil || len(brokers) == 0 ||
+		compressionType < sarama.CompressionNone || sarama.CompressionLZ4 < compressionType {
+		return &asyncProducer{}, fmt.Errorf("@clientID:%s, @brokers:%s, @compressionType:%d", clientID, brokers, compressionType)
 	}
 
 	var partitionerConstructor sarama.PartitionerConstructor
@@ -187,6 +200,7 @@ func NewAsyncProducer(
 	kafkaConfig.Producer.Return.Successes = true
 	kafkaConfig.Producer.Return.Errors = true
 	kafkaConfig.Producer.Partitioner = partitionerConstructor
+	kafkaConfig.Producer.Compression = compressionType
 	if waitForAllAck {
 		kafkaConfig.Producer.RequiredAcks = sarama.WaitForAll
 	} else {
