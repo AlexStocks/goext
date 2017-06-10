@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/06/10
+	> feature
+	* add compression for kafka producer
+
 - 2017/05/02
 	> feature
 	* add gxtime.Wheel:Now()
