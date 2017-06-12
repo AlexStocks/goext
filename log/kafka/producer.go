@@ -16,6 +16,7 @@ import (
 
 import (
 	"github.com/AlexStocks/goext/sync"
+	"github.com/AlexStocks/goext/time"
 	Log "github.com/AlexStocks/log4go"
 	"github.com/Shopify/sarama"
 )
@@ -44,12 +45,14 @@ type producer struct {
 
 // NewProducer constructs a new SyncProducer for give brokers addresses.
 // @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
+// @updateMetaDataInterval is in second. to keep socket connection alive. its value shoule be less than connections.max.idle.ms.
 // @compressionType pls note that the version of kafka should >= V0_10_0_0 if you wanna use CompressionLZ4.
 func NewProducer(
 	clientID string,
 	brokers []string,
 	partitionMethod int,
 	waitForAllAck bool,
+	updateMetaDataInterval int,
 	compressionType sarama.CompressionCodec,
 ) (Producer, error) {
 
@@ -79,6 +82,8 @@ func NewProducer(
 		kafkaConfig.Producer.RequiredAcks = sarama.WaitForLocal
 	}
 	kafkaConfig.Producer.Compression = compressionType
+
+	kafkaConfig.Metadata.RefreshFrequency = gxtime.TimeSecondDuration(updateMetaDataInterval)
 
 	kafkaProducer, err := sarama.NewSyncProducer(brokers, kafkaConfig)
 	if err != nil {
@@ -169,12 +174,14 @@ type asyncProducer struct {
 
 // NewAsyncProducer constructs a new AsyncProducer for give brokers addresses.
 // @clientID should applied for sarama.validID [sarama config.go:var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)]
+// @updateMetaDataInterval is in second. to keep socket connection alive. its value shoule be less than connections.max.idle.ms.
 // @compressionType pls note that the version of kafka should >= V0_10_0_0 if you wanna use CompressionLZ4.
 func NewAsyncProducer(
 	clientID string,
 	brokers []string,
 	partitionMethod int,
 	waitForAllAck bool,
+	updateMetaDataInterval int,
 	compressionType sarama.CompressionCodec,
 	successfulMessageCallback ProducerMessageCallback,
 	errorCallback ProducerErrorCallback,
@@ -206,6 +213,8 @@ func NewAsyncProducer(
 	} else {
 		kafkaConfig.Producer.RequiredAcks = sarama.WaitForLocal
 	}
+
+	kafkaConfig.Metadata.RefreshFrequency = gxtime.TimeSecondDuration(updateMetaDataInterval)
 
 	kafkaProducer, err := sarama.NewAsyncProducer(brokers, kafkaConfig)
 	if err != nil {

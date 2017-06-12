@@ -42,7 +42,7 @@ func TestKafkaProducer(t *testing.T) {
 		message   Message
 	)
 
-	if producer, err = NewProducer(id, brokers, HASH, true, sarama.CompressionGZIP); err != nil {
+	if producer, err = NewProducer(id, brokers, HASH, true, 45, sarama.CompressionGZIP); err != nil {
 		t.Errorf("NewProducerWithZk(id:%s, brokers:%s) = err{%v}", id, brokers, err)
 	}
 	defer producer.Stop()
@@ -90,7 +90,7 @@ func BenchmarkProducer_SendMessage(b *testing.B) {
 	)
 
 	b.StopTimer()
-	if producer, err = NewProducer(id, brokers, HASH, true, sarama.CompressionGZIP); err != nil {
+	if producer, err = NewProducer(id, brokers, HASH, true, 45, sarama.CompressionGZIP); err != nil {
 		b.Errorf("NewProducerWithZk(id:%s, brokers:%s) = err{%v}", id, brokers, err)
 	}
 	defer producer.Stop()
@@ -163,7 +163,7 @@ func TestAsyncKafkaProducer(t *testing.T) {
 		failures++
 	}
 
-	if producer, err = NewAsyncProducer(id, brokers, HASH, true, sarama.CompressionLZ4, msgCallback, errCallback); err != nil {
+	if producer, err = NewAsyncProducer(id, brokers, HASH, true, 45, sarama.CompressionLZ4, msgCallback, errCallback); err != nil {
 		t.Errorf("NewAsyncProducerWithZk(zk:%s) = err{%v}", brokers, err)
 	}
 	producer.Start()
@@ -238,7 +238,7 @@ func BenchmarkAsyncProducer_SendMessage(b *testing.B) {
 		b.Fatalf("Failed to get broker list: %v", err)
 	}
 
-	if producer, err = NewAsyncProducer(id, brokers, HASH, true, sarama.CompressionLZ4, msgCallback, errCallback); err != nil {
+	if producer, err = NewAsyncProducer(id, brokers, HASH, true, 45, sarama.CompressionLZ4, msgCallback, errCallback); err != nil {
 		b.Errorf("NewAsyncProducerWithZk(zk:%s) = err{%v}", zk, err)
 	}
 	producer.Start()

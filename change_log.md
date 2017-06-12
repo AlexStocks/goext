@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/06/12
+	> feature
+	* add updateMetaDataInterval for kafka producer
+
 - 2017/06/10
 	> feature
 	* add compression for kafka producer
