@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/07/09
+	> feature
+	* add HashMap
+
 - 2017/06/12
 	> feature
 	* add updateMetaDataInterval for kafka producer
