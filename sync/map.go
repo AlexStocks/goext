@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// refers to https://github.com/golang/go/blob/master/src/sync/map.go
 // package sync
 package gxsync
 
@@ -391,6 +392,9 @@ func (m *Map) CompareAndSwap(key, oldValue, newValue interface{}) (actual interf
 		actual, loaded = e.tryCompareAndSwap(oldValue, newValue)
 		m.missLocked()
 	}
+	// else
+	// read 和 dirty中都不存在
+
 	m.mu.Unlock()
 
 	if loaded {
