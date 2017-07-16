@@ -20,7 +20,7 @@ type HashMap struct {
 	size     int64
 	shardNum int // shard number
 	hash     Hash
-	shard    []*sync.Map // use pointer here. cause sync.*HashMap obj can not be copied.
+	shard    []*Map // use pointer here. cause sync.*HashMap obj can not be copied.
 }
 
 // Creates a new concurrent map.
@@ -29,16 +29,16 @@ func NewHashMap(shardNum int, hash Hash) *HashMap {
 		shardNum = SHARD_COUNT
 	}
 
-	m := &HashMap{shardNum: shardNum, hash: hash, shard: make([]*sync.Map, shardNum)}
+	m := &HashMap{shardNum: shardNum, hash: hash, shard: make([]*Map, shardNum)}
 	for i := 0; i < shardNum; i++ {
-		m.shard[i] = &sync.Map{}
+		m.shard[i] = &Map{}
 	}
 
 	return m
 }
 
 // Returns shard under given key
-func (m *HashMap) GetShard(key interface{}) *sync.Map {
+func (m *HashMap) GetShard(key interface{}) *Map {
 	return m.shard[uint(m.hash(key))%uint(m.shardNum)]
 }
 
@@ -106,7 +106,14 @@ func (m *HashMap) Get(key interface{}) (interface{}, bool) {
 
 // Returns the number of elements within the map.
 func (m *HashMap) Count() int {
-	return int(atomic.LoadInt64(&(m.size)))
+	//return int(atomic.LoadInt64(&(m.size)))
+	// Returns the number of elements within the map.
+	count := 0
+	for i := 0; i < m.shardNum; i++ {
+		count += m.shard[i].Len()
+	}
+
+	return count
 }
 
 // Looks up an item under specified key
@@ -165,7 +172,7 @@ func (m *HashMap) IterBuffered() <-chan Tuple {
 		wg.Add(m.shardNum)
 		// Foreach shard.
 		for _, shard := range m.shard {
-			go func(shard *sync.Map) {
+			go func(shard *Map) {
 				// Foreach key, value pair.
 				shard.Range(func(key, value interface{}) bool {
 					ch <- Tuple{key, value}
@@ -215,7 +222,7 @@ func (m *HashMap) Keys() []interface{} {
 		wg := sync.WaitGroup{}
 		wg.Add(m.shardNum)
 		for _, shard := range m.shard {
-			go func(shard *sync.Map) {
+			go func(shard *Map) {
 				// Foreach key, value pair.
 				shard.Range(func(key, value interface{}) bool {
 					ch <- key

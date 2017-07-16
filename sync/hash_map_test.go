@@ -42,7 +42,7 @@ func TestInsert(t *testing.T) {
 	m.Set("monkey", monkey)
 
 	if m.Count() != 2 {
-		t.Error("map should contain exactly two elements.")
+		t.Errorf("map should contain exactly two elements, but its count is %s", m.Count())
 	}
 }
 

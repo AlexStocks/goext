@@ -6,6 +6,7 @@
 package gxsync
 
 import (
+	"sync"
 	"sync/atomic"
 	"unsafe"
 )
@@ -19,7 +20,7 @@ import (
 // 如果ditry不为空，则包含read中全部值，如果为空则说明老的ditry刚被提升为read
 type Map struct {
 	// 当涉及到dirty数据的操作的时候，需要使用这个锁
-	mu Mutex
+	mu sync.Mutex
 
 	// 一个只读的数据结构，因为只读，所以不会有读写冲突。
 	// 所以从这个数据中读取总是安全的。
@@ -42,6 +43,9 @@ type Map struct {
 	// 当misses累积到 dirty的长度的时候， 就会将dirty提升为read,避免从dirty中miss太多次。
 	// 因为操作dirty需要加锁。
 	misses int
+
+	// map element size
+	size int64
 }
 
 // readOnly is an immutable struct stored atomically in the Map.read field.
@@ -85,6 +89,10 @@ func (m *Map) missLocked() {
 	m.read.Store(readOnly{m: m.dirty})
 	m.dirty = nil
 	m.misses = 0
+}
+
+func (m *Map) Len() int {
+	return int(atomic.LoadInt64(&(m.size)))
 }
 
 // 双检查的技术Java程序员非常熟悉了，单例模式的实现之一就是利用双检查的技术。
@@ -199,6 +207,7 @@ func (m *Map) Store(key, value interface{}) {
 	// 如果m.read存在这个键，并且这个entry没有被标记删除(dirty不存在)，尝试直接存储。
 	read, _ := m.read.Load().(readOnly)
 	if e, ok := read.m[key]; ok && e.tryStore(&value) {
+		atomic.AddInt64(&(m.size), 1)
 		return
 	}
 
@@ -229,6 +238,7 @@ func (m *Map) Store(key, value interface{}) {
 		m.dirty[key] = newEntry(value)
 	}
 	m.mu.Unlock()
+	atomic.AddInt64(&(m.size), 1)
 }
 
 // tryLoadOrStore atomically loads or stores a value if the entry is not
@@ -268,10 +278,14 @@ func (e *entry) tryLoadOrStore(i interface{}) (actual interface{}, loaded, ok bo
 // The loaded result is true if the value was loaded, false if stored.
 func (m *Map) LoadOrStore(key, value interface{}) (actual interface{}, loaded bool) {
 	// Avoid locking if it's a clean hit.
+	// 尝试从read中读取原值
 	read, _ := m.read.Load().(readOnly)
 	if e, ok := read.m[key]; ok {
 		actual, loaded, ok := e.tryLoadOrStore(value)
 		if ok {
+			if !loaded {
+				atomic.AddInt64(&(m.size), 1)
+			}
 			return actual, loaded
 		}
 	}
@@ -282,9 +296,15 @@ func (m *Map) LoadOrStore(key, value interface{}) (actual interface{}, loaded bo
 		if e.unexpungeLocked() {
 			m.dirty[key] = e
 		}
-		actual, loaded, _ = e.tryLoadOrStore(value)
+		actual, loaded, ok = e.tryLoadOrStore(value)
+		if ok && !loaded {
+			atomic.AddInt64(&(m.size), 1)
+		}
 	} else if e, ok := m.dirty[key]; ok {
-		actual, loaded, _ = e.tryLoadOrStore(value)
+		actual, loaded, ok = e.tryLoadOrStore(value)
+		if ok && !loaded {
+			atomic.AddInt64(&(m.size), 1)
+		}
 		m.missLocked()
 	} else {
 		if !read.amended {
@@ -292,6 +312,7 @@ func (m *Map) LoadOrStore(key, value interface{}) (actual interface{}, loaded bo
 			// Make sure it is allocated and mark the read-only map as incomplete.
 			m.dirtyLocked()
 			m.read.Store(readOnly{m: read.m, amended: true})
+			atomic.AddInt64(&(m.size), 1)
 		}
 		m.dirty[key] = newEntry(value)
 		actual, loaded = value, false
@@ -299,6 +320,84 @@ func (m *Map) LoadOrStore(key, value interface{}) (actual interface{}, loaded bo
 	m.mu.Unlock()
 
 	return actual, loaded
+}
+
+func (e *entry) loadWithNil() (interface{}, bool) {
+	p := atomic.LoadPointer(&e.p)
+	if p == expunged {
+		return nil, false
+	}
+	if p == nil {
+		return nil, true
+	}
+
+	return *(*interface{})(p), true
+}
+
+// tryLoadAndStore atomically loads and stores a value if the entry is not
+// expunged and its old value == @old.
+//
+// If the entry is expunged or its value != old, tryCompareAndSwap leaves the entry unchanged and
+// returns false.
+func (e *entry) tryCompareAndSwap(oldValue, newValue interface{}) (interface{}, bool) {
+	p := atomic.LoadPointer(&e.p)
+	if p == expunged {
+		return nil, false
+	}
+
+	// Copy the interface after the first load to make this method more amenable
+	// to escape analysis: if we hit the "load" path or the entry is expunged, we
+	// shouldn't bother heap-allocating.
+	value := newValue
+	for {
+		if atomic.CompareAndSwapPointer(&e.p, unsafe.Pointer(&oldValue), unsafe.Pointer(&value)) {
+			return oldValue, true
+		}
+		v, ok := e.loadWithNil()
+		if !ok {
+			return nil, false
+		}
+		if v != oldValue {
+			return v, false
+		}
+	}
+}
+
+// CompareAndSwap returns the existing value for the key if present.
+// If the key existed and its value == @oldValue, the loaded result is true and its value is updated by @newValue.
+// Please Attention that the oldValue shoule be the same(Value and Address) as the @value use in function Store.
+// Cause we compare by CompareAndSwapPointer.
+//
+// 这里需要注意的是，oldValue一定要是Store存储的时候使用的原原本本的原value，
+// 否则就算值相等也无济于事，因为上面使用的是CompareAndSwapPointer
+func (m *Map) CompareAndSwap(key, oldValue, newValue interface{}) (actual interface{}, loaded bool) {
+	// Avoid locking if it's a clean hit.
+	read, _ := m.read.Load().(readOnly)
+	if e, ok := read.m[key]; ok {
+		actual, loaded = e.tryCompareAndSwap(oldValue, newValue)
+		if loaded {
+			atomic.AddInt64(&(m.size), 1)
+		}
+		return
+	}
+
+	m.mu.Lock()
+	read, _ = m.read.Load().(readOnly)
+	// it existed in read
+	if e, ok := read.m[key]; ok {
+		actual, loaded = e.tryCompareAndSwap(oldValue, newValue)
+	} else if e, ok := m.dirty[key]; ok {
+		// it exist in dirty but does not exist in read
+		actual, loaded = e.tryCompareAndSwap(oldValue, newValue)
+		m.missLocked()
+	}
+	m.mu.Unlock()
+
+	if loaded {
+		atomic.AddInt64(&(m.size), 1)
+	}
+
+	return
 }
 
 func (e *entry) delete() (hadValue bool) {
@@ -325,13 +424,16 @@ func (m *Map) Delete(key interface{}) {
 		if !ok && read.amended {
 			// 再次校验后read中不存在相应值，dirty中存在
 			delete(m.dirty, key)
+			atomic.AddInt64(&(m.size), -1)
 		}
 		m.mu.Unlock()
 	}
 	if ok {
 		// read和dirty中都存在相应值，直接置为nil，
 		// 在read向dirty复制(dirtyLocked)时，这个字段会被置为expunged
-		e.delete()
+		if e.delete() {
+			atomic.AddInt64(&(m.size), -1)
+		}
 	}
 }
 
