@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/07/20
+	> feature
+	* colorful print
+
 - 2017/07/09
 	> feature
 	* add HashMap

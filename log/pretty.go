@@ -8,8 +8,21 @@ package gxlog
 
 import (
 	"github.com/davecgh/go-spew/spew"
+	"github.com/k0kubun/pp"
 )
 
-func PrettyStruct(t interface{}) string {
-	return spew.Sdump(t)
+func PrettyString(i interface{}) string {
+	return spew.Sdump(i)
+}
+
+func ColorPrint(i interface{}) {
+	pp.Print(i)
+}
+
+func ColorPrintln(i interface{}) {
+	pp.Println(i)
+}
+
+func ColorPrintf(fmt string, args ...interface{}) {
+	pp.Printf(fmt, args...)
 }
