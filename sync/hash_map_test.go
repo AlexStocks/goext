@@ -300,7 +300,7 @@ func TestMInsert(t *testing.T) {
 		"elephant": Animal{"elephant"},
 		"monkey":   Animal{"monkey"},
 	}
-	m := NewHashMap(64, fnv32)
+	m := NewHashMap(127, fnv32)
 	m.MSet(animals)
 
 	if m.Count() != 2 {

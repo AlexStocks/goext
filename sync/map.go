@@ -4,6 +4,7 @@
 
 // refers to https://github.com/golang/go/blob/master/src/sync/map.go
 // package sync
+// Please do not use it. Just wait the official release in G0 1.9 or 1.10 to wait the method (Map)Len() int
 package gxsync
 
 import (

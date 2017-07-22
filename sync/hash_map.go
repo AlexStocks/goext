@@ -4,10 +4,9 @@
 package gxsync
 
 // refs: https://github.com/orcaman/concurrent-map/blob/master/concurrent_map.go
-
+// Please do not use it. Just wait the official release in G0 1.9 or 1.10 to wait the method (Map)Len() int
 import (
 	"sync"
-	"sync/atomic"
 )
 
 var SHARD_COUNT = 32
@@ -17,7 +16,6 @@ type Hash func(key interface{}) uint32
 // A "thread" safe map of type string:Anything.
 // To avoid lock bottlenecks this map is dived to several (m.shardNum) map shards.
 type HashMap struct {
-	size     int64
 	shardNum int // shard number
 	hash     Hash
 	shard    []*Map // use pointer here. cause sync.*HashMap obj can not be copied.
@@ -53,8 +51,6 @@ func (m *HashMap) Set(key interface{}, value interface{}) {
 	// Get map shard.
 	shard := m.GetShard(key)
 	shard.Store(key, value)
-
-	atomic.AddInt64(&m.size, 1)
 }
 
 // Callback to return new element to be inserted into the map
@@ -131,7 +127,6 @@ func (m *HashMap) Remove(key interface{}) {
 	shard := m.GetShard(key)
 	if _, ok := shard.Load(key); ok {
 		shard.Delete(key)
-		atomic.AddInt64(&(m.size), -1)
 	}
 }
 
@@ -142,7 +137,6 @@ func (m *HashMap) Pop(key interface{}) (v interface{}, exists bool) {
 	v, ok := shard.Load(key)
 	if ok {
 		shard.Delete(key)
-		atomic.AddInt64(&(m.size), -1)
 	}
 	return v, ok
 }
@@ -244,14 +238,3 @@ func (m *HashMap) Keys() []interface{} {
 	return keys
 }
 
-////Reviles *HashMap "private" variables to json marshal.
-//func (m *HashMap) MarshalJSON() ([]byte, error) {
-//	// Create a temporary map, which will hold all item spread across shards.
-//	tmp := make(map[interface{}]interface{})
-//
-//	// Insert items to temporary map.
-//	for item := range m.IterBuffered() {
-//		tmp[item.Key] = item.Val
-//	}
-//	return json.Marshal(tmp)
-//}
