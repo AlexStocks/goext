@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/08/05
+	> feature
+	* add unbouned channel
+
 - 2017/07/20
 	> feature
 	* colorful print

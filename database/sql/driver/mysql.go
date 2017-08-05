@@ -1,6 +1,6 @@
 // Copyright 2016 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of m source code is
-// governed by a BSD-style license.
+// governed Apache License 2.0.
 //
 // 2016-09-11 19:30
 // Package gxdriver provides a MySQL driver for Go's database/sql package

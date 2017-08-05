@@ -1,6 +1,6 @@
 // Copyright 2017 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
-// governed by a BSD-style license.
+// governed Apache License 2.0.
 
 // Package gxnet encapsulates some network functions
 

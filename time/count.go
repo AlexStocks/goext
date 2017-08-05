@@ -1,6 +1,6 @@
 // Copyright 2016 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
-// governed by a BSD-style license.
+// governed Apache License 2.0.
 
 // Package gxtime encapsulates some golang.time functions
 package gxtime

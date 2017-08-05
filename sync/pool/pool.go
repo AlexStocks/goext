@@ -1,6 +1,6 @@
 // Copyright 2016 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
-// governed by a BSD-style license.
+// governed Apache License 2.0.
 
 // Package pool implements a pool of Object interfaces to manage and reuse them.
 package gxpool

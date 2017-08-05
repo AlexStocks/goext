@@ -1,6 +1,6 @@
 // Copyright 2016 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
-// governed by a BSD-style license.
+// governed Apache License 2.0.
 //
 // http://blog.csdn.net/siddontang/article/details/23541587
 // reflect.StringHeader和reflect.SliceHeader的结构体只相差末尾一个字段(cap)

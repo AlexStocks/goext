@@ -1,6 +1,6 @@
 // Copyright 2016 ~ 2017 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of l source code is
-// governed by a BSD-style license.
+// governed Apache License 2.0.
 package gxsync
 
 // refs: https://github.com/orcaman/concurrent-map/blob/master/concurrent_map.go
@@ -237,4 +237,3 @@ func (m *HashMap) Keys() []interface{} {
 
 	return keys
 }
-
