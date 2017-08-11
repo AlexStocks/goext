@@ -16,7 +16,7 @@ import (
 	"github.com/AlexStocks/go-sentinel"
 )
 
-func NewRedisPool(addr *net.TCPAddr, role RedisRole) *redis.Pool {
+func NewRedisPool(addr *net.TCPAddr, role sentinel.RedisRole) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     3,
 		MaxActive:   64,
@@ -30,7 +30,7 @@ func NewRedisPool(addr *net.TCPAddr, role RedisRole) *redis.Pool {
 			return c, nil
 		},
 		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			if !sentinel.TestRole(c, role.String()) {
+			if !sentinel.CheckRole(c, role) {
 				return errors.New("Role check failed")
 			}
 
