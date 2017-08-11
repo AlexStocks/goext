@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/08/11
+	> feature
+	* add redis
+
 - 2017/08/05
 	> feature
 	* add unbouned channel
