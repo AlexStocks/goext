@@ -1,6 +1,6 @@
 // Copyright 2015 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
-// governed Apache License 2.0.
+// governed by Apache License 2.0.
 
 // Package list implements a xor-doubly linked list in xor style
 // whose interface is partially compatible with golang's list.

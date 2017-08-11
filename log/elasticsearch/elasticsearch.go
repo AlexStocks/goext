@@ -1,6 +1,6 @@
-// Copyright 2017 AlexStocks(https://github.com/AlexStocks).
+// Copyright 2016 ~ 2017 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
-// governed by a BSD-style license.
+// governed by Apache License 2.0.
 
 // 2017-04-02 02:04
 // package gxelasticsearch provides a Elasticsearch driver

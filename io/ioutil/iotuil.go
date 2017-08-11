@@ -1,6 +1,6 @@
 // Copyright 2016 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
-// governed Apache License 2.0.
+// governed by Apache License 2.0.
 
 // Package gxioutil implements some I/O utility functions.
 package gxioutil

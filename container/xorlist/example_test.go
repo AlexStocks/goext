@@ -1,6 +1,6 @@
 // Copyright 2015 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
-// governed Apache License 2.0.
+// governed by Apache License 2.0.
 
 package gxxorlist_test
 
@@ -10,6 +10,7 @@ import (
 
 import (
 	"github.com/AlexStocks/goext/container/xorlist"
+	"github.com/AlexStocks/github.com/test/goext/src/container/xorlist"
 )
 
 func Example() {

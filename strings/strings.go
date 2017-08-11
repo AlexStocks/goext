@@ -1,10 +1,10 @@
-// Copyright 2016 AlexStocks(https://github.com/AlexStocks).
+// Copyright 2016 ~ 2017 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
-// governed Apache License 2.0.
-//
+// governed by Apache License 2.0.
+
+
 // 2016/09/28
 // Package gxstrings implements string related utilities.
-
 package gxstrings
 
 import (

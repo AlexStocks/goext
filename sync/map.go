@@ -1,6 +1,6 @@
-// Copyright 2016 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
+// Copyright 2016 ~ 2017 AlexStocks(https://github.com/AlexStocks).
+// All rights reserved.  Use of this source code is
+// governed by Apache License 2.0.
 
 // refers to https://github.com/golang/go/blob/master/src/sync/map.go
 // package sync

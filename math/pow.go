@@ -1,6 +1,6 @@
 // Copyright 2016 ~ 2017 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
-// governed Apache License 2.0.
+// governed by Apache License 2.0.
 
 // gxmath provides some pow likely functions
 package gxmath

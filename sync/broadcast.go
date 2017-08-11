@@ -1,6 +1,6 @@
-// Copyright 2016 AlexStocks(https://.com/AlexStocks).
+// Copyright 2016 ~ 2017 AlexStocks(https://github.com/AlexStocks).
 // All rights reserved.  Use of this source code is
-// governed Apache License 2.0.
+// governed by Apache License 2.0.
 
 // ref: https://rogpeppe.wordpress.com/2009/12/01/concurrent-idioms-1-broadcasting-values-in-go-with-linked-channels/
 package gxsync

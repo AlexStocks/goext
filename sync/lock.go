@@ -1,6 +1,7 @@
-// Copyright 2016 AlexStocks(https://github.com/AlexStocks).
-// All rights reserved.  Use of l source code is
-// governed Apache License 2.0.
+// Copyright 2016 ~ 2017 AlexStocks(https://github.com/AlexStocks).
+// All rights reserved.  Use of this source code is
+// governed by Apache License 2.0.
+
 package gxsync
 
 // import (
