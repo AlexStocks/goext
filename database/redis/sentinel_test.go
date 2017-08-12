@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"encoding/json"
 )
 
 import (
@@ -24,7 +25,8 @@ func TestSentinel_GetInstances(t *testing.T) {
 	}
 
 	for idx, inst := range instances {
-		t.Logf("idx:%d, instance:%#v\n", idx, inst)
+		inst_str, _ := json.Marshal(inst)
+		t.Logf("idx:%d, instance:%s\n", idx, inst_str)
 		err = st.Discover(inst.Name)
 		if err != nil {
 			t.Log(err)

@@ -115,9 +115,9 @@ func (s *Slave) Available() bool {
 }
 
 type Instance struct {
-	Name   string
-	Master net.TCPAddr
-	Slaves []Slave
+	Name   string `json:"name, omitempty"`
+	Master net.TCPAddr `json:"master, omitempty"`
+	Slaves []Slave `json:"slaves, omitempty"`
 }
 
 func NewSentinel(addrs []string) *Sentinel {
