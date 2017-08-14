@@ -77,6 +77,7 @@ func TestSentinel_GetConn(t *testing.T) {
 			fmt.Println("get conn fail, ", i)
 			continue
 		}
+		defer conn.Close()
 		s, err := redis.String(conn.Do("INFO"))
 		if err != nil {
 			fmt.Println("do command error:", err)
