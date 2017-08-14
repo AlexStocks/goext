@@ -71,11 +71,7 @@ import (
 const (
 	switchMasterChannel = "+switch-master"
 	defaultTimeout      = 10 // seconds
-)
-
-const (
-	RedisMaster = 0
-	RedisSlave  = 1
+	defaultMaxConnNum   = 32
 )
 
 type Sentinel struct {
@@ -205,7 +201,7 @@ func (s *Sentinel) putToBottom(addr string) {
 func (s *Sentinel) defaultPool(addr string) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     3,
-		MaxActive:   10,
+		MaxActive:   defaultMaxConnNum,
 		Wait:        true,
 		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
