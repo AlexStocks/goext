@@ -72,6 +72,7 @@ const (
 	switchMasterChannel = "+switch-master"
 	defaultTimeout      = 10 // seconds
 	defaultMaxConnNum   = 32
+	defaultMaxIdleNum   = 16
 )
 
 type Sentinel struct {
@@ -200,7 +201,7 @@ func (s *Sentinel) putToBottom(addr string) {
 // us to call concurrent requests to Sentinel using connection Do method.
 func (s *Sentinel) defaultPool(addr string) *redis.Pool {
 	return &redis.Pool{
-		MaxIdle:     3,
+		MaxIdle:     defaultMaxIdleNum,
 		MaxActive:   defaultMaxConnNum,
 		Wait:        true,
 		IdleTimeout: 240 * time.Second,
