@@ -4,6 +4,7 @@
 
 // 2017-08-12 11:57
 // Package gxredis provides a redis driver by sentinel
+// ref: https://github.com/alexstocks/go-sentinel/blob/master/role.go
 package gxredis
 
 import (

@@ -1,11 +1,12 @@
+// ref: https://github.com/alexstocks/go-sentinel/blob/master/sentinel_test.go
 package gxredis
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
-	"encoding/json"
 )
 
 import (

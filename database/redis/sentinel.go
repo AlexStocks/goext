@@ -4,6 +4,7 @@
 
 // 2017-08-12 11:57
 // Package gxredis provides a redis driver by sentinel
+// ref: https://github.com/alexstocks/go-sentinel/blob/master/sentinel.go
 package gxredis
 
 import (
@@ -115,9 +116,9 @@ func (s *Slave) Available() bool {
 }
 
 type Instance struct {
-	Name   string `json:"name, omitempty"`
+	Name   string      `json:"name, omitempty"`
 	Master net.TCPAddr `json:"master, omitempty"`
-	Slaves []Slave `json:"slaves, omitempty"`
+	Slaves []Slave     `json:"slaves, omitempty"`
 }
 
 func NewSentinel(addrs []string) *Sentinel {
