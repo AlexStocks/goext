@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/08/21
+	> feature
+	* add deque
+
 - 2017/08/11
 	> feature
 	* add redis
