@@ -17,7 +17,7 @@ func TestPackage(t *testing.T) {
 
 type suite struct {
 	jjtesting.IsolationSuite
-	gxdeque *Deque
+	q *Deque
 }
 
 var _ = gc.Suite(&suite{})
@@ -25,7 +25,7 @@ var _ = gc.Suite(&suite{})
 const testLen = 1000
 
 func (s *suite) SetUpTest(c *gc.C) {
-	s.gxdeque = New()
+	s.q = New()
 }
 
 func (s *suite) TestInit(c *gc.C) {
@@ -35,14 +35,18 @@ func (s *suite) TestInit(c *gc.C) {
 func (s *suite) TestStackBack(c *gc.C) {
 	// Push many values on to the back.
 	for i := 0; i < testLen; i++ {
-		c.Assert(s.gxdeque.Len(), gc.Equals, i)
-		s.gxdeque.PushBack(i)
+		c.Assert(s.q.Len(), gc.Equals, i)
+		s.q.PushBack(i)
+
+		v, ok := s.q.PeekBack()
+		c.Assert(ok, gc.Equals, true)
+		c.Assert(v.(int), gc.Equals, i)
 	}
 
 	// Pop them all off from the back.
 	for i := testLen; i > 0; i-- {
-		c.Assert(s.gxdeque.Len(), gc.Equals, i)
-		v, ok := s.gxdeque.PopBack()
+		c.Assert(s.q.Len(), gc.Equals, i)
+		v, ok := s.q.PopBack()
 		c.Assert(ok, jc.IsTrue)
 		c.Assert(v.(int), gc.Equals, i-1)
 	}
@@ -53,14 +57,18 @@ func (s *suite) TestStackBack(c *gc.C) {
 func (s *suite) TestStackFront(c *gc.C) {
 	// Push many values on to the front.
 	for i := 0; i < testLen; i++ {
-		c.Assert(s.gxdeque.Len(), gc.Equals, i)
-		s.gxdeque.PushFront(i)
+		c.Assert(s.q.Len(), gc.Equals, i)
+		s.q.PushFront(i)
+
+		v, ok := s.q.PeekFront()
+		c.Assert(ok, gc.Equals, true)
+		c.Assert(v.(int), gc.Equals, i)
 	}
 
 	// Pop them all off from the front.
 	for i := testLen; i > 0; i-- {
-		c.Assert(s.gxdeque.Len(), gc.Equals, i)
-		v, ok := s.gxdeque.PopFront()
+		c.Assert(s.q.Len(), gc.Equals, i)
+		v, ok := s.q.PopFront()
 		c.Assert(ok, jc.IsTrue)
 		c.Assert(v.(int), gc.Equals, i-1)
 	}
@@ -71,12 +79,12 @@ func (s *suite) TestStackFront(c *gc.C) {
 func (s *suite) TestQueueFromFront(c *gc.C) {
 	// Push many values on to the back.
 	for i := 0; i < testLen; i++ {
-		s.gxdeque.PushBack(i)
+		s.q.PushBack(i)
 	}
 
 	// Pop them all off the front.
 	for i := 0; i < testLen; i++ {
-		v, ok := s.gxdeque.PopFront()
+		v, ok := s.q.PopFront()
 		c.Assert(ok, jc.IsTrue)
 		c.Assert(v.(int), gc.Equals, i)
 	}
@@ -87,12 +95,12 @@ func (s *suite) TestQueueFromFront(c *gc.C) {
 func (s *suite) TestQueueFromBack(c *gc.C) {
 	// Push many values on to the front.
 	for i := 0; i < testLen; i++ {
-		s.gxdeque.PushFront(i)
+		s.q.PushFront(i)
 	}
 
 	// Pop them all off the back.
 	for i := 0; i < testLen; i++ {
-		v, ok := s.gxdeque.PopBack()
+		v, ok := s.q.PopBack()
 		c.Assert(ok, jc.IsTrue)
 		c.Assert(v.(int), gc.Equals, i)
 	}
@@ -103,40 +111,40 @@ func (s *suite) TestQueueFromBack(c *gc.C) {
 func (s *suite) TestFrontBack(c *gc.C) {
 	// Populate from the front and back.
 	for i := 0; i < testLen; i++ {
-		c.Assert(s.gxdeque.Len(), gc.Equals, i*2)
-		s.gxdeque.PushFront(i)
-		s.gxdeque.PushBack(i)
+		c.Assert(s.q.Len(), gc.Equals, i*2)
+		s.q.PushFront(i)
+		s.q.PushBack(i)
 	}
 
 	//  Remove half the items from the front and back.
 	for i := testLen; i > testLen/2; i-- {
-		c.Assert(s.gxdeque.Len(), gc.Equals, i*2)
+		c.Assert(s.q.Len(), gc.Equals, i*2)
 
-		vb, ok := s.gxdeque.PopBack()
+		vb, ok := s.q.PopBack()
 		c.Assert(ok, jc.IsTrue)
 		c.Assert(vb.(int), gc.Equals, i-1)
 
-		vf, ok := s.gxdeque.PopFront()
+		vf, ok := s.q.PopFront()
 		c.Assert(ok, jc.IsTrue)
 		c.Assert(vf.(int), gc.Equals, i-1)
 	}
 
 	// Expand out again.
 	for i := testLen / 2; i < testLen; i++ {
-		c.Assert(s.gxdeque.Len(), gc.Equals, i*2)
-		s.gxdeque.PushFront(i)
-		s.gxdeque.PushBack(i)
+		c.Assert(s.q.Len(), gc.Equals, i*2)
+		s.q.PushFront(i)
+		s.q.PushBack(i)
 	}
 
 	// Consume all.
 	for i := testLen; i > 0; i-- {
-		c.Assert(s.gxdeque.Len(), gc.Equals, i*2)
+		c.Assert(s.q.Len(), gc.Equals, i*2)
 
-		vb, ok := s.gxdeque.PopBack()
+		vb, ok := s.q.PopBack()
 		c.Assert(ok, jc.IsTrue)
 		c.Assert(vb.(int), gc.Equals, i-1)
 
-		vf, ok := s.gxdeque.PopFront()
+		vf, ok := s.q.PopFront()
 		c.Assert(ok, jc.IsTrue)
 		c.Assert(vf.(int), gc.Equals, i-1)
 	}
@@ -179,28 +187,28 @@ func (s *suite) TestBlockAllocation(c *gc.C) {
 	// blocks as expected.
 
 	for i := 0; i < testLen; i++ {
-		s.gxdeque.PushFront(i)
-		s.gxdeque.PushBack(i)
+		s.q.PushFront(i)
+		s.q.PushBack(i)
 	}
 	// 2000 items at a blockLen of 64:
 	// 31 full blocks + 1 partial front + 1 partial back = 33
-	c.Assert(s.gxdeque.blocks.Len(), gc.Equals, 33)
+	c.Assert(s.q.blocks.Len(), gc.Equals, 33)
 
 	for i := 0; i < testLen; i++ {
-		s.gxdeque.PopFront()
-		s.gxdeque.PopBack()
+		s.q.PopFront()
+		s.q.PopBack()
 	}
 	// At empty there should be just 1 block.
-	c.Assert(s.gxdeque.blocks.Len(), gc.Equals, 1)
+	c.Assert(s.q.blocks.Len(), gc.Equals, 1)
 }
 
 func (s *suite) checkEmpty(c *gc.C) {
-	c.Assert(s.gxdeque.Len(), gc.Equals, 0)
+	c.Assert(s.q.Len(), gc.Equals, 0)
 
-	_, ok := s.gxdeque.PopFront()
+	_, ok := s.q.PopFront()
 	c.Assert(ok, jc.IsFalse)
 
-	_, ok = s.gxdeque.PopBack()
+	_, ok = s.q.PopBack()
 	c.Assert(ok, jc.IsFalse)
 }
 

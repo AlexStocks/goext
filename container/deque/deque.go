@@ -177,3 +177,33 @@ func (d *Deque) PopFront() (interface{}, bool) {
 
 	return item, true
 }
+
+// PeekBack gets an item from the back of the queue and returns
+// it. The returned flag is true unless there were no items left in
+// the queue.
+func (d *Deque) PeekBack() (interface{}, bool) {
+	if d.len < 1 {
+		return nil, false
+	}
+
+	elem := d.blocks.Back()
+	block := elem.Value.(blockT)
+	item := block[d.backIdx]
+
+	return item, true
+}
+
+// PeekFront gets an item from the front of the queue and returns
+// it. The returned flag is true unless there were no items left in
+// the queue.
+func (d *Deque) PeekFront() (interface{}, bool) {
+	if d.len < 1 {
+		return nil, false
+	}
+
+	elem := d.blocks.Front()
+	block := elem.Value.(blockT)
+	item := block[d.frontIdx]
+
+	return item, true
+}
