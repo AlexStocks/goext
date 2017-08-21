@@ -10,7 +10,7 @@ import (
 )
 
 import (
-	"github.com/AlexStocks/goext/container/queue"
+	"github.com/AlexStocks/goext/container/deque"
 )
 
 const (
@@ -25,12 +25,14 @@ type UnboundedChan struct {
 	mu     sync.Mutex
 	cond   *sync.Cond
 	closed bool
-	Q      *gxqueue.Queue
+	// Q      *gxqueue.Queue
+	Q *gxdeque.Deque
 }
 
 func NewUnboundedChan() *UnboundedChan {
 	c := &UnboundedChan{
-		Q: gxqueue.NewQueueWithSize(QSize),
+		// Q: gxqueue.NewQueueWithSize(QSize),
+		Q: gxdeque.New(),
 	}
 	c.cond = sync.NewCond(&c.mu)
 
@@ -50,16 +52,21 @@ func (q *UnboundedChan) Pop() interface{} {
 
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if q.Q.Length() == 0 && !q.closed && !q.wait {
+	// if q.Q.Length() == 0 && !q.closed && !q.wait {
+	if q.Q.Len() == 0 && !q.closed && !q.wait {
 		return v
 	}
-	for q.Q.Length() == 0 && !q.closed {
+	// for q.Q.Length() == 0 && !q.closed {
+	for q.Q.Len() == 0 && !q.closed {
 		q.cond.Wait()
 	}
 
-	if q.Q.Length() > 0 {
-		v = q.Q.Peek()
-		q.Q.Remove()
+	// if q.Q.Length() > 0 {
+	// 	v = q.Q.Peek()
+	// 	q.Q.Remove()
+	// }
+	if q.Q.Len() > 0 {
+		v, _ = q.Q.PopFront()
 	}
 
 	return v
@@ -75,10 +82,13 @@ func (q *UnboundedChan) TryPop() (interface{}, bool) {
 	defer q.mu.Unlock()
 	if q.closed {
 		ok = true
-	} else if q.Q.Length() > 0 {
-		v = q.Q.Peek()
-		q.Q.Remove()
-		ok = true
+		// } else if q.Q.Length() > 0 {
+		// 	v = q.Q.Peek()
+		// 	q.Q.Remove()
+		// 	ok = true
+		// }
+	} else if q.Q.Len() > 0 {
+		v, ok = q.Q.PopFront()
 	}
 
 	return v, ok
@@ -87,7 +97,8 @@ func (q *UnboundedChan) TryPop() (interface{}, bool) {
 func (q *UnboundedChan) Push(v interface{}) {
 	q.mu.Lock()
 	if !q.closed {
-		q.Q.Add(v)
+		// q.Q.Add(v)
+		q.Q.PushBack(v)
 		q.cond.Signal()
 	}
 	q.mu.Unlock()
@@ -95,7 +106,8 @@ func (q *UnboundedChan) Push(v interface{}) {
 
 func (q *UnboundedChan) Len() int {
 	q.mu.Lock()
-	l := q.Q.Length()
+	// l := q.Q.Length()
+	l := q.Q.Len()
 	q.mu.Unlock()
 
 	return l
