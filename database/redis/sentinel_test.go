@@ -116,7 +116,7 @@ func TestSentinel_GetConn(t *testing.T) {
 
 		conn, _ := st.GetConnByRole(fmt.Sprintf("%s:%d", inst.Master.IP, inst.Master.Port), RR_Master)
 		if conn == nil {
-			fmt.Println("get conn fail, ", i)
+			fmt.Println("get conn fail, ", inst.Master.IP, inst.Master.Port)
 			continue
 		}
 		defer conn.Close()
