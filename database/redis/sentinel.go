@@ -20,6 +20,7 @@ import (
 
 import (
 	"github.com/garyburd/redigo/redis"
+	xerrors "github.com/pkg/errors"
 )
 
 // Sentinel provides a way to add high availability (HA) to Redis Pool using
@@ -397,6 +398,94 @@ func (s *Sentinel) GetInstanceNames() ([]string, error) {
 	}
 
 	return res.([]string), nil
+}
+
+// AddInstance adds a redis intance to sentinel to monitor it
+func (s *Sentinel) AddInstance(
+	name string, // instance name
+	ip string, // master ip
+	port int, // master port
+	epoch int, // sentinel epoch
+	sdownTime int, // sdown time in second
+	failoverTimeout int, // failover time in second
+	notifyScript string, // notify script, can be empty string if it does not exist
+) error {
+	for _, addr := range s.Addrs {
+		if err := s.addInstance(addr, name, ip, port, epoch, sdownTime, failoverTimeout, notifyScript); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Sentinel) addInstance(
+	sentinelAddr string,
+	name string,
+	ip string,
+	port int,
+	epoch int,
+	sdownTime int,
+	failoverTimeout int,
+	notifyScript string,
+) error {
+	conn := s.GetConn(sentinelAddr)
+	if conn == nil {
+		return fmt.Errorf("can not connect to sentinel instance %s", sentinelAddr)
+	}
+	defer conn.Close()
+
+	if _, err := conn.Do("sentinel", "monitor", name, ip, port, epoch); err != nil {
+		// error: ERR Duplicated master name
+		return xerrors.Wrapf(err, "sentinelAddr:%s, command:sentinel monitor %s %s %d %d", sentinelAddr, name, ip, port, epoch)
+	}
+
+	if _, err := conn.Do("sentinel", "set", name, "down-after-milliseconds", sdownTime*1000); err != nil {
+		return xerrors.Wrapf(err, "sentinelAddr:%s, command:sentinel down-after-milliseconds %s %d", sentinelAddr, name, sdownTime*1000)
+	}
+
+	if _, err := conn.Do("sentinel", "set", name, "parallel-syncs", 1); err != nil {
+		return xerrors.Wrapf(err, "sentinelAddr:%s, command:sentinel parallel-syncs %s 1", sentinelAddr, name)
+	}
+
+	if _, err := conn.Do("sentinel", "set", name, "failover-timeout", failoverTimeout*1000); err != nil {
+		return xerrors.Wrapf(err, "sentinelAddr:%s, command:sentinel failover-timeout %s %d", sentinelAddr, name, failoverTimeout*1000)
+	}
+
+	if notifyScript != "" {
+		if _, err := conn.Do("sentinel", "set", name, "client-reconfig-script", notifyScript); err != nil {
+			//  ERR Client reconfiguration script seems non existing or non executable
+			return xerrors.Wrapf(err, "sentinelAddr:%s, command:sentinel client-reconfig-script %s %s", sentinelAddr, name, notifyScript)
+		}
+	}
+
+	return nil
+}
+
+// RemoveInstance removes a redis intance from sentinel
+func (s *Sentinel) RemoveInstance(name string) error {
+	for _, addr := range s.Addrs {
+		if err := s.removeInstance(addr, name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *Sentinel) removeInstance(sentinelAddr string, name string) error {
+	conn := s.GetConn(sentinelAddr)
+	if conn == nil {
+		return fmt.Errorf("can not connect to sentinel instance %s", sentinelAddr)
+	}
+	defer conn.Close()
+
+	if _, err := redis.String(conn.Do("sentinel", "remove", name)); err != nil {
+		// error: ERR No such master with that name
+		return xerrors.Wrapf(err, "remove %s from sentinel %s", name, sentinelAddr)
+	}
+
+	return nil
 }
 
 // Discover allows to update list of known Sentinel addresses. From docs:

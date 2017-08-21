@@ -52,27 +52,69 @@ func TestSentinel_GetInstanceNames(t *testing.T) {
 	}
 	t.Logf("sentinel instance names:%#v\n", names)
 }
+func TestSentinel_AddInstance(t *testing.T) {
+	st := NewSentinel(
+		[]string{"192.168.10.100:26380", "192.168.10.100:26381", "192.168.10.100:26382"},
+	)
+	defer st.Close()
+
+	// 不能用下面的方法去扩充st.Addrs，因为执行完结果是 [192.168.10.100:26380 192.168.10.100:26381 192.168.10.100:26382 127.0.0.1:26382 127.0.0.1:26381]
+	// 因为所有的sentinel都在一个机器上部署着
+	// to find all sentinel addresses
+	// instances, err := st.GetInstances()
+	// if err != nil {
+	// 	t.Errorf("st.GetInstances, error:%#v\n", err)
+	// 	t.FailNow()
+	// }
+	//
+	// for _, inst := range instances {
+	// 	err = st.Discover(inst.Name)
+	// 	if err != nil {
+	// 		t.Log(err)
+	// 		t.FailNow()
+	// 	}
+	// }
+
+	st.RemoveInstance("meta")
+	err := st.AddInstance("meta", "192.168.10.100", 6000, 2, 10, 450, "")
+	if err != nil {
+		t.Errorf("RemoveInstance(meta) = error:%#v", err)
+	}
+}
+
+func TestSentinel_RemoveInstance(t *testing.T) {
+	st := NewSentinel(
+		[]string{"192.168.10.100:26380", "192.168.10.100:26381", "192.168.10.100:26382"},
+	)
+	defer st.Close()
+
+	st.AddInstance("meta", "192.168.10.100", 6000, 2, 10, 450, "")
+	err := st.RemoveInstance("meta")
+	if err != nil {
+		t.Errorf("RemoveInstance(meta) = error:%#v", err)
+	}
+}
 
 func TestSentinel_GetConn(t *testing.T) {
-	sp := NewSentinel(
+	st := NewSentinel(
 		[]string{"192.168.10.100:26380"},
 	)
-	defer sp.Close()
+	defer st.Close()
 
-	instances, err := sp.GetInstances()
+	instances, err := st.GetInstances()
 	if err != nil {
 		t.Errorf("st.GetInstances, error:%#v\n", err)
 		t.FailNow()
 	}
 
 	for i, inst := range instances {
-		err = sp.Discover(inst.Name)
+		err = st.Discover(inst.Name)
 		if err != nil {
 			t.Log(err)
 			t.FailNow()
 		}
 
-		conn, _ := sp.GetConnByRole(fmt.Sprintf("%s:%d", inst.Master.IP, inst.Master.Port), RR_Master)
+		conn, _ := st.GetConnByRole(fmt.Sprintf("%s:%d", inst.Master.IP, inst.Master.Port), RR_Master)
 		if conn == nil {
 			fmt.Println("get conn fail, ", i)
 			continue
