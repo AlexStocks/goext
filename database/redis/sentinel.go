@@ -493,13 +493,17 @@ func (s *Sentinel) removeInstance(sentinelAddr string, name string) error {
 // A client may update its internal list of Sentinel nodes following this procedure:
 // 1) Obtain a list of other Sentinels for this master using the command SENTINEL sentinels <master-name>.
 // 2) Add every ip:port pair not already existing in our list at the end of the list.
-func (s *Sentinel) Discover(name string) error {
+func (s *Sentinel) Discover(name string, excludeIPArray []string) error {
 	addrs, err := s.SentinelAddrs(name)
 	if err != nil {
 		return err
 	}
 	s.mu.Lock()
 	for _, addr := range addrs {
+		ip, _, _ := net.SplitHostPort(addr)
+		if stringInSlice(ip, excludeIPArray) {
+			continue
+		}
 		if !stringInSlice(addr, s.Addrs) {
 			s.Addrs = append(s.Addrs, addr)
 		}

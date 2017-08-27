@@ -28,7 +28,7 @@ func TestSentinel_GetInstances(t *testing.T) {
 	for idx, inst := range instances {
 		inst_str, _ := json.Marshal(inst)
 		t.Logf("idx:%d, instance:%s\n", idx, inst_str)
-		err = st.Discover(inst.Name)
+		err = st.Discover(inst.Name, []string{"127.0.0.1"})
 		if err != nil {
 			t.Log(err)
 			t.FailNow()
@@ -58,25 +58,26 @@ func TestSentinel_AddInstance(t *testing.T) {
 	)
 	defer st.Close()
 
-	// 不能用下面的方法去扩充st.Addrs，因为执行完结果是 [192.168.10.100:26380 192.168.10.100:26381 192.168.10.100:26382 127.0.0.1:26382 127.0.0.1:26381]
-	// 因为所有的sentinel都在一个机器上部署着
-	// to find all sentinel addresses
-	// instances, err := st.GetInstances()
-	// if err != nil {
-	// 	t.Errorf("st.GetInstances, error:%#v\n", err)
-	// 	t.FailNow()
-	// }
-	//
-	// for _, inst := range instances {
-	// 	err = st.Discover(inst.Name)
-	// 	if err != nil {
-	// 		t.Log(err)
-	// 		t.FailNow()
-	// 	}
-	// }
+	//to find all sentinel addresses
+	instances, err := st.GetInstances()
+	if err != nil {
+		t.Errorf("st.GetInstances, error:%#v\n", err)
+		t.FailNow()
+	}
+
+	for _, inst := range instances {
+		// 如果所有的sentinel都在一个机器上部署着，如果不加上excludeIPArray参数，
+		// 则执行完结果是 [192.168.10.100:26380 192.168.10.100:26381 192.168.10.100:26382 127.0.0.1:26382 127.0.0.1:26381]
+		err = st.Discover(inst.Name, []string{"127.0.0.1"})
+		if err != nil {
+			t.Log(err)
+			t.FailNow()
+		}
+	}
+	t.Log(st.Addrs)
 
 	st.RemoveInstance("meta")
-	err := st.AddInstance("meta", "192.168.10.100", 6000, 2, 10, 450, "")
+	err = st.AddInstance("meta", "192.168.10.100", 6000, 2, 10, 450, "")
 	if err != nil {
 		t.Errorf("RemoveInstance(meta) = error:%#v", err)
 	}
@@ -108,7 +109,7 @@ func TestSentinel_GetConn(t *testing.T) {
 	}
 
 	for i, inst := range instances {
-		err = st.Discover(inst.Name)
+		err = st.Discover(inst.Name, []string{"127.0.0.1"})
 		if err != nil {
 			t.Log(err)
 			t.FailNow()
@@ -144,7 +145,7 @@ func TestSentinel_MakeSentinelWatcher(t *testing.T) {
 	}
 
 	for _, inst := range instances {
-		err = st.Discover(inst.Name)
+		err = st.Discover(inst.Name, []string{"127.0.0.1"})
 		if err != nil {
 			t.Log(err)
 			t.FailNow()
