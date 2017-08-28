@@ -4,6 +4,7 @@ package gxredis
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -168,4 +169,60 @@ func TestSentinel_MakeSentinelWatcher(t *testing.T) {
 	fmt.Println("close")
 	watcher.Close()
 	wg.Wait()
+}
+
+func TestSentinel_Transaction(t *testing.T) {
+	st := NewSentinel(
+		[]string{"192.168.10.100:26380"},
+	)
+	defer st.Close()
+
+	instances, err := st.GetInstances()
+	if err != nil {
+		t.Errorf("st.GetInstances, error:%#v\n", err)
+		t.FailNow()
+	}
+
+	for _, inst := range instances {
+		err = st.Discover(inst.Name)
+		if err != nil {
+			t.Log(err)
+			t.FailNow()
+		}
+	}
+
+	conn, _ := st.GetConnByRole(net.JoinHostPort("192.168.10.100", "6001"), RR_Master)
+	if conn == nil {
+		t.Errorf("get host %s conn fail", net.JoinHostPort("192.168.10.100", "6000"))
+		t.FailNow()
+	}
+
+	defer func() {
+		if err != nil {
+			conn.Do("discard")
+		}
+		conn.Close()
+	}()
+
+	key := "testk"
+	value := "testv"
+	// tx进行过程中，key发生任何改变（如原来不存在，tx过程中被创建；或者原来存在，tx过程被删除或者值被修改），tx就会失败
+	if _, err = conn.Do("watch", key); err != nil {
+		t.Errorf("watch %s, got error:%#v", key, err)
+		t.FailNow()
+	}
+
+	conn.Send("multi")
+	time.Sleep(10e9)
+	conn.Do("Set", "fuck", value)
+	conn.Do("Set", "fuck", value)
+
+	queued, err := conn.Do("exec")
+	if err != nil {
+		t.Errorf("exec error:%#v", err)
+		t.FailNow()
+	}
+	if queued == nil {
+		t.Logf("tx failed, q:%#v", queued)
+	}
 }
