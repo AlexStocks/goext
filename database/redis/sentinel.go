@@ -119,6 +119,20 @@ type Instance struct {
 	Slaves []Slave     `json:"slaves, omitempty"`
 }
 
+func (i Instance) String() string {
+	var s = fmt.Sprintf("{Name:%s, Master:%s, Slaves:{", i.Name, i.Master.String())
+
+	for idx, slave := range i.Slaves {
+		s += slave.String()
+		if idx != len(i.Slaves)-1 {
+			s += ", "
+		}
+	}
+	s += "}}"
+
+	return s
+}
+
 func NewSentinel(addrs []string) *Sentinel {
 	return &Sentinel{
 		Addrs: addrs,
