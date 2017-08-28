@@ -214,8 +214,8 @@ func TestSentinel_Transaction(t *testing.T) {
 
 	conn.Send("multi")
 	time.Sleep(10e9)
-	conn.Do("Set", "fuck", value)
-	conn.Do("Set", "fuck", value)
+	conn.Do("Set", "testKey", value)
+	conn.Do("Set", "testKey2", value)
 
 	queued, err := conn.Do("exec")
 	if err != nil {
