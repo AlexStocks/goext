@@ -339,14 +339,14 @@ func (s *Sentinel) SlaveAddrs(name string) ([]string, error) {
 }
 
 // Slaves returns a slice with known slaves of master instance.
-func (s *Sentinel) Slaves(name string) ([]*Slave, error) {
+func (s *Sentinel) Slaves(name string) ([]Slave, error) {
 	res, err := s.doUntilSuccess(func(c redis.Conn) (interface{}, error) {
 		return queryForSlaves(c, name)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return res.([]*Slave), nil
+	return res.([]Slave), nil
 }
 
 // SentinelAddrs returns a slice of known Sentinel addresses Sentinel server aware of.
