@@ -530,8 +530,8 @@ func (s *Sentinel) subscriptMasterSwitch() (redis.PubSubConn, error) {
 
 type MasterSwitchInfo struct {
 	Name      string
-	OldMaster net.TCPAddr
-	NewMaster net.TCPAddr
+	OldMaster IPAddr
+	NewMaster IPAddr
 }
 
 type SentinelWatcher struct {
@@ -590,14 +590,16 @@ func (ms *SentinelWatcher) Watch() (<-chan MasterSwitchInfo, error) {
 				if err != nil {
 					continue
 				}
-				info.OldMaster = *tcpAddr
+				info.OldMaster.IP = tcpAddr.IP.String()
+				info.OldMaster.Port = uint32(tcpAddr.Port)
 
 				addr = fmt.Sprintf("%s:%s", string(p[3]), string(p[4]))
 				tcpAddr, err = net.ResolveTCPAddr("tcp4", addr)
 				if err != nil {
 					continue
 				}
-				info.NewMaster = *tcpAddr
+				info.NewMaster.IP = tcpAddr.IP.String()
+				info.NewMaster.Port = uint32(tcpAddr.Port)
 
 				ms.infoChan <- info
 
