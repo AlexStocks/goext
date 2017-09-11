@@ -14,9 +14,13 @@ import (
 	"github.com/garyburd/redigo/redis"
 )
 
+const (
+	HOST_IP = "192.168.11.100"
+)
+
 func TestSentinel_GetInstances(t *testing.T) {
 	st := NewSentinel(
-		[]string{"192.168.10.100:26380"},
+		[]string{HOST_IP + ":26380"},
 	)
 	defer st.Close()
 
@@ -42,7 +46,7 @@ func TestSentinel_GetInstances(t *testing.T) {
 
 func TestSentinel_GetInstanceNames(t *testing.T) {
 	st := NewSentinel(
-		[]string{"192.168.10.100:26380"},
+		[]string{HOST_IP + ":26380"},
 	)
 	defer st.Close()
 
@@ -55,7 +59,7 @@ func TestSentinel_GetInstanceNames(t *testing.T) {
 }
 func TestSentinel_AddInstance(t *testing.T) {
 	st := NewSentinel(
-		[]string{"192.168.10.100:26380", "192.168.10.100:26381", "192.168.10.100:26382"},
+		[]string{HOST_IP + ":26380", HOST_IP + ":26381", HOST_IP + ":26382"},
 	)
 	defer st.Close()
 
@@ -78,7 +82,7 @@ func TestSentinel_AddInstance(t *testing.T) {
 	t.Log(st.Addrs)
 
 	st.RemoveInstance("meta")
-	err = st.AddInstance("meta", "192.168.10.100", 6000, 2, 10, 450, "")
+	err = st.AddInstance("meta", HOST_IP, 6000, 2, 10, 450, "")
 	if err != nil {
 		t.Errorf("RemoveInstance(meta) = error:%#v", err)
 	}
@@ -86,11 +90,11 @@ func TestSentinel_AddInstance(t *testing.T) {
 
 func TestSentinel_RemoveInstance(t *testing.T) {
 	st := NewSentinel(
-		[]string{"192.168.10.100:26380", "192.168.10.100:26381", "192.168.10.100:26382"},
+		[]string{HOST_IP + ":26380", HOST_IP + ":26381", HOST_IP + ":26382"},
 	)
 	defer st.Close()
 
-	st.AddInstance("meta", "192.168.10.100", 6000, 2, 10, 450, "")
+	st.AddInstance("meta", HOST_IP, 6000, 2, 10, 450, "")
 	err := st.RemoveInstance("meta")
 	if err != nil {
 		t.Errorf("RemoveInstance(meta) = error:%#v", err)
@@ -99,7 +103,7 @@ func TestSentinel_RemoveInstance(t *testing.T) {
 
 func TestSentinel_GetConn(t *testing.T) {
 	st := NewSentinel(
-		[]string{"192.168.10.100:26380"},
+		[]string{HOST_IP + ":26380"},
 	)
 	defer st.Close()
 
@@ -135,7 +139,7 @@ func TestSentinel_GetConn(t *testing.T) {
 
 func TestSentinel_MakeSentinelWatcher(t *testing.T) {
 	st := NewSentinel(
-		[]string{"192.168.10.100:26380"},
+		[]string{HOST_IP + ":26380"},
 	)
 	defer st.Close()
 
@@ -173,7 +177,7 @@ func TestSentinel_MakeSentinelWatcher(t *testing.T) {
 
 func TestSentinel_Transaction(t *testing.T) {
 	st := NewSentinel(
-		[]string{"192.168.10.100:26380"},
+		[]string{HOST_IP + ":26380"},
 	)
 	defer st.Close()
 
@@ -184,16 +188,16 @@ func TestSentinel_Transaction(t *testing.T) {
 	}
 
 	for _, inst := range instances {
-		err = st.Discover(inst.Name)
+		err = st.Discover(inst.Name, []string{"127.0.0.1"})
 		if err != nil {
 			t.Log(err)
 			t.FailNow()
 		}
 	}
 
-	conn, _ := st.GetConnByRole(net.JoinHostPort("192.168.10.100", "6001"), RR_Master)
+	conn, _ := st.GetConnByRole(net.JoinHostPort(HOST_IP, "6000"), RR_Master)
 	if conn == nil {
-		t.Errorf("get host %s conn fail", net.JoinHostPort("192.168.10.100", "6000"))
+		t.Errorf("get host %s conn fail", net.JoinHostPort(HOST_IP, "6000"))
 		t.FailNow()
 	}
 

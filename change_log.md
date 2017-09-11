@@ -6,6 +6,10 @@
 ---
 
 - 2017/08/21
+	> improvement
+	* use gogoprotobuf for redis
+
+- 2017/08/21
 	> feature
 	* add deque
 

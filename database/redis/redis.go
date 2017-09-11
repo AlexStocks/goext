@@ -97,50 +97,13 @@ type Sentinel struct {
 	addr  string
 }
 
-// Slave represents a Redis slave instance which is known by Sentinel.
-type Slave struct {
-	net.TCPAddr
-	flags string
-}
-
-// Addr returns an address of slave.
-func (s *Slave) Addr() string {
-	return s.String()
-}
-
-// Available returns if slave is in working state at moment based on information in slave flags.
-func (s *Slave) Available() bool {
-	return !strings.Contains(s.flags, "disconnected") && !strings.Contains(s.flags, "s_down")
-}
-
-type Instance struct {
-	Name   string      `json:"name, omitempty"`
-	Master net.TCPAddr `json:"master, omitempty"`
-	Slaves []Slave     `json:"slaves, omitempty"`
-}
-
-func (i Instance) String() string {
-	var s = fmt.Sprintf("{Name:%s, Master:%s, Slaves:{", i.Name, i.Master.String())
-
-	for idx, slave := range i.Slaves {
-		s += slave.String()
-		if idx != len(i.Slaves)-1 {
-			s += ", "
-		}
-	}
-	s += "}}"
-
-	return s
-}
-
 func NewSentinel(addrs []string) *Sentinel {
 	return &Sentinel{
 		Addrs: addrs,
 		Dial: func(addr string) (redis.Conn, error) {
 			timeout := defaultTimeout * time.Second
 			// read timeout set to 0 to wait sentinel notify
-			c, err := redis.DialTimeout("tcp", addr,
-				timeout, 0, timeout)
+			c, err := redis.DialTimeout("tcp", addr, timeout, 0, timeout)
 			if err != nil {
 				return nil, err
 			}
@@ -339,14 +302,14 @@ func (s *Sentinel) SlaveAddrs(name string) ([]string, error) {
 }
 
 // Slaves returns a slice with known slaves of master instance.
-func (s *Sentinel) Slaves(name string) ([]Slave, error) {
+func (s *Sentinel) Slaves(name string) ([]*Slave, error) {
 	res, err := s.doUntilSuccess(func(c redis.Conn) (interface{}, error) {
 		return queryForSlaves(c, name)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return res.([]Slave), nil
+	return res.([]*Slave), nil
 }
 
 // SentinelAddrs returns a slice of known Sentinel addresses Sentinel server aware of.
@@ -385,11 +348,13 @@ func (s *Sentinel) GetInstances() ([]Instance, error) {
 				return instances, err
 			}
 			instance.Name = sm["name"]
-			instance.Master.IP = net.ParseIP(sm["ip"])
-			instance.Master.Port, err = strconv.Atoi(sm["port"])
+			instance.Master = &IPAddr{}
+			instance.Master.IP = net.ParseIP(sm["ip"]).String()
+			port, err := strconv.Atoi(sm["port"])
 			if err != nil {
 				return instances, err
 			}
+			instance.Master.Port = uint32(port)
 			instance.Slaves, err = queryForSlaves(conn, instance.Name)
 			if err != nil {
 				return instances, err
@@ -680,31 +645,33 @@ func queryForSlaveAddrs(conn redis.Conn, masterName string) ([]string, error) {
 	}
 	slaveAddrs := make([]string, 0)
 	for _, slave := range slaves {
-		slaveAddrs = append(slaveAddrs, slave.Addr())
+		slaveAddrs = append(slaveAddrs, slave.Address())
 	}
 	return slaveAddrs, nil
 }
 
-func queryForSlaves(conn redis.Conn, masterName string) ([]Slave, error) {
+func queryForSlaves(conn redis.Conn, masterName string) ([]*Slave, error) {
 	res, err := redis.Values(conn.Do("SENTINEL", "slaves", masterName))
 	if err != nil {
 		return nil, err
 	}
-	slaves := make([]Slave, 0)
+	slaves := make([]*Slave, 0)
 	for _, a := range res {
 		sm, err := redis.StringMap(a, err)
 		if err != nil {
 			return slaves, err
 		}
 		slave := &Slave{
-			flags: sm["flags"],
+			Flags: sm["flags"],
+			Addr:  new(IPAddr),
 		}
-		slave.IP = net.ParseIP(sm["ip"])
-		slave.Port, err = strconv.Atoi(sm["port"])
+		slave.Addr.IP = net.ParseIP(sm["ip"]).String()
+		port, err := strconv.Atoi(sm["port"])
 		if err != nil {
 			return slaves, err
 		}
-		slaves = append(slaves, *slave)
+		slave.Addr.Port = uint32(port)
+		slaves = append(slaves, slave)
 	}
 	return slaves, nil
 }

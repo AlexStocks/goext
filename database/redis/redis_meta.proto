@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package gxredis;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+// option (gogoproto.goproto_stringer_all) = false;
+// option (gogoproto.stringer_all) =  true;
+// option (gogoproto.populate_all) = true;
+// option (gogoproto.testgen_all) = true;
+// option (gogoproto.benchgen_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+
+enum RedisRole {
+    RR_Default = 0;
+	RR_Master = 1;
+	RR_Slave = 2;
+	RR_Sentinel = 3;
+}
+
+// TCPAddr represents the address of a TCP end point.
+message IPAddr {
+    string IP = 1;
+    uint32 Port = 2;
+}
+
+// Slave represents a Redis slave instance which is known by Sentinel.
+message Slave {
+	IPAddr Addr = 1;
+    string Flags = 2;
+}
+
+message Instance {
+    string  Name = 1;
+	IPAddr Master = 2;
+	repeated Slave Slaves = 3;
+}
+

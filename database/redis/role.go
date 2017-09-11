@@ -15,33 +15,6 @@ import (
 	"github.com/garyburd/redigo/redis"
 )
 
-// RedisRole defines the role of the redis
-type RedisRole int
-
-const (
-	RR_BEGIN RedisRole = iota
-	RR_Master
-	RR_Slave
-	RR_Sentinel
-	RR_END
-)
-
-var redisRoleStrings = [...]string{
-	"Begin",
-	"master",
-	"slave",
-	"sentinel",
-	"End",
-}
-
-func (r RedisRole) String() string {
-	if RR_BEGIN < r && r < RR_END {
-		return redisRoleStrings[r]
-	}
-
-	return ""
-}
-
 // CheckRole wraps GetRole in a test to verify if the role matches an expected
 // role string. If there was any error in querying the supplied connection,
 // the function returns false. Works with Redis >= 2.8.12.
@@ -49,7 +22,7 @@ func (r RedisRole) String() string {
 // then you are OK.
 func CheckRole(c redis.Conn, redisRole RedisRole) bool {
 	role, err := getRole(c)
-	if err != nil || role != redisRole.String() {
+	if err != nil || getRedisRole(role) != redisRole {
 		return false
 	}
 	return true
@@ -85,7 +58,7 @@ func getSentileRoles(c redis.Conn) ([]string, error) {
 	if len(res1) != 2 {
 		return []string{""}, errors.New("redigo: the length of ROLE reply is not 2")
 	}
-	if string(res1[0].([]byte)) != (RedisRole(RR_Sentinel)).String() {
+	if getRedisRole(string(res1[0].([]byte))) != (RedisRole(RR_Sentinel)) {
 		return []string{""}, errors.New("redigo: res[0] of ROLE replay is not \"sentinel\"")
 	}
 	res2, ok := res1[1].([]interface{})
