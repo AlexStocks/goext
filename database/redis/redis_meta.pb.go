@@ -24,7 +24,10 @@ import strconv "strconv"
 import strings "strings"
 import reflect "reflect"
 
-import io "io"
+import (
+	io "io"
+	"net"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -83,6 +86,13 @@ type IPAddr struct {
 func (m *IPAddr) Reset()                    { *m = IPAddr{} }
 func (*IPAddr) ProtoMessage()               {}
 func (*IPAddr) Descriptor() ([]byte, []int) { return fileDescriptorRedisMeta, []int{0} }
+func (m *IPAddr) TcpAddr() *net.TCPAddr {
+	var addr net.TCPAddr
+	addr.IP = net.ParseIP(m.IP)
+	addr.Port = int(m.Port)
+
+	return &addr
+}
 
 // Slave represents a Redis slave instance which is known by Sentinel.
 type Slave struct {
