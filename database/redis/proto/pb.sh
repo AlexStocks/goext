@@ -15,4 +15,4 @@ gopath=~/test/golang/lib/src/github.com/gogo/protobuf/protobuf
 # proto_path to include the descriptor.proto and gogo.proto.
 # gogo.proto is located in github.com/gogo/protobuf/gogoproto
 gogopath=~/test/golang/lib/src/
-protoc -I=$gopath:$gogopath:./ --gogoslick_out=./  redis_meta.proto
+protoc -I=$gopath:$gogopath:./ --gogoslick_out=./ --govalidators_out=gogoimport=true:. redis_meta.proto

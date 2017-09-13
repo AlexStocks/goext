@@ -12,7 +12,6 @@ import (
 )
 
 import (
-	"fmt"
 	"github.com/garyburd/redigo/redis"
 )
 
@@ -22,10 +21,7 @@ import (
 // It's not goroutine safe, but if you call this method on pooled connections
 // then you are OK.
 func CheckRole(c redis.Conn, redisRole RedisRole) bool {
-	fmt.Printf("conn:%#v\n", c)
-	fmt.Printf("role:%#v\n", redisRole)
 	role, err := getRole(c)
-	fmt.Printf("role:%#v, err:%#v\n", role, err)
 	if err != nil || getRedisRole(role) != redisRole {
 		return false
 	}
@@ -37,8 +33,6 @@ func CheckRole(c redis.Conn, redisRole RedisRole) bool {
 // redis 2.8.12.
 func getRole(c redis.Conn) (string, error) {
 	res, err := c.Do("ROLE")
-	fmt.Printf("res:%#v\n", res)
-	fmt.Printf("err:%#v\n", err)
 	if err != nil {
 		return "", err
 	}

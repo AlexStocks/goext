@@ -11,6 +11,7 @@
 		IPAddr
 		Slave
 		Instance
+		RawInstance
 */
 package gxredis
 
@@ -18,6 +19,7 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
+import _ "github.com/mwitkow/go-proto-validators"
 
 import strconv "strconv"
 
@@ -124,10 +126,24 @@ func (m *Instance) Reset()                    { *m = Instance{} }
 func (*Instance) ProtoMessage()               {}
 func (*Instance) Descriptor() ([]byte, []int) { return fileDescriptorRedisMeta, []int{2} }
 
+type RawInstance struct {
+	Name            string  `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
+	Addr            *IPAddr `protobuf:"bytes,2,opt,name=Addr" json:"Addr,omitempty"`
+	Epoch           int32   `protobuf:"varint,3,opt,name=Epoch,proto3" json:"Epoch,omitempty"`
+	Sdowntime       int32   `protobuf:"varint,4,opt,name=Sdowntime,proto3" json:"Sdowntime,omitempty"`
+	FailoverTimeout int32   `protobuf:"varint,5,opt,name=FailoverTimeout,proto3" json:"FailoverTimeout,omitempty"`
+	NotifyScript    string  `protobuf:"bytes,6,opt,name=NotifyScript,proto3" json:"NotifyScript,omitempty"`
+}
+
+func (m *RawInstance) Reset()                    { *m = RawInstance{} }
+func (*RawInstance) ProtoMessage()               {}
+func (*RawInstance) Descriptor() ([]byte, []int) { return fileDescriptorRedisMeta, []int{3} }
+
 func init() {
 	proto.RegisterType((*IPAddr)(nil), "gxredis.IPAddr")
 	proto.RegisterType((*Slave)(nil), "gxredis.Slave")
 	proto.RegisterType((*Instance)(nil), "gxredis.Instance")
+	proto.RegisterType((*RawInstance)(nil), "gxredis.RawInstance")
 	proto.RegisterEnum("gxredis.RedisRole", RedisRole_name, RedisRole_value)
 }
 func (x RedisRole) String() string {
@@ -351,6 +367,96 @@ func (this *Instance) Equal(that interface{}) bool {
 	}
 	return true
 }
+func (this *RawInstance) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*RawInstance)
+	if !ok {
+		that2, ok := that.(RawInstance)
+		if ok {
+			that1 = &that2
+		} else {
+			return fmt.Errorf("that is not of type *RawInstance")
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *RawInstance but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *RawInstance but is not nil && this == nil")
+	}
+	if this.Name != that1.Name {
+		return fmt.Errorf("Name this(%v) Not Equal that(%v)", this.Name, that1.Name)
+	}
+	if !this.Addr.Equal(that1.Addr) {
+		return fmt.Errorf("Addr this(%v) Not Equal that(%v)", this.Addr, that1.Addr)
+	}
+	if this.Epoch != that1.Epoch {
+		return fmt.Errorf("Epoch this(%v) Not Equal that(%v)", this.Epoch, that1.Epoch)
+	}
+	if this.Sdowntime != that1.Sdowntime {
+		return fmt.Errorf("Sdowntime this(%v) Not Equal that(%v)", this.Sdowntime, that1.Sdowntime)
+	}
+	if this.FailoverTimeout != that1.FailoverTimeout {
+		return fmt.Errorf("FailoverTimeout this(%v) Not Equal that(%v)", this.FailoverTimeout, that1.FailoverTimeout)
+	}
+	if this.NotifyScript != that1.NotifyScript {
+		return fmt.Errorf("NotifyScript this(%v) Not Equal that(%v)", this.NotifyScript, that1.NotifyScript)
+	}
+	return nil
+}
+func (this *RawInstance) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*RawInstance)
+	if !ok {
+		that2, ok := that.(RawInstance)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Name != that1.Name {
+		return false
+	}
+	if !this.Addr.Equal(that1.Addr) {
+		return false
+	}
+	if this.Epoch != that1.Epoch {
+		return false
+	}
+	if this.Sdowntime != that1.Sdowntime {
+		return false
+	}
+	if this.FailoverTimeout != that1.FailoverTimeout {
+		return false
+	}
+	if this.NotifyScript != that1.NotifyScript {
+		return false
+	}
+	return true
+}
 func (this *IPAddr) GoString() string {
 	if this == nil {
 		return "nil"
@@ -388,6 +494,23 @@ func (this *Instance) GoString() string {
 	if this.Slaves != nil {
 		s = append(s, "Slaves: "+fmt.Sprintf("%#v", this.Slaves)+",\n")
 	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *RawInstance) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 10)
+	s = append(s, "&gxredis.RawInstance{")
+	s = append(s, "Name: "+fmt.Sprintf("%#v", this.Name)+",\n")
+	if this.Addr != nil {
+		s = append(s, "Addr: "+fmt.Sprintf("%#v", this.Addr)+",\n")
+	}
+	s = append(s, "Epoch: "+fmt.Sprintf("%#v", this.Epoch)+",\n")
+	s = append(s, "Sdowntime: "+fmt.Sprintf("%#v", this.Sdowntime)+",\n")
+	s = append(s, "FailoverTimeout: "+fmt.Sprintf("%#v", this.FailoverTimeout)+",\n")
+	s = append(s, "NotifyScript: "+fmt.Sprintf("%#v", this.NotifyScript)+",\n")
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -508,6 +631,61 @@ func (m *Instance) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *RawInstance) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *RawInstance) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if len(m.Name) > 0 {
+		dAtA[i] = 0xa
+		i++
+		i = encodeVarintRedisMeta(dAtA, i, uint64(len(m.Name)))
+		i += copy(dAtA[i:], m.Name)
+	}
+	if m.Addr != nil {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintRedisMeta(dAtA, i, uint64(m.Addr.Size()))
+		n3, err := m.Addr.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n3
+	}
+	if m.Epoch != 0 {
+		dAtA[i] = 0x18
+		i++
+		i = encodeVarintRedisMeta(dAtA, i, uint64(m.Epoch))
+	}
+	if m.Sdowntime != 0 {
+		dAtA[i] = 0x20
+		i++
+		i = encodeVarintRedisMeta(dAtA, i, uint64(m.Sdowntime))
+	}
+	if m.FailoverTimeout != 0 {
+		dAtA[i] = 0x28
+		i++
+		i = encodeVarintRedisMeta(dAtA, i, uint64(m.FailoverTimeout))
+	}
+	if len(m.NotifyScript) > 0 {
+		dAtA[i] = 0x32
+		i++
+		i = encodeVarintRedisMeta(dAtA, i, uint64(len(m.NotifyScript)))
+		i += copy(dAtA[i:], m.NotifyScript)
+	}
+	return i, nil
+}
+
 func encodeFixed64RedisMeta(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	dAtA[offset+1] = uint8(v >> 8)
@@ -582,6 +760,33 @@ func (m *Instance) Size() (n int) {
 	return n
 }
 
+func (m *RawInstance) Size() (n int) {
+	var l int
+	_ = l
+	l = len(m.Name)
+	if l > 0 {
+		n += 1 + l + sovRedisMeta(uint64(l))
+	}
+	if m.Addr != nil {
+		l = m.Addr.Size()
+		n += 1 + l + sovRedisMeta(uint64(l))
+	}
+	if m.Epoch != 0 {
+		n += 1 + sovRedisMeta(uint64(m.Epoch))
+	}
+	if m.Sdowntime != 0 {
+		n += 1 + sovRedisMeta(uint64(m.Sdowntime))
+	}
+	if m.FailoverTimeout != 0 {
+		n += 1 + sovRedisMeta(uint64(m.FailoverTimeout))
+	}
+	l = len(m.NotifyScript)
+	if l > 0 {
+		n += 1 + l + sovRedisMeta(uint64(l))
+	}
+	return n
+}
+
 func sovRedisMeta(x uint64) (n int) {
 	for {
 		n++
@@ -625,6 +830,21 @@ func (this *Instance) String() string {
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`Master:` + strings.Replace(fmt.Sprintf("%v", this.Master), "IPAddr", "IPAddr", 1) + `,`,
 		`Slaves:` + strings.Replace(fmt.Sprintf("%v", this.Slaves), "Slave", "Slave", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *RawInstance) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&RawInstance{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Addr:` + strings.Replace(fmt.Sprintf("%v", this.Addr), "IPAddr", "IPAddr", 1) + `,`,
+		`Epoch:` + fmt.Sprintf("%v", this.Epoch) + `,`,
+		`Sdowntime:` + fmt.Sprintf("%v", this.Sdowntime) + `,`,
+		`FailoverTimeout:` + fmt.Sprintf("%v", this.FailoverTimeout) + `,`,
+		`NotifyScript:` + fmt.Sprintf("%v", this.NotifyScript) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -990,6 +1210,204 @@ func (m *Instance) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *RawInstance) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRedisMeta
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: RawInstance: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: RawInstance: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRedisMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRedisMeta
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Addr", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRedisMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRedisMeta
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Addr == nil {
+				m.Addr = &IPAddr{}
+			}
+			if err := m.Addr.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Epoch", wireType)
+			}
+			m.Epoch = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRedisMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Epoch |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Sdowntime", wireType)
+			}
+			m.Sdowntime = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRedisMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Sdowntime |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FailoverTimeout", wireType)
+			}
+			m.FailoverTimeout = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRedisMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.FailoverTimeout |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NotifyScript", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRedisMeta
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthRedisMeta
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NotifyScript = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRedisMeta(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRedisMeta
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func skipRedisMeta(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1098,27 +1516,38 @@ var (
 func init() { proto.RegisterFile("redis_meta.proto", fileDescriptorRedisMeta) }
 
 var fileDescriptorRedisMeta = []byte{
-	// 338 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x50, 0xcd, 0x4e, 0xea, 0x40,
-	0x18, 0xed, 0x14, 0xe8, 0xa5, 0x1f, 0x17, 0x68, 0x26, 0x77, 0x41, 0xee, 0x62, 0x42, 0xb8, 0xc9,
-	0x95, 0x18, 0x2d, 0x09, 0xfa, 0x02, 0x12, 0x63, 0xd2, 0x85, 0xa6, 0x19, 0x1f, 0xa0, 0x19, 0x60,
-	0xa8, 0x24, 0xa5, 0x63, 0xda, 0xc1, 0xb8, 0xf4, 0x11, 0x7c, 0x0c, 0x1f, 0x85, 0x25, 0x4b, 0x97,
-	0x74, 0xdc, 0xb8, 0xe4, 0x11, 0x4c, 0xbf, 0x36, 0xae, 0xdc, 0x9d, 0x9f, 0xef, 0x9c, 0x33, 0x19,
-	0xf0, 0x32, 0xb9, 0x5c, 0xe7, 0xd1, 0x46, 0x6a, 0xe1, 0x3f, 0x66, 0x4a, 0x2b, 0xfa, 0x2b, 0x7e,
-	0x46, 0xed, 0xef, 0x79, 0xbc, 0xd6, 0x0f, 0xdb, 0xb9, 0xbf, 0x50, 0x9b, 0x49, 0xac, 0x62, 0x35,
-	0x41, 0x7f, 0xbe, 0x5d, 0x21, 0x43, 0x82, 0xa8, 0xca, 0x8d, 0xce, 0xc0, 0x09, 0xc2, 0xab, 0xe5,
-	0x32, 0xa3, 0x3d, 0xb0, 0x83, 0x70, 0x40, 0x86, 0x64, 0xec, 0x72, 0x3b, 0x08, 0x29, 0x85, 0x66,
-	0xa8, 0x32, 0x3d, 0xb0, 0x87, 0x64, 0xdc, 0xe5, 0x88, 0x47, 0x33, 0x68, 0xdd, 0x27, 0xe2, 0x49,
-	0xd2, 0x7f, 0xd0, 0x2c, 0x43, 0x78, 0xde, 0x99, 0xf6, 0xfd, 0x7a, 0xdd, 0xaf, 0xba, 0x38, 0x9a,
-	0xf4, 0x0f, 0xb4, 0x6e, 0x12, 0x11, 0xe7, 0x58, 0xe1, 0xf2, 0x8a, 0x8c, 0x14, 0xb4, 0x83, 0x34,
-	0xd7, 0x22, 0x5d, 0xc8, 0x72, 0xe3, 0x4e, 0x6c, 0x64, 0xbd, 0x8a, 0x98, 0x9e, 0x80, 0x73, 0x2b,
-	0x72, 0x2d, 0x33, 0x8c, 0xfd, 0x50, 0x5e, 0xdb, 0xf4, 0x3f, 0x38, 0xf8, 0x98, 0x7c, 0xd0, 0x18,
-	0x36, 0xc6, 0x9d, 0x69, 0xef, 0xfb, 0x10, 0x65, 0x5e, 0xbb, 0xa7, 0x01, 0xb8, 0xbc, 0x94, 0xb9,
-	0x4a, 0x24, 0xed, 0x01, 0x70, 0x1e, 0x5d, 0xcb, 0x95, 0xd8, 0x26, 0xda, 0xb3, 0x68, 0x17, 0x5c,
-	0xce, 0xa3, 0xaa, 0xd1, 0x23, 0xf4, 0x37, 0xb4, 0x39, 0x8f, 0x30, 0xe8, 0xd9, 0xb4, 0x0f, 0x9d,
-	0x92, 0xc9, 0x54, 0xaf, 0x53, 0x99, 0x78, 0x8d, 0xd9, 0xe5, 0xae, 0x60, 0xd6, 0xbe, 0x60, 0xd6,
-	0x7b, 0xc1, 0xac, 0x43, 0xc1, 0xc8, 0xb1, 0x60, 0xe4, 0xc5, 0x30, 0xf2, 0x66, 0x18, 0xd9, 0x19,
-	0x46, 0xf6, 0x86, 0x91, 0x83, 0x61, 0xe4, 0xd3, 0x30, 0xeb, 0x68, 0x18, 0x79, 0xfd, 0x60, 0xd6,
-	0xdc, 0xc1, 0xaf, 0xbe, 0xf8, 0x0a, 0x00, 0x00, 0xff, 0xff, 0xeb, 0x22, 0x54, 0xf5, 0xb6, 0x01,
-	0x00, 0x00,
+	// 515 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x52, 0x4d, 0x6f, 0x52, 0x41,
+	0x14, 0x7d, 0xc3, 0xc7, 0xb3, 0x5c, 0xda, 0xf2, 0x32, 0x71, 0xf1, 0x42, 0xcc, 0x40, 0xb0, 0x51,
+	0xa2, 0xf2, 0x21, 0x35, 0x4d, 0x5c, 0x4a, 0x94, 0x84, 0x85, 0x0d, 0x19, 0xdc, 0xf9, 0x41, 0x06,
+	0x18, 0x5e, 0x27, 0xbe, 0xc7, 0x90, 0xf7, 0x06, 0xd0, 0x18, 0x13, 0x7f, 0x82, 0x3f, 0xc3, 0x9f,
+	0xd2, 0x65, 0x97, 0xee, 0x28, 0xe3, 0xc6, 0x25, 0xff, 0xa0, 0x86, 0x79, 0x84, 0x16, 0xd3, 0xa4,
+	0xbb, 0x7b, 0xcf, 0x39, 0x77, 0xce, 0xb9, 0x37, 0x03, 0x4e, 0xc8, 0x87, 0x22, 0xea, 0x05, 0x5c,
+	0xb1, 0xea, 0x24, 0x94, 0x4a, 0xe2, 0x7b, 0xde, 0x17, 0x83, 0xe5, 0x2b, 0x9e, 0x50, 0x67, 0xd3,
+	0x7e, 0x75, 0x20, 0x83, 0x9a, 0x27, 0x3d, 0x59, 0x33, 0x7c, 0x7f, 0x3a, 0x32, 0x9d, 0x69, 0x4c,
+	0x15, 0xcf, 0xe5, 0x4f, 0x6e, 0xc8, 0x83, 0xb9, 0x50, 0x9f, 0xe5, 0xbc, 0xe6, 0xc9, 0x8a, 0x21,
+	0x2b, 0x33, 0xe6, 0x8b, 0x21, 0x53, 0x32, 0x8c, 0x6a, 0xdb, 0x32, 0x9e, 0x2b, 0x4d, 0xc0, 0x6e,
+	0x77, 0x5e, 0x0d, 0x87, 0x21, 0x6e, 0x41, 0xa2, 0xdd, 0x71, 0x51, 0x11, 0x95, 0x33, 0xcd, 0x13,
+	0xbd, 0x28, 0x34, 0xa0, 0xfe, 0xe9, 0x7d, 0xbd, 0xf2, 0xf2, 0xe3, 0xb7, 0xe7, 0xcf, 0x8e, 0xbf,
+	0x7f, 0xa8, 0xde, 0x5d, 0x1f, 0xd1, 0x44, 0xbb, 0x83, 0x09, 0xa4, 0x3a, 0x32, 0x54, 0x6e, 0xa2,
+	0x88, 0xca, 0x07, 0x4d, 0xd0, 0x8b, 0x82, 0xed, 0x20, 0xf7, 0xea, 0x2a, 0x49, 0x0d, 0x5e, 0x6a,
+	0x42, 0xba, 0xeb, 0xb3, 0x19, 0xc7, 0x0f, 0x21, 0xb5, 0x36, 0x36, 0x96, 0xd9, 0x46, 0xae, 0xba,
+	0xd9, 0xbc, 0x1a, 0xe7, 0xa1, 0x86, 0xc4, 0xf7, 0x21, 0xdd, 0xf2, 0x99, 0x17, 0x99, 0xe7, 0x32,
+	0x34, 0x6e, 0x4a, 0x12, 0xf6, 0xda, 0xe3, 0x48, 0xb1, 0xf1, 0x80, 0x63, 0x0c, 0xa9, 0x53, 0x16,
+	0xf0, 0x38, 0x39, 0x35, 0x35, 0x7e, 0x0c, 0xf6, 0x5b, 0x16, 0x29, 0x1e, 0x9a, 0xb1, 0x5b, 0x1e,
+	0xdf, 0xd0, 0xf8, 0x11, 0xd8, 0x26, 0x4c, 0xe4, 0x26, 0x8b, 0xc9, 0x72, 0xb6, 0x71, 0xb8, 0x15,
+	0x1a, 0x98, 0x6e, 0xd8, 0xd2, 0x0a, 0x41, 0x96, 0xb2, 0xf9, 0xd6, 0x34, 0x7f, 0xd3, 0xb4, 0x69,
+	0xeb, 0x45, 0x21, 0x51, 0x44, 0x1b, 0xf3, 0xa7, 0x9b, 0xbd, 0x6e, 0xb7, 0xbe, 0x16, 0x9b, 0xfd,
+	0x1e, 0x40, 0xfa, 0xcd, 0x44, 0x0e, 0xce, 0xdc, 0x64, 0x11, 0x95, 0xd3, 0x31, 0xe9, 0x58, 0x34,
+	0x06, 0xf1, 0x11, 0x64, 0xba, 0x43, 0x39, 0x1f, 0x2b, 0x11, 0x70, 0x37, 0xb5, 0xa3, 0xb8, 0x26,
+	0x70, 0x1d, 0x72, 0x2d, 0x26, 0x7c, 0x39, 0xe3, 0xe1, 0x3b, 0x11, 0x70, 0x39, 0x55, 0x6e, 0x7a,
+	0x47, 0xfb, 0x3f, 0x8d, 0x4b, 0xb0, 0x7f, 0x2a, 0x95, 0x18, 0x7d, 0xed, 0x0e, 0x42, 0x31, 0x51,
+	0xae, 0x6d, 0x6e, 0xb7, 0x83, 0x3d, 0x69, 0x43, 0x86, 0xae, 0x73, 0x53, 0xe9, 0x73, 0x7c, 0x08,
+	0x40, 0x69, 0xef, 0x35, 0x1f, 0xb1, 0xa9, 0xaf, 0x1c, 0x0b, 0x1f, 0x40, 0x86, 0xd2, 0x5e, 0x7c,
+	0x44, 0x07, 0xe1, 0x7d, 0xd8, 0xa3, 0xb4, 0x67, 0x6e, 0xe5, 0x24, 0x70, 0x0e, 0xb2, 0xeb, 0x8e,
+	0x8f, 0x95, 0x18, 0x73, 0xdf, 0x49, 0x36, 0x5f, 0x9c, 0x2f, 0x89, 0x75, 0xb1, 0x24, 0xd6, 0xef,
+	0x25, 0xb1, 0x2e, 0x97, 0x04, 0xad, 0x96, 0x04, 0xfd, 0xd0, 0x04, 0xfd, 0xd2, 0x04, 0x9d, 0x6b,
+	0x82, 0x2e, 0x34, 0x41, 0x97, 0x9a, 0xa0, 0xbf, 0x9a, 0x58, 0x2b, 0x4d, 0xd0, 0xcf, 0x3f, 0xc4,
+	0xea, 0xdb, 0xe6, 0x87, 0x1e, 0xff, 0x0b, 0x00, 0x00, 0xff, 0xff, 0xaf, 0x1e, 0x89, 0x47, 0x25,
+	0x03, 0x00, 0x00,
 }

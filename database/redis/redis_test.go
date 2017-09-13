@@ -82,7 +82,14 @@ func TestSentinel_AddInstance(t *testing.T) {
 	t.Log(st.Addrs)
 
 	st.RemoveInstance("meta")
-	err = st.AddInstance("meta", HOST_IP, 6000, 2, 10, 450, "")
+	inst := RawInstance{
+		Name:            "meta",
+		Addr:            &IPAddr{IP: HOST_IP, Port: 6000},
+		Epoch:           2,
+		Sdowntime:       10,
+		FailoverTimeout: 450,
+	}
+	err = st.AddInstance(inst)
 	if err != nil {
 		t.Errorf("RemoveInstance(meta) = error:%#v", err)
 	}
@@ -94,7 +101,14 @@ func TestSentinel_RemoveInstance(t *testing.T) {
 	)
 	defer st.Close()
 
-	st.AddInstance("meta", HOST_IP, 6000, 2, 10, 450, "")
+	inst := RawInstance{
+		Name:            "meta",
+		Addr:            &IPAddr{IP: HOST_IP, Port: 6000},
+		Epoch:           2,
+		Sdowntime:       10,
+		FailoverTimeout: 450,
+	}
+	st.AddInstance(inst)
 	err := st.RemoveInstance("meta")
 	if err != nil {
 		t.Errorf("RemoveInstance(meta) = error:%#v", err)
