@@ -71,6 +71,7 @@ import (
 
 const (
 	switchMasterChannel = "+switch-master"
+	redisDownChannel    = "+sdown"
 	defaultTimeout      = 10 // seconds
 	defaultMaxConnNum   = 32
 	defaultMaxIdleNum   = 16
@@ -520,90 +521,165 @@ func (s *Sentinel) subscriptMasterSwitch() (redis.PubSubConn, error) {
 	return redis.PubSubConn{nil}, NoSentinelsAvailable{lastError: lastErr}
 }
 
+func (s *Sentinel) subscriptSdown() (redis.PubSubConn, error) {
+	s.mu.RLock()
+	addrs := s.Addrs
+	s.mu.RUnlock()
+	var lastErr error
+
+	for _, addr := range addrs {
+		conn := s.GetConn(addr)
+		sub := redis.PubSubConn{Conn: conn}
+		err := sub.Subscribe(redisDownChannel)
+		if err != nil {
+			lastErr = err
+			s.mu.Lock()
+			pool, ok := s.pools[addr]
+			if ok {
+				pool.Close()
+				delete(s.pools, addr)
+			}
+			s.putToBottom(addr)
+			s.mu.Unlock()
+			continue
+		}
+		s.putToTop(addr)
+		return sub, nil
+	}
+
+	return redis.PubSubConn{nil}, NoSentinelsAvailable{lastError: lastErr}
+}
+
 type MasterSwitchInfo struct {
 	Name      string
 	OldMaster IPAddr
 	NewMaster IPAddr
 }
 
+type SdownInfo struct {
+	Name string
+	Addr IPAddr
+	Role RedisRole
+}
+
 type SentinelWatcher struct {
-	pubsub redis.PubSubConn
+	redisChannel string
+	pubsub       redis.PubSubConn
 	sync.Mutex
 	sync.WaitGroup
-	infoChan chan MasterSwitchInfo
+	infoChan chan interface{}
 	closed   bool
 }
 
-func NewMasterSentinel(conn redis.PubSubConn) *SentinelWatcher {
+func NewSentinelWatcher(redisChannel string, conn redis.PubSubConn) *SentinelWatcher {
 	return &SentinelWatcher{
-		pubsub:   conn,
-		closed:   false,
-		infoChan: make(chan MasterSwitchInfo, 32),
+		redisChannel: redisChannel,
+		pubsub:       conn,
+		closed:       false,
+		infoChan:     make(chan interface{}, 32),
 	}
 }
 
-func (ms *SentinelWatcher) Close() error {
+func (s *SentinelWatcher) Close() error {
 	// protect pubsub.Unsubscribe to prevent concurrently called
-	ms.Lock()
+	s.Lock()
 	// prevent repeatedly call
-	if ms.closed {
-		ms.Unlock()
+	if s.closed {
+		s.Unlock()
 		return nil
 	}
-	ms.pubsub.Unsubscribe(switchMasterChannel) // watch goroutine will exit.
-	ms.closed = true
-	ms.Unlock()
+	s.pubsub.Unsubscribe(s.redisChannel) // watch goroutine will exit.
+	s.closed = true
+	s.Unlock()
 	// wait watch rontine exit
-	ms.Wait()
-	return ms.pubsub.Close()
+	s.Wait()
+	return s.pubsub.Close()
 }
 
-func (ms *SentinelWatcher) Watch() (<-chan MasterSwitchInfo, error) {
+// cache1 192.168.11.100 4001 192.168.11.100 14001
+func handleMasterSwitchInfo(msg [][]byte) (MasterSwitchInfo, error) {
 	var (
 		err     error
 		tcpAddr *net.TCPAddr
 		info    MasterSwitchInfo
 	)
 
-	ms.Add(1)
+	info.Name = string(msg[0])
+	addr := fmt.Sprintf("%s:%s", string(msg[1]), string(msg[2]))
+	tcpAddr, err = net.ResolveTCPAddr("tcp4", addr)
+	if err != nil {
+		return info, xerrors.Wrapf(err, "net.ResolveTCPAddr(tcp4, addr:%#v)", addr)
+	}
+	info.OldMaster.IP = tcpAddr.IP.String()
+	info.OldMaster.Port = uint32(tcpAddr.Port)
+
+	addr = fmt.Sprintf("%s:%s", string(msg[3]), string(msg[4]))
+	tcpAddr, err = net.ResolveTCPAddr("tcp4", addr)
+	if err != nil {
+		return info, xerrors.Wrapf(err, "net.ResolveTCPAddr(tcp4, addr:%#v)", addr)
+	}
+	info.NewMaster.IP = tcpAddr.IP.String()
+	info.NewMaster.Port = uint32(tcpAddr.Port)
+
+	return info, nil
+}
+
+func (s *SentinelWatcher) Watch() (<-chan interface{}, error) {
+	s.Add(1)
 	go func() {
-		defer ms.Done()
+		defer s.Done()
 		for {
-			switch reply := ms.pubsub.Receive().(type) {
+			switch reply := s.pubsub.Receive().(type) {
 			case redis.Message:
-				p := bytes.Split(reply.Data, []byte(" "))
-				if len(p) != 5 {
+				msg := bytes.Split(reply.Data, []byte(" "))
+				if string(msg[0]) == "master" && len(msg) == 4 {
+					var info SdownInfo
+					info.Name = string(msg[1])
+					info.Role = RR_Master
+					info.Addr.IP = string(msg[2])
+					port, err := strconv.Atoi(string(msg[3]))
+					if err != nil {
+						continue
+					}
+					info.Addr.Port = uint32(port)
+
+					s.infoChan <- info
+					// master cache0 192.168.11.100 4000
+					continue
+				} else if string(msg[0]) == "slave" && len(msg) == 8 {
+					// slave 192.168.11.100:14001 192.168.11.100 14001 @ cache1 192.168.11.100 4001
+					var info SdownInfo
+					info.Name = string(msg[5])
+					info.Role = RR_Slave
+					info.Addr.IP = string(msg[2])
+					port, err := strconv.Atoi(string(msg[3]))
+					if err != nil {
+						continue
+					}
+					info.Addr.Port = uint32(port)
+
+					s.infoChan <- info
+				} else if len(msg) == 5 {
+					// cache1 192.168.11.100 4001 192.168.11.100 14001
+					info, err := handleMasterSwitchInfo(msg)
+					if err != nil {
+						continue
+					}
+
+					s.infoChan <- info
+				} else {
 					continue
 				}
-				info.Name = string(p[0])
-
-				addr := fmt.Sprintf("%s:%s", string(p[1]), string(p[2]))
-				tcpAddr, err = net.ResolveTCPAddr("tcp4", addr)
-				if err != nil {
-					continue
-				}
-				info.OldMaster.IP = tcpAddr.IP.String()
-				info.OldMaster.Port = uint32(tcpAddr.Port)
-
-				addr = fmt.Sprintf("%s:%s", string(p[3]), string(p[4]))
-				tcpAddr, err = net.ResolveTCPAddr("tcp4", addr)
-				if err != nil {
-					continue
-				}
-				info.NewMaster.IP = tcpAddr.IP.String()
-				info.NewMaster.Port = uint32(tcpAddr.Port)
-
-				ms.infoChan <- info
 
 			case error:
 				// fmt.Printf("watch goroutine got error!\n")
-				close(ms.infoChan)
+				close(s.infoChan)
 				return
 
 			case redis.Subscription:
-				if reply.Channel == switchMasterChannel &&
+				if reply.Channel == s.redisChannel &&
 					reply.Kind == "unsubscribe" && reply.Count == 0 {
-					close(ms.infoChan)
+					close(s.infoChan)
 					// fmt.Printf("watch goroutine got unsubscribe!\n")
 					return
 				}
@@ -611,16 +687,25 @@ func (ms *SentinelWatcher) Watch() (<-chan MasterSwitchInfo, error) {
 		}
 	}()
 
-	return ms.infoChan, nil
+	return s.infoChan, nil
 }
 
-func (s *Sentinel) MakeSentinelWatcher() (*SentinelWatcher, error) {
+func (s *Sentinel) MakeMasterSwitchSentinelWatcher() (*SentinelWatcher, error) {
 	sub, err := s.subscriptMasterSwitch()
 	if err != nil {
 		return nil, err
 	}
 
-	return NewMasterSentinel(sub), nil
+	return NewSentinelWatcher(switchMasterChannel, sub), nil
+}
+
+func (s *Sentinel) MakeSdownSentinelWatcher() (*SentinelWatcher, error) {
+	sub, err := s.subscriptSdown()
+	if err != nil {
+		return nil, err
+	}
+
+	return NewSentinelWatcher(redisDownChannel, sub), nil
 }
 
 func queryForMaster(conn redis.Conn, masterName string) (string, error) {

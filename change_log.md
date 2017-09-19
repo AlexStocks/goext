@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/09/19
+	> feature
+	* subscribe +sdown redis channel to get crashed redis instance
+
 - 2017/08/21
 	> improvement
 	* use gogoprotobuf for redis

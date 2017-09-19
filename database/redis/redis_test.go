@@ -151,7 +151,7 @@ func TestSentinel_GetConn(t *testing.T) {
 	}
 }
 
-func TestSentinel_MakeSentinelWatcher(t *testing.T) {
+func TestSentinel_MakeMasterSwitchSentinelWatcher(t *testing.T) {
 	st := NewSentinel(
 		[]string{HOST_IP + ":26380"},
 	)
@@ -172,7 +172,7 @@ func TestSentinel_MakeSentinelWatcher(t *testing.T) {
 	}
 
 	wg := &sync.WaitGroup{}
-	watcher, err := st.MakeSentinelWatcher()
+	watcher, err := st.MakeMasterSwitchSentinelWatcher()
 	w, err := watcher.Watch()
 	_ = w
 	go func() {
@@ -183,7 +183,46 @@ func TestSentinel_MakeSentinelWatcher(t *testing.T) {
 		}
 		fmt.Println("watch exit")
 	}()
-	time.Sleep(20 * time.Second)
+	time.Sleep(600 * time.Second)
+	fmt.Println("close")
+	watcher.Close()
+	wg.Wait()
+}
+
+func TestSentinel_MakeSdownSentinelWatcher(t *testing.T) {
+	st := NewSentinel(
+		[]string{HOST_IP + ":26380"},
+	)
+	defer st.Close()
+
+	instances, err := st.GetInstances()
+	if err != nil {
+		t.Errorf("st.GetInstances, error:%#v\n", err)
+		t.FailNow()
+	}
+
+	for _, inst := range instances {
+		err = st.Discover(inst.Name, []string{"127.0.0.1"})
+		if err != nil {
+			t.Log(err)
+			t.FailNow()
+		}
+	}
+
+	wg := &sync.WaitGroup{}
+	watcher, err := st.MakeSdownSentinelWatcher()
+	w, err := watcher.Watch()
+	_ = w
+	go func() {
+		defer wg.Done()
+		wg.Add(1)
+		for info := range w {
+			fmt.Printf("watch info:%s\n", info)
+			t.Logf("redis slave down: %#v\n", info)
+		}
+		fmt.Println("watch exit")
+	}()
+	time.Sleep(30 * time.Second)
 	fmt.Println("close")
 	watcher.Close()
 	wg.Wait()
