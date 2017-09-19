@@ -183,7 +183,7 @@ func TestSentinel_MakeMasterSwitchSentinelWatcher(t *testing.T) {
 		}
 		fmt.Println("watch exit")
 	}()
-	time.Sleep(600 * time.Second)
+	time.Sleep(30 * time.Second)
 	fmt.Println("close")
 	watcher.Close()
 	wg.Wait()

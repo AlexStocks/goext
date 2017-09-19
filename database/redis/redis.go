@@ -713,6 +713,10 @@ func queryForMaster(conn redis.Conn, masterName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if len(res) < 2 {
+		return "", errors.New("redigo: malformed get-master-addr-by-name reply")
+	}
+
 	masterAddr := strings.Join(res, ":")
 	return masterAddr, nil
 }
