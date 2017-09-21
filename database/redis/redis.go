@@ -348,6 +348,10 @@ func (s *Sentinel) GetInstances() ([]Instance, error) {
 			if err != nil {
 				return instances, err
 			}
+			// bugfix: 20170921测试发现master所有的slave down掉后，再干掉master，则其状态为"s_down,o_down,master,disconnected"
+			if sm["flags"] != "master" {
+				continue
+			}
 			instance.Name = sm["name"]
 			instance.Master = &IPAddr{}
 			instance.Master.IP = net.ParseIP(sm["ip"]).String()

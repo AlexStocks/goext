@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/09/21
+	> bugfix
+	* check redis master is available or not in databases/redis/GetInstances
+
 - 2017/09/19
 	> feature
 	* subscribe +sdown redis channel to get crashed redis instance
