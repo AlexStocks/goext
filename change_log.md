@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/10/11
+	> feature
+	* add os.GetPkgPath
+	
 - 2017/09/21
 	> bugfix
 	* check redis master is available or not in databases/redis/GetInstances
