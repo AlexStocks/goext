@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/10/12
+	> feature
+	* add gxlog.ColorSprint & gxlog.ColorSprintln & ColorSprintf
+	
 - 2017/10/11
 	> feature
 	* add os.GetPkgPath
