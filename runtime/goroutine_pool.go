@@ -41,7 +41,6 @@ type Pool struct {
 	grID  int32
 	state int32
 	wg    sync.WaitGroup
-	once  sync.Once
 }
 
 // goroutine is actually a background goroutine, with a channel bound for communication.
