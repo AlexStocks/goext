@@ -14,10 +14,6 @@ import (
 	"time"
 )
 
-import (
-	"github.com/AlexStocks/goext/sync"
-)
-
 const (
 	OnceLoopGoroutineNum = 30
 )
@@ -39,12 +35,12 @@ type Pool struct {
 	tail        *goroutine
 	count       int // idle list size
 	idleTimeout time.Duration
+	done        bool
 	sync.Mutex
 
 	grID  int32
 	state int32
 	wg    sync.WaitGroup
-	done  chan gxsync.Empty
 	once  sync.Once
 }
 
@@ -62,7 +58,6 @@ func NewGoroutinePool(idleTimeout time.Duration) *Pool {
 	pool := &Pool{
 		idleTimeout: idleTimeout,
 		state:       PoolInit,
-		done:        make(chan gxsync.Empty),
 	}
 	pool.tail = &pool.head
 	// pool.wg.Add(1)
@@ -72,25 +67,15 @@ func NewGoroutinePool(idleTimeout time.Duration) *Pool {
 
 // check whether the pool has been closed.
 func (p *Pool) IsClosed() bool {
-	select {
-	case <-p.done:
-		return true
-
-	default:
-		return false
-	}
+	p.Lock()
+	defer p.Unlock()
+	return p.done
 }
 
 func (p *Pool) stop() {
-	select {
-	case <-p.done:
-		return
-
-	default:
-		p.once.Do(func() {
-			close(p.done)
-		})
-	}
+	p.Lock()
+	defer p.Unlock()
+	p.done = true
 }
 
 func (p *Pool) Close() {
@@ -194,6 +179,7 @@ func (p *Pool) gc() {
 		state  int32
 		t      time.Duration
 	)
+
 	for {
 		finish = false
 		more = false
