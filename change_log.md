@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/10/24
+	> feature
+	* add runtime/goroutine_pool
+	
 - 2017/10/12
 	> feature
 	* add gxlog.ColorSprint & gxlog.ColorSprintln & ColorSprintf
