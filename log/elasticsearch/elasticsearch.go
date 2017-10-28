@@ -207,7 +207,7 @@ func (ec EsClient) BulkInsert(index string, typ string, arr []interface{}) error
 		// 	Log.Warn("index:%d, fail:%s", i, gxlog.PrettyStruct(f))
 		// }
 		return fmt.Errorf("BulkInsert(@arr len:%d), failed number:%#v, first fail{reason:%#v, fail detail:%#v}",
-			len(arr), len(rsp.Failed()), gxlog.PrettyStruct(rsp.Failed()[0]))
+			len(arr), len(rsp.Failed()), gxlog.PrettyString(rsp.Failed()[0]))
 	}
 
 	return nil

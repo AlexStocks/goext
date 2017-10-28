@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/10/28
+	> feature
+	* gxlog.PrettyStruct -> gxlog.PrettyString in log/elasticsearch.go
+
 - 2017/10/24
 	> feature
 	* add runtime/goroutine_pool
