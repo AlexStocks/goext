@@ -1,9 +1,12 @@
 package gxruntime
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
+
+//  go test -v ./...
 
 func TestBasicAPI(t *testing.T) {
 	gp := NewGoroutinePool(time.Second)
@@ -37,11 +40,16 @@ func TestRace(t *testing.T) {
 	gp := NewGoroutinePool(200 * time.Millisecond)
 	begin := make(chan struct{})
 	for i := 0; i < 50; i++ {
+		idxI := i
 		go func() {
 			<-begin
 			for i := 0; i < 10; i++ {
-				gp.Go(func() {
-				})
+				idxJ := i
+				res := gp.Go(func() {})
+				if res != nil {
+					t.Logf("fail to start work %d-%d", idxI, idxJ)
+					return
+				}
 				time.Sleep(5 * time.Millisecond)
 			}
 		}()
@@ -56,9 +64,10 @@ func TestRace(t *testing.T) {
 	if count != 0 {
 		t.Errorf("all goroutines should be recycled, count:%d\n", count)
 	}
+	t.Logf("work req number:%d, work finish number:%d", gp.workStartNum, gp.workFinNum)
 }
 
-// go test -v -bench BenchmarkGoPool -run=^a
+// go test -v -bench GoPool -run=^a
 func BenchmarkGoPool(b *testing.B) {
 	gp := NewGoroutinePool(10 * time.Second)
 	for i := 0; i < b.N; i++ {
@@ -100,9 +109,13 @@ func BenchmarkMorestackPool(b *testing.B) {
 func BenchmarkMoreStack(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		var wg sync.WaitGroup
+		wg.Add(1)
 		go func() {
 			morestack(false)
+			wg.Done()
 		}()
+		wg.Wait()
 	}
 }
 

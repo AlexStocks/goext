@@ -20,8 +20,9 @@ const (
 
 const (
 	PoolInit = iota
-	PoolRunning
+	PoolStarting
 	PoolGcing
+	PoolClosing
 	PoolClosed
 )
 
@@ -38,9 +39,10 @@ type Pool struct {
 	done        bool
 	sync.Mutex
 
-	grID  int32
-	state int32
-	wg    sync.WaitGroup
+	grID         int32
+	state        int32
+	workStartNum int64
+	workFinNum   int64
 }
 
 // goroutine is actually a background goroutine, with a channel bound for communication.
@@ -48,8 +50,9 @@ type goroutine struct {
 	id      int32
 	ch      chan func()
 	lastRun time.Time
-	pool    *Pool
-	next    *goroutine
+	sync.Mutex
+	pool *Pool
+	next *goroutine
 }
 
 // New returns a new *Pool object.
@@ -59,7 +62,6 @@ func NewGoroutinePool(idleTimeout time.Duration) *Pool {
 		state:       PoolInit,
 	}
 	pool.tail = &pool.head
-	// pool.wg.Add(1)
 	go pool.gc()
 	return pool
 }
@@ -79,10 +81,14 @@ func (p *Pool) stop() {
 
 func (p *Pool) Close() {
 	p.stop()
-	if atomic.LoadInt32(&p.state) == PoolGcing {
-		atomic.CompareAndSwapInt32(&p.state, PoolGcing, PoolClosed)
+	atomic.CompareAndSwapInt32(&p.state, PoolGcing, PoolClosing)
+	t := min(p.idleTimeout/10, 50*time.Millisecond)
+	for {
+		if atomic.LoadInt64(&p.workStartNum) == atomic.LoadInt64(&p.workFinNum) {
+			return
+		}
+		time.Sleep(t)
 	}
-	p.wg.Wait()
 }
 
 // Go works like go func(), but goroutines are pooled for reusing.
@@ -94,6 +100,7 @@ func (p *Pool) Go(f func()) error {
 
 	g := p.get()
 	g.ch <- f
+	atomic.AddInt64(&p.workStartNum, 1)
 	// When the goroutine finish f(), it will be put back to pool automatically,
 	// so it doesn't need to call pool.put() here.
 
@@ -127,9 +134,7 @@ func (p *Pool) put(g *goroutine) {
 	p.count++
 	p.Unlock()
 
-	if atomic.LoadInt32(&p.state) == PoolRunning {
-		atomic.CompareAndSwapInt32(&p.state, PoolRunning, PoolGcing)
-	}
+	atomic.CompareAndSwapInt32(&p.state, PoolStarting, PoolGcing)
 }
 
 func (p *Pool) alloc() *goroutine {
@@ -142,13 +147,11 @@ func (p *Pool) alloc() *goroutine {
 
 	go func(g *goroutine) {
 		for work := range g.ch {
-			func() {
-				g.pool.wg.Add(1)
-				// do not cost much time
-				defer g.pool.wg.Done()
-				work()
-			}()
+			work()
+			atomic.AddInt64(&p.workFinNum, 1)
+			g.Lock()
 			g.lastRun = time.Now()
+			g.Unlock()
 			// Put g back to the pool.
 			// This is the normal usage for a resource pool:
 			//
@@ -163,15 +166,12 @@ func (p *Pool) alloc() *goroutine {
 		}
 	}(g)
 
-	if atomic.LoadInt32(&p.state) == PoolInit {
-		atomic.CompareAndSwapInt32(&p.state, PoolInit, PoolRunning)
-	}
+	atomic.CompareAndSwapInt32(&p.state, PoolInit, PoolStarting)
 
 	return g
 }
 
 func (p *Pool) gc() {
-	// defer p.wg.Done()
 	var (
 		finish bool
 		more   bool
@@ -182,15 +182,16 @@ func (p *Pool) gc() {
 	for {
 		finish = false
 		more = false
-		if state = atomic.LoadInt32(&p.state); state > PoolRunning {
+		if state = atomic.LoadInt32(&p.state); state > PoolStarting {
 			finish, more = p.gcOnce(OnceLoopGoroutineNum)
 			if finish {
+				atomic.CompareAndSwapInt32(&p.state, PoolClosing, PoolClosed)
 				return
 			}
 		}
 
-		if atomic.LoadInt32(&p.state) == PoolClosed {
-			t = min(p.idleTimeout/10, 50*time.Millisecond)
+		if atomic.LoadInt32(&p.state) >= PoolClosing {
+			t = min(p.idleTimeout/10, 10*time.Millisecond)
 		} else if more {
 			t = min(p.idleTimeout/10, 500*time.Millisecond)
 		} else {
@@ -209,9 +210,13 @@ func (p *Pool) gcOnce(count int) (finish bool, more bool) {
 	p.Lock()
 	head := &p.head
 
+	var lastRun time.Time
 	for head.next != nil && i < count {
 		save := head.next
-		duration := now.Sub(save.lastRun)
+		save.Lock()
+		lastRun = save.lastRun
+		save.Unlock()
+		duration := now.Sub(lastRun)
 		if duration < p.idleTimeout {
 			break
 		}
