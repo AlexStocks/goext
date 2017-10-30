@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/10/30
+	> improvement
+	* add leak check on file header: // +build !leak
+
 - 2017/10/28
 	> feature
 	* gxlog.PrettyStruct -> gxlog.PrettyString in log/elasticsearch.go
