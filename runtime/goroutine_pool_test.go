@@ -1,3 +1,4 @@
+// +build !leak
 package gxruntime
 
 import (
@@ -6,8 +7,7 @@ import (
 	"time"
 )
 
-//  go test -v ./...
-
+// go test -v -bench ".*"
 func TestBasicAPI(t *testing.T) {
 	gp := NewGoroutinePool(time.Second)
 	// cover alloc()
