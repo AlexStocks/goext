@@ -21,3 +21,12 @@ func TestGenSinaShortURL(t *testing.T) {
 
 	t.Logf("short url:%s", shortURL)
 }
+
+func TestGenBaiduShortURL(t *testing.T) {
+	shortURL, err := GenBaiduShortURL("https://github.com/alexstocks/goext")
+	if err != nil {
+		t.Errorf("error:%#v", err)
+	}
+
+	t.Logf("short url:%s", shortURL)
+}
