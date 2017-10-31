@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/10/31
+	> feature
+	* add short url api
+
 - 2017/10/30
 	> improvement
 	* add leak check on file header: // +build !leak
