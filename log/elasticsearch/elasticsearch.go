@@ -47,6 +47,28 @@ func buildEsIndexSettings(shardNum int32, replicaNum int32, refreshInterval int3
 	}`, shardNum, replicaNum, refreshInterval)
 }
 
+func buildEsIndexSettingsWithTimestamp(shardNum int32, replicaNum int32, refreshInterval int32,
+	indexType string, timestampField string, timestampFormat string) string {
+
+	return fmt.Sprintf(`{
+		"settings" : {
+			"number_of_shards": %d,
+			"number_of_replicas": %d,
+			"refresh_interval": "%ds"
+		},
+		"mappings" : {
+	    "%s" : {
+				"properties" : {
+					"%s" : {
+						"type":"date",
+						"format":"%s"
+					}
+				}
+	    }
+		}
+	}`, shardNum, replicaNum, refreshInterval, indexType, timestampField, timestampFormat)
+}
+
 func (ec EsClient) CreateEsIndex(index string, shardNum int32, replicaNum int32, refreshInterval int32) error {
 	var (
 		err    error
@@ -66,6 +88,34 @@ func (ec EsClient) CreateEsIndex(index string, shardNum int32, replicaNum int32,
 	}
 
 	body = buildEsIndexSettings(shardNum, replicaNum, refreshInterval)
+	_, err = ec.CreateIndex(index).BodyString(body).DoC(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "CreateEsIndex(body:%s)", body)
+	}
+
+	return nil
+}
+
+func (ec EsClient) CreateEsIndexWithTimestamp(index string, shardNum int32, replicaNum int32, refreshInterval int32,
+	indexType string, timestampField string, timestampFormat string) error {
+	var (
+		err    error
+		exists bool
+		body   string
+		ctx    context.Context
+	)
+
+	ctx = context.Background()
+	exists, err = ec.IndexExists(index).DoC(ctx)
+	if err != nil {
+		return errors.Wrapf(err, "CreateRcIndex(index:%s, shardNum:%s, replicaNum:%d, refreshInterval:%d)",
+			index, shardNum, replicaNum, refreshInterval)
+	}
+	if exists {
+		return nil
+	}
+
+	body = buildEsIndexSettingsWithTimestamp(shardNum, replicaNum, refreshInterval, indexType, timestampField, timestampFormat)
 	_, err = ec.CreateIndex(index).BodyString(body).DoC(ctx)
 	if err != nil {
 		return errors.Wrapf(err, "CreateEsIndex(body:%s)", body)
