@@ -11,13 +11,20 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 import (
 	"github.com/pkg/errors"
+)
+
+const (
+	dialTimeout = 1e9
+	connTimeout = 2e9
 )
 
 const (
@@ -28,6 +35,16 @@ const (
 
 var (
 	ErrorHTTPPrefix = fmt.Errorf("The url should start with http:// or https://")
+
+	httpDial = func(protocol string, addr string) (net.Conn, error) {
+		c, err := net.DialTimeout(protocol, addr, dialTimeout)
+		if err != nil {
+			return nil, err
+		}
+		deadline := time.Now().Add(connTimeout)
+		c.SetDeadline(deadline)
+		return c, nil
+	}
 )
 
 // refers: https://github.com/osamingo/gitio/blob/master/shortener/gitio.go
@@ -38,7 +55,9 @@ func GenGitioShortURL(uri string) (string, error) {
 		return "", ErrorHTTPPrefix
 	}
 
-	rsp, err := http.PostForm(GitioShortURL, url.Values{
+	c := http.Client{Transport: &http.Transport{Dial: httpDial}}
+	// rsp, err := http.PostForm(GitioShortURL, url.Values{
+	rsp, err := c.PostForm(GitioShortURL, url.Values{
 		"url": []string{uri},
 		// "code": []string{code},
 	})
@@ -70,7 +89,8 @@ func GenSinaShortURL(uri string) (string, error) {
 		return "", ErrorHTTPPrefix
 	}
 
-	rsp, err := http.Get(SinaShortURL + uri)
+	c := http.Client{Transport: &http.Transport{Dial: httpDial}}
+	rsp, err := c.Get(SinaShortURL + uri)
 	if err != nil {
 		return "", errors.Wrapf(err, "http.Get(%s)", SinaShortURL+uri)
 	}
@@ -103,7 +123,8 @@ func GenBaiduShortURL(uri string) (string, error) {
 		return "", ErrorHTTPPrefix
 	}
 
-	rsp, err := http.PostForm(BaiduShortURL, url.Values{
+	c := http.Client{Transport: &http.Transport{Dial: httpDial}}
+	rsp, err := c.PostForm(BaiduShortURL, url.Values{
 		"url": []string{uri},
 		// "code": []string{code},
 	})
