@@ -11,8 +11,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Gops() error {
-	if err := agent.Listen(agent.Options{}); err != nil {
+func Gops(addr string) error {
+	if err := agent.Listen(agent.Options{Addr: addr}); err != nil {
 		return errors.Wrapf(err, "gops/agent.Listen()")
 	}
 
