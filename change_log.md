@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2017/11/05
+	> feature
+	* add runtime/pprof by gops
+	
 - 2017/10/31
 	> feature
 	* add short url api
