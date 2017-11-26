@@ -5,6 +5,11 @@
 ## dev list ##
 ---
 
+
+- 2017/11/26
+	> improvement
+	* add GenSinaShortURLByGoogd because the source field is invalid in SinaShortURL
+	
 - 2017/11/05
 	> feature
 	* add runtime/pprof by gops

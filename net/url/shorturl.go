@@ -30,7 +30,9 @@ const (
 const (
 	GitioShortURL = "https://git.io"
 	BaiduShortURL = "http://dwz.cn/create.php"
-	SinaShortURL  = "http://api.t.sina.com.cn/short_url/shorten.json?source=3271760578&url_long="
+	// SinaShortURL  = "http://api.t.sina.com.cn/short_url/shorten.json?source=3271760578&url_long="
+	SinaShortURL  = "http://api.t.sina.com.cn/short_url/shorten.json?source=1681459862&url_long="
+	GoogdShortURL = "http://www.goo.gd/action/json.php?source=1681459862&url_long="
 )
 
 var (
@@ -84,6 +86,7 @@ type SinaResult struct {
 }
 
 // GenSinaShortURL generates short url by sina.com
+// ref doc: http://open.weibo.com/wiki/Short_url/shorten
 func GenSinaShortURL(uri string) (string, error) {
 	if !strings.HasPrefix(uri, "http://") && !strings.HasPrefix(uri, "https://") {
 		return "", ErrorHTTPPrefix
@@ -108,6 +111,46 @@ func GenSinaShortURL(uri string) (string, error) {
 	}
 
 	return (*res)[0].UrlShort, nil
+}
+
+type GoogdResults struct {
+	Urls []GoogdResult `json:"urls"`
+}
+
+type GoogdResult struct {
+	Result     bool   `json:"result"`
+	UrlShort   string `json:"url_short"`
+	UrlLong    string `json:"url_long"`
+	ObjectType string `json:"object_type"`
+	Type       int    `json:"type"`
+	ObjectID   string `json:"object_id"`
+}
+
+// GenSinaShortURL generates short url by sina.com
+func GenSinaShortURLByGoogd(uri string) (string, error) {
+	if !strings.HasPrefix(uri, "http://") && !strings.HasPrefix(uri, "https://") {
+		return "", ErrorHTTPPrefix
+	}
+
+	c := http.Client{Transport: &http.Transport{Dial: httpDial}}
+	rsp, err := c.Get(GoogdShortURL + uri)
+	if err != nil {
+		return "", errors.Wrapf(err, "http.Get(%s)", GoogdShortURL+uri)
+	}
+
+	defer rsp.Body.Close()
+	body, err := ioutil.ReadAll(rsp.Body)
+	if err != nil {
+		return "", errors.Wrapf(err, "ioutil.ReadAll")
+	}
+
+	res := &GoogdResults{}
+	err = json.Unmarshal([]byte(body), &res)
+	if err != nil {
+		return "", errors.Wrapf(err, "json.Unmarshal")
+	}
+
+	return res.Urls[0].UrlShort, nil
 }
 
 type BaiduResult struct {
