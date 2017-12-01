@@ -5,15 +5,18 @@
 ## dev list ##
 ---
 
+- 2017/12/02
+	> feature
+	* add c like api strftime in time
 
 - 2017/11/26
 	> improvement
 	* add GenSinaShortURLByGoogd because the source field is invalid in SinaShortURL
-	
+
 - 2017/11/05
 	> feature
 	* add runtime/pprof by gops
-	
+
 - 2017/10/31
 	> feature
 	* add short url api
@@ -29,15 +32,15 @@
 - 2017/10/24
 	> feature
 	* add runtime/goroutine_pool
-	
+
 - 2017/10/12
 	> feature
 	* add gxlog.ColorSprint & gxlog.ColorSprintln & ColorSprintf
-	
+
 - 2017/10/11
 	> feature
 	* add os.GetPkgPath
-	
+
 - 2017/09/21
 	> bugfix
 	* check redis master is available or not in databases/redis/GetInstances
@@ -85,7 +88,7 @@
 - 2017/04/25
 	> feature
 	* add elasticsearch bulk insert
-	
+
 - 2017/04/24
 
    > feature
