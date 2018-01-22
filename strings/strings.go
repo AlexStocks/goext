@@ -2,7 +2,6 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-
 // 2016/09/28
 // Package gxstrings implements string related utilities.
 package gxstrings
@@ -41,14 +40,17 @@ func Contains(s []string, e string) bool {
 
 /*
  code example:
+ output:
+ // data len: 2 , cap: 3 , data: [one two]
+ // data2 len: 2 , cap: 3 , data: [1 3]
 
  data := []string{"one", "two", "three"}
  ArrayRemoveAt(&data, 2)
- fmt.Println("data len:", len(data), ", data:", data)
+ fmt.Println("data len:", len(data), ", cap:", cap(data), ", data:", data)
 
- data2 := []int32{1, 2, 3}
- ArrayRemoveAt(&data2, 2)
- fmt.Println("data2 len:", len(data2), ", data2:", data2)
+ data2 := []int{1, 2, 3}
+ ArrayRemoveAt(&data2, 1)
+ fmt.Println("data2 len:", len(data2), ", cap:", cap(data2), ", data:", data2)
 */
 func ArrayRemoveAt(a interface{}, i int) {
 	if i < 0 {

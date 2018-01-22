@@ -2,20 +2,15 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-package gxxorlist_test
+package gxxorlist
 
 import (
 	"fmt"
 )
 
-import (
-	"github.com/AlexStocks/goext/container/xorlist"
-	"github.com/AlexStocks/github.com/test/goext/src/container/xorlist"
-)
-
 func Example() {
 	// Create a new list and put some numbers in it.
-	l := xorlist.New()
+	l := New()
 	e4 := l.PushBack(4)
 	e1 := l.PushFront(1)
 	l.InsertBefore(3, e4)

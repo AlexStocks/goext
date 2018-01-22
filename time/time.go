@@ -51,6 +51,10 @@ func Unix2Time(unix int64) time.Time {
 	return time.Unix(unix, 0)
 }
 
+func UnixNano2Time(nano int64) time.Time {
+	return time.Unix(nano/1e9, nano%1e9)
+}
+
 func UnixString2Time(unix string) time.Time {
 	i, err := strconv.ParseInt(unix, 10, 64)
 	if err != nil {
@@ -63,4 +67,8 @@ func UnixString2Time(unix string) time.Time {
 // 注意把time转换成unix的时候有精度损失，只返回了秒值，没有用到纳秒值
 func Time2Unix(t time.Time) int64 {
 	return t.Unix()
+}
+
+func Time2UnixNano(t time.Time) int64 {
+	return t.UnixNano()
 }

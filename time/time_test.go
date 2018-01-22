@@ -14,3 +14,12 @@ func TestUnix2Time(t *testing.T) {
 		t.Fatalf("@now:%#v, tm:%#v", now, tm)
 	}
 }
+
+func TestUnixNano2Time(t *testing.T) {
+	now := time.Now()
+	nowUnix := Time2UnixNano(now)
+	tm := UnixNano2Time(nowUnix)
+	if tm.UnixNano() != now.UnixNano() {
+		t.Fatalf("@now:%#v, tm:%#v", now, tm)
+	}
+}

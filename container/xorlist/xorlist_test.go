@@ -350,3 +350,25 @@ func TestMoveUnkownMark(t *testing.T) {
 	checkList(t, &l1, []interface{}{1})
 	checkList(t, &l2, []interface{}{2})
 }
+
+func TestLoopRemove(t *testing.T) {
+	l := New()
+	checkListPointers(t, l, []*XorElement{})
+
+	// build list
+	e1 := l.PushBack(2)
+	e2 := l.PushBack(1)
+	e3 := l.PushBack(3)
+	e4 := l.PushBack(2)
+	e5 := l.PushBack(5)
+	e6 := l.PushBack(2)
+	checkListPointers(t, l, []*XorElement{e1, e2, e3, e4, e5, e6})
+	for e, p := l.Front(); e != nil; e, p = e.Next(p), e {
+		if e.Value.(int) == 2 {
+			elem := e
+			e, p = p, p.Prev(e)
+			l.Remove(elem)
+		}
+	}
+	checkListPointers(t, l, []*XorElement{e2, e3, e5})
+}

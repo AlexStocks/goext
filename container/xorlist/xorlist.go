@@ -18,10 +18,23 @@
 //	for e := l.Back(); e != nil; n, e = e, e.Prev(n) {
 //		// do something with e.Value
 //	}
+// or
+// To delete a element in iteration
+//  var p *XorElement = nil
+//	for e := l.Front(); e != nil; p, e = e, e.Next(p) {
+//		if condition (e) {
+//	      elem := e
+//        e, p = p, p.Prev(e)
+//        l.Remove(elem)
+//	  }
+//	}
 
 package gxxorlist
 
-import "unsafe"
+import (
+	// "fmt"
+	"unsafe"
+)
 
 // XorElement is an element of a xor-linked list.
 type XorElement struct {
@@ -75,6 +88,15 @@ type XorList struct {
 	tail XorElement // last sentinel list element, only &tail, tail.prev, and tail.next are used
 	len  int        // current list length excluding @list.s two sentinel element
 }
+
+// just for test
+// func (l *XorList) Output() {
+// 	fmt.Printf("fake head{addr:%p, PN:%#x, value:%v} --> \n", &l.head, l.head.PN, l.head.Value)
+// 	for e, p := l.Front(); e != nil; p, e = e, e.Next(p) {
+// 		fmt.Printf("   element{addr:%p, PN:%#x, value:%v} --> \n", &e, e.PN, e.Value)
+// 	}
+// 	fmt.Printf("fake tail{addr:%p, PN:%#x, value:%v}\n", &l.tail, l.tail.PN, l.tail.Value)
+// }
 
 // Init initializes or clears list l.
 func (l *XorList) Init() *XorList {
