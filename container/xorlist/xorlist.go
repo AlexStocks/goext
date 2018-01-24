@@ -32,7 +32,7 @@
 package gxxorlist
 
 import (
-	// "fmt"
+	"fmt"
 	"unsafe"
 )
 
@@ -90,13 +90,13 @@ type XorList struct {
 }
 
 // just for test
-// func (l *XorList) Output() {
-// 	fmt.Printf("fake head{addr:%p, PN:%#x, value:%v} --> \n", &l.head, l.head.PN, l.head.Value)
-// 	for e, p := l.Front(); e != nil; p, e = e, e.Next(p) {
-// 		fmt.Printf("   element{addr:%p, PN:%#x, value:%v} --> \n", &e, e.PN, e.Value)
-// 	}
-// 	fmt.Printf("fake tail{addr:%p, PN:%#x, value:%v}\n", &l.tail, l.tail.PN, l.tail.Value)
-// }
+func (l *XorList) Output() {
+	fmt.Printf("fake head{addr:%p, PN:%#x, value:%v} --> \n", &l.head, l.head.PN, l.head.Value)
+	for e, p := l.Front(); e != nil; p, e = e, e.Next(p) {
+		fmt.Printf("   element{addr:%p, PN:%#x, value:%v} --> \n", &e, e.PN, e.Value)
+	}
+	fmt.Printf("fake tail{addr:%p, PN:%#x, value:%v}\n", &l.tail, l.tail.PN, l.tail.Value)
+}
 
 // Init initializes or clears list l.
 func (l *XorList) Init() *XorList {

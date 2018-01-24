@@ -29,33 +29,46 @@ const (
 )
 
 var (
-	defaultTimerOnce sync.Once
-	defaultTimer     *TimerWheel
-	nextID           TimerID
-	curGxTime        int64 = time.Now().UnixNano() // current goext time in nanoseconds
-)
-
-var (
 	ErrTimeChannelFull   = fmt.Errorf("timer channel full")
 	ErrTimeChannelClosed = fmt.Errorf("timer channel closed")
 )
+
+// to init a default timer wheel
+func Init() {
+	defaultTimerWheelOnce.Do(func() {
+		defaultTimerWheel = NewTimerWheel()
+	})
+}
 
 ////////////////////////////////////////////////
 // timer node
 ////////////////////////////////////////////////
 
+var (
+	defaultTimerWheelOnce sync.Once
+	defaultTimerWheel     *TimerWheel
+	nextID                TimerID
+	curGxTime             int64 = time.Now().UnixNano() // current goext time in nanoseconds
+)
+
 const (
-	MAX_MS       = 1000
-	MAX_SECOND   = 60
-	MAX_MINUTE   = 60
-	MAX_HOUR     = 24
-	MAX_DAY      = 31
-	MS           = 1e6
-	SECOND_MS    = 1 * MAX_MS * MS
-	MINUTE_MS    = 1 * MAX_SECOND * SECOND_MS
-	HOUR_MS      = 1 * MAX_MINUTE * MINUTE_MS
-	DAY_MS       = 1 * MAX_HOUR * HOUR_MS
-	MINIMUM_DIFF = 500 * MS
+	MAX_MS     = 1000
+	MAX_SECOND = 60
+	MAX_MINUTE = 60
+	MAX_HOUR   = 24
+	MAX_DAY    = 31
+	MS         = 1e6
+	SECOND_MS  = 1 * MAX_MS * MS
+	MINUTE_MS  = 1 * MAX_SECOND * SECOND_MS
+	HOUR_MS    = 1 * MAX_MINUTE * MINUTE_MS
+	DAY_MS     = 1 * MAX_HOUR * HOUR_MS
+	// ticker interval不能设置到这种精度，
+	// 实际运行时ticker的时间间隔会在1.001ms上下浮动,
+	// 当ticker interval小于1ms的时候，会导致TimerWheel.hand
+	// 和timeWheel.inc不增长，造成时间错乱：例如本来
+	// 1.5s运行的函数在持续2.1s之后才被执行
+	// MINIMUM_DIFF = 1.001 * MS
+	MINIMUM_DIFF = 10 * MS
 )
 
 func MS_NUM(expire int64) int64     { return expire / MS }
@@ -103,6 +116,19 @@ func compareTimerNode(first, second timerNode) int {
 	return ret
 }
 
+type timerAction = int64
+
+const (
+	ADD_TIMER   timerAction = 1
+	DEL_TIMER   timerAction = 2
+	RESET_TIMER timerAction = 3
+)
+
+type timerNodeAction struct {
+	node   timerNode
+	action timerAction
+}
+
 ////////////////////////////////////////////////
 // timer wheel
 ////////////////////////////////////////////////
@@ -118,7 +144,7 @@ type TimerWheel struct {
 	hand   [MAX_TIMER_LEVEL]int64              // clock
 	slot   [MAX_TIMER_LEVEL]*gxxorlist.XorList // timer list
 
-	timerQ chan timerNode
+	timerQ chan timerNodeAction
 
 	once   sync.Once // for close ticker
 	ticker *time.Ticker
@@ -128,15 +154,15 @@ type TimerWheel struct {
 func (t *TimerWheel) output() {
 	for idx := range t.slot {
 		gxlog.CDebug("print slot %d\n", idx)
-		// t.slot[idx].Output()
+		t.slot[idx].Output()
 	}
 }
 
 func NewTimerWheel() *TimerWheel {
 	w := &TimerWheel{
 		clock:  atomic.LoadInt64(&curGxTime),
-		ticker: time.NewTicker(MINIMUM_DIFF / 1000000),
-		timerQ: make(chan timerNode, timerNodeQueueSize),
+		ticker: time.NewTicker(MINIMUM_DIFF),
+		timerQ: make(chan timerNodeAction, timerNodeQueueSize),
 	}
 
 	for i := 0; i < MAX_TIMER_LEVEL; i++ {
@@ -146,47 +172,59 @@ func NewTimerWheel() *TimerWheel {
 	w.wg.Add(1)
 	go func() {
 		defer w.wg.Done()
-		// var cw CountWatch
-		// cw.Start()
 		var (
-			t     time.Time
-			cFlag bool
-			node  timerNode
-			qFlag bool
-			guard bool
+			t          time.Time
+			cFlag      bool
+			nodeAction timerNodeAction
+			qFlag      bool
 		)
 
+	LOOP:
 		for {
 			select {
 			case t, cFlag = <-w.ticker.C:
-				if cFlag {
-					atomic.StoreInt64(&curGxTime, t.UnixNano())
-					if w.timerUpdate(t) == 0 {
+				atomic.StoreInt64(&curGxTime, t.UnixNano())
+				if cFlag && 0 != atomic.LoadInt64(&w.number) {
+					ret := w.timerUpdate(t)
+					if ret == 0 {
 						w.run()
 					}
 
-					break
+					continue
 				}
 
-				guard = true
+				break LOOP
 
-			case node, qFlag = <-w.timerQ:
-				// gxlog.CError("new node:%#v, qFlag:%#v\n", node, qFlag)
+			case nodeAction, qFlag = <-w.timerQ:
+				// 此处只用一个channel，保证对同一个timer操作的顺序性
 				if qFlag {
-					w.timerInsertNode(node)
-					break
+					switch {
+					case nodeAction.action == ADD_TIMER:
+						atomic.AddInt64(&w.number, 1)
+						w.insertTimerNode(nodeAction.node)
+					case nodeAction.action == DEL_TIMER:
+						atomic.AddInt64(&w.number, -1)
+						w.deleteTimerNode(nodeAction.node)
+					case nodeAction.action == RESET_TIMER:
+						// gxlog.CInfo("node action:%#v", nodeAction)
+						w.resetTimerNode(nodeAction.node)
+					default:
+						atomic.AddInt64(&w.number, 1)
+						w.insertTimerNode(nodeAction.node)
+					}
+					continue
 				}
 
-				guard = true
-			}
-
-			if guard {
-				break
+				break LOOP
 			}
 		}
 	}()
 
 	return w
+}
+
+func (w *TimerWheel) TimerNumber() int {
+	return int(atomic.LoadInt64(&w.number))
 }
 
 func (w *TimerWheel) run() {
@@ -195,6 +233,7 @@ func (w *TimerWheel) run() {
 		err   error
 		node  timerNode
 		slot  *gxxorlist.XorList
+		array []timerNode
 	)
 
 	slot = w.slot[0]
@@ -205,16 +244,20 @@ func (w *TimerWheel) run() {
 			break
 		}
 
-		temp := e
-		e, p = p, p.Prev(e)
-		slot.Remove(temp)
-
 		err = node.run(node.ID, UnixNano2Time(clock), node.arg)
 		if err == nil && node.typ == ETimerLoop {
-			w.timerInsertNode(node)
+			array = append(array, node)
+			// w.insertTimerNode(node)
 		} else {
 			atomic.AddInt64(&w.number, -1)
 		}
+
+		temp := e
+		e, p = p, p.Prev(e)
+		slot.Remove(temp)
+	}
+	for idx := range array[:] {
+		w.insertTimerNode(array[idx])
 	}
 }
 
@@ -232,20 +275,54 @@ func (w *TimerWheel) insertSlot(idx int, node timerNode) {
 		}
 	}
 
-	// gxlog.CInfo("before insert, level %d slot:", idx)
 	if pos != nil {
-		// gxlog.CInfo("insertSlot.InsertBefore(pos:%d, node:%#v)", idx, node.ID)
 		slot.InsertBefore(node, pos)
 	} else {
 		// if slot is empty or @node_ptr is the maximum node
 		// in slot, insert it at the last of slot
-		// gxlog.CInfo("insertSlot.PushBack(node:%#v)", idx, node.ID)
 		slot.PushBack(node)
 	}
-	// gxlog.CInfo("after insert, level %d slot:", idx)
 }
 
-func (w *TimerWheel) timerInsertNode(node timerNode) {
+func (w *TimerWheel) deleteTimerNode(node timerNode) {
+	var (
+		level int
+	)
+
+LOOP:
+	for level, _ = range w.slot[:] {
+		for e, p := w.slot[level].Front(); e != nil; p, e = e, e.Next(p) {
+			if e.Value.(timerNode).ID == node.ID {
+				w.slot[level].Remove(e)
+				// atomic.AddInt64(&w.number, -1)
+				break LOOP
+			}
+		}
+	}
+}
+
+func (w *TimerWheel) resetTimerNode(node timerNode) {
+	var (
+		level int
+	)
+
+LOOP:
+	for level, _ = range w.slot[:] {
+		for e, p := w.slot[level].Front(); e != nil; p, e = e, e.Next(p) {
+			if e.Value.(timerNode).ID == node.ID {
+				n := e.Value.(timerNode)
+				n.trig -= n.period
+				n.period = node.period
+				n.trig += n.period
+				w.slot[level].Remove(e)
+				w.insertTimerNode(n)
+				break LOOP
+			}
+		}
+	}
+}
+
+func (w *TimerWheel) insertTimerNode(node timerNode) {
 	var (
 		idx  int
 		diff int64
@@ -267,7 +344,6 @@ func (w *TimerWheel) timerInsertNode(node timerNode) {
 		idx = 0
 	}
 
-	// gxlog.CInfo("insertSlot(idx:%d, node:%d)", idx, node.ID)
 	w.insertSlot(idx, node)
 }
 
@@ -280,33 +356,31 @@ func (w *TimerWheel) timerCascade(level int) {
 	)
 
 	clock = atomic.LoadInt64(&w.clock)
-	// w.slot[level].Output()
 	for e, p := w.slot[level].Front(); e != nil; p, e = e, e.Next(p) {
 		cur = e.Value.(timerNode)
-		diff = clock - cur.trig
-		if diff <= 0 {
+		diff = cur.trig - clock
+		switch {
+		case cur.trig <= clock:
 			guard = false
-		} else {
-			switch level {
-			case 1:
-				guard = SECOND_NUM(diff) > 0
-			case 2:
-				guard = MINUTE_NUM(diff) > 0
-			case 3:
-				guard = HOUR_NUM(diff) > 0
-			case 4:
-				guard = DAY_NUM(diff) > 0
-			}
-
-			if guard {
-				break
-			}
-
-			w.timerInsertNode(cur)
-			temp := e
-			e, p = p, p.Prev(e)
-			w.slot[level].Remove(temp)
+		case level == 1:
+			guard = SECOND_NUM(diff) > 0
+		case level == 2:
+			guard = MINUTE_NUM(diff) > 0
+		case level == 3:
+			guard = HOUR_NUM(diff) > 0
+		case level == 4:
+			guard = DAY_NUM(diff) > 0
 		}
+
+		if guard {
+			break
+		}
+
+		temp := e
+		e, p = p, p.Prev(e)
+		w.slot[level].Remove(temp)
+
+		w.insertTimerNode(cur)
 	}
 }
 
@@ -317,6 +391,7 @@ var (
 
 func (w *TimerWheel) timerUpdate(curTime time.Time) int {
 	var (
+		clock  int64
 		now    int64
 		idx    int32
 		diff   int64
@@ -325,8 +400,9 @@ func (w *TimerWheel) timerUpdate(curTime time.Time) int {
 	)
 
 	now = curTime.UnixNano()
-	diff = now - atomic.LoadInt64(&w.clock)
-	if diff < MINIMUM_DIFF {
+	clock = atomic.LoadInt64(&w.clock)
+	diff = now - clock
+	if diff < MINIMUM_DIFF*0.8 {
 		return -1
 	}
 	atomic.StoreInt64(&w.clock, now)
@@ -367,40 +443,69 @@ func (w *TimerWheel) Close() {
 }
 
 // add
-func (w *TimerWheel) AddTimer(f TimerFunc, typ TimerType, period int64, arg interface{}) (TimerID, error) {
+func (w *TimerWheel) AddTimer(f TimerFunc, typ TimerType, period int64, arg interface{}) (*Timer, error) {
 	if w.timerQ == nil {
-		return 0, ErrTimeChannelClosed
+		return nil, ErrTimeChannelClosed
 	}
 
+	t := &Timer{w: w}
 	node := newTimerNode(f, typ, period, arg)
 	select {
-	case w.timerQ <- node:
-		atomic.AddInt64(&(w.number), 1)
-		return node.ID, nil
-	case <-time.After(1e9):
+	case w.timerQ <- timerNodeAction{node: node, action: ADD_TIMER}:
+		t.ID = node.ID
+		return t, nil
+	default:
 	}
 
-	return 0, ErrTimeChannelFull
+	return nil, ErrTimeChannelFull
 }
 
-func sendTime(ID TimerID, t time.Time, arg interface{}) error {
+func (w *TimerWheel) deleteTimer(t *Timer) error {
+	if w.timerQ == nil {
+		return ErrTimeChannelClosed
+	}
+
+	select {
+	case w.timerQ <- timerNodeAction{action: DEL_TIMER, node: timerNode{ID: t.ID}}:
+		return nil
+	default:
+	}
+
+	return ErrTimeChannelFull
+}
+
+func (w *TimerWheel) resetTimer(t *Timer, d time.Duration) error {
+	if w.timerQ == nil {
+		return ErrTimeChannelClosed
+	}
+
+	select {
+	case w.timerQ <- timerNodeAction{action: RESET_TIMER, node: timerNode{ID: t.ID, period: int64(d)}}:
+		return nil
+	default:
+	}
+
+	return ErrTimeChannelFull
+}
+
+func sendTime(_ TimerID, t time.Time, arg interface{}) error {
 	select {
 	case arg.(chan time.Time) <- t:
 	default:
 	}
-
 	return nil
 }
 
 func (w *TimerWheel) NewTimer(d time.Duration) *Timer {
 	c := make(chan time.Time, 1)
 	t := &Timer{
-		C: c,
+		c: c,
 	}
 
-	ID, err := w.AddTimer(sendTime, ETimerOnce, int64(d), c)
+	timer, err := w.AddTimer(sendTime, ETimerOnce, int64(d), c)
 	if err == nil {
-		t.ID = ID
+		t.ID = timer.ID
+		t.w = timer.w
 		return t
 	}
 
@@ -409,5 +514,27 @@ func (w *TimerWheel) NewTimer(d time.Duration) *Timer {
 }
 
 func (w *TimerWheel) After(d time.Duration) <-chan time.Time {
-	return w.NewTimer(d).C
+	//timer := defaultTimer.NewTimer(d)
+	//if timer == nil {
+	//	return nil
+	//}
+	//
+	//return timer.C
+	return w.NewTimer(d).c
+}
+
+func goFunc(_ TimerID, _ time.Time, arg interface{}) error {
+	go arg.(func())()
+
+	return nil
+}
+
+func (w *TimerWheel) AfterFunc(d time.Duration, f func()) *Timer {
+	t, _ := w.AddTimer(goFunc, ETimerOnce, int64(d), f)
+
+	return t
+}
+
+func (w *TimerWheel) Sleep(d time.Duration) {
+	<-w.NewTimer(d).c
 }
