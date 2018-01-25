@@ -4,7 +4,10 @@
 
 ## dev list ##
 ---
-
+- 2018/01/25
+	> feature
+	* add gxtimeticker
+	
 - 2018/01/24
 	> feature
 	* add gxtime sleep
