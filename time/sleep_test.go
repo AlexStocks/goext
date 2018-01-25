@@ -46,15 +46,15 @@ func TestAfter(t *testing.T) {
 	defer wheel.Stop()
 
 	f := func(d time.Duration, num int) {
-		defer wg.Done()
-
 		var (
 			cw    CountWatch
 			index int
 		)
+
 		defer func() {
 			gxlog.CInfo("duration %d loop %d, timer costs:%dms", d, num, cw.Count()/1e6)
 			gxlog.CInfo("in timer func, timer number:%d", wheel.TimerNumber())
+			wg.Done()
 		}()
 
 		cw.Start()

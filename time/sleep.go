@@ -10,28 +10,47 @@ import (
 )
 
 type Timer struct {
-	c  <-chan time.Time
+	C  <-chan time.Time
 	ID TimerID
 	w  *TimerWheel
 }
 
 func After(d time.Duration) <-chan time.Time {
+	if d <= 0 {
+		return nil
+	}
+
 	return defaultTimerWheel.After(d)
 }
 
 func Sleep(d time.Duration) {
+	if d <= 0 {
+		return
+	}
+
 	defaultTimerWheel.Sleep(d)
 }
 
 func AfterFunc(d time.Duration, f func()) *Timer {
+	if d <= 0 {
+		return nil
+	}
+
 	return defaultTimerWheel.AfterFunc(d, f)
 }
 
 func NewTimer(d time.Duration) *Timer {
+	if d <= 0 {
+		return nil
+	}
+
 	return defaultTimerWheel.NewTimer(d)
 }
 
 func (t *Timer) Reset(d time.Duration) {
+	if d <= 0 {
+		return
+	}
 	if t.w == nil {
 		panic("time: Stop called on uninitialized Timer")
 	}
@@ -45,4 +64,5 @@ func (t *Timer) Stop() {
 	}
 
 	t.w.deleteTimer(t)
+	t.w = nil
 }

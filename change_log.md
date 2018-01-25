@@ -5,6 +5,14 @@
 ## dev list ##
 ---
 
+- 2018/01/24
+	> feature
+	* add gxtime sleep
+
+- 2018/01/21
+	> feature
+	* add gxtime time wheel
+	
 - 2017/12/02
 	> feature
 	* add c like api strftime in time
