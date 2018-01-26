@@ -40,6 +40,10 @@ func Init() {
 	})
 }
 
+func Now() time.Time {
+	return defaultTimerWheel.Now()
+}
+
 ////////////////////////////////////////////////
 // timer node
 ////////////////////////////////////////////////
@@ -232,6 +236,10 @@ func (w *TimerWheel) output() {
 
 func (w *TimerWheel) TimerNumber() int {
 	return int(atomic.LoadInt64(&w.number))
+}
+
+func (w *TimerWheel) Now() time.Time {
+	return UnixNano2Time(atomic.LoadInt64(&curGxTime))
 }
 
 func (w *TimerWheel) run() {
