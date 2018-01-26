@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// 每个函数单独进行测试，否则timer number会不准确，因为ticker相关的timer会用于运行下去
 func TestNewTicker(t *testing.T) {
 	var (
 		num     int

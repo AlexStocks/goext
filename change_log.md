@@ -4,6 +4,11 @@
 
 ## dev list ##
 ---
+
+- 2018/01/26
+	> feature
+	* add context
+	
 - 2018/01/25
 	> feature
 	* add gxtimeticker
