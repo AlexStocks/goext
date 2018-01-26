@@ -18,6 +18,10 @@ func TestNewValuesContext(t *testing.T) {
 	v := ctx.Get(key)
 	xassert.Equalf(value, v, "key:%s", key)
 
+	ctx.Delete(key)
+	v = ctx.Get(key)
+	xassert.Equalf(nil, v, "key:%s", key)
+
 	ctx1 := NewValuesContext(nil)
 	key1 := struct {
 		s string
@@ -26,4 +30,8 @@ func TestNewValuesContext(t *testing.T) {
 	ctx1.Set(key1, value)
 	v1 := ctx1.Get(key1)
 	xassert.Equalf(value, v1, "key:%#v", key1)
+
+	ctx1.Delete(key1)
+	v1 = ctx1.Get(key)
+	xassert.Equalf(nil, v1, "key:%#v", key1)
 }
