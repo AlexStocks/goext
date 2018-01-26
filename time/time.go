@@ -10,20 +10,32 @@ import (
 	"time"
 )
 
-func TimeSecondDuration(sec int) time.Duration {
-	return time.Duration(sec) * time.Second
+func TimeDayDuratioin(day float64) time.Duration {
+	return time.Duration(day * 24 * float64(time.Hour))
 }
 
-func TimeMillisecondDuration(m int) time.Duration {
-	return time.Duration(m) * time.Millisecond
+func TimeHourDuratioin(hour float64) time.Duration {
+	return time.Duration(hour * float64(time.Hour))
 }
 
-func TimeMicrosecondDuration(m int) time.Duration {
-	return time.Duration(m) * time.Microsecond
+func TimeMinuteDuration(minute float64) time.Duration {
+	return time.Duration(minute * float64(time.Minute))
 }
 
-func TimeNanosecondDuration(n int) time.Duration {
-	return time.Duration(n) * time.Nanosecond
+func TimeSecondDuration(sec float64) time.Duration {
+	return time.Duration(sec * float64(time.Second))
+}
+
+func TimeMillisecondDuration(m float64) time.Duration {
+	return time.Duration(m * float64(time.Millisecond))
+}
+
+func TimeMicrosecondDuration(m float64) time.Duration {
+	return time.Duration(m * float64(time.Microsecond))
+}
+
+func TimeNanosecondDuration(n float64) time.Duration {
+	return time.Duration(n * float64(time.Nanosecond))
 }
 
 // desc: convert year-month-day-hour-minute-seccond to int in second
@@ -44,7 +56,7 @@ func YMDPrint(sec int, nsec int) string {
 }
 
 func Future(sec int, f func()) {
-	time.AfterFunc(TimeSecondDuration(sec), f)
+	time.AfterFunc(TimeSecondDuration(float64(sec)), f)
 }
 
 func Unix2Time(unix int64) time.Time {

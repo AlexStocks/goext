@@ -9,6 +9,7 @@ import (
 
 import (
 	"github.com/AlexStocks/goext/log"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewTimerWheel(t *testing.T) {
@@ -70,14 +71,15 @@ func TestAfter(t *testing.T) {
 	}
 
 	wg.Add(6)
-	go f(1.5*SECOND_MS, 15)
-	go f(2.510*SECOND_MS, 10)
-	go f(1.5*SECOND_MS, 40)
-	go f(0.15*SECOND_MS, 200)
-	go f(3*SECOND_MS, 20)
-	go f(63*SECOND_MS, 1)
-	time.Sleep(0.1 * SECOND_MS)
-	gxlog.CInfo("after add 6 timers, timer number:%d", wheel.TimerNumber())
+	go f(TimeSecondDuration(1.5), 15)
+	go f(TimeSecondDuration(2.510), 10)
+	go f(TimeSecondDuration(1.5), 40)
+	go f(TimeSecondDuration(0.15), 200)
+	go f(TimeSecondDuration(3), 20)
+	go f(TimeSecondDuration(63), 1)
+
+	time.Sleep(TimeSecondDuration(0.01))
+	assert.Equalf(t, 6, defaultTimerWheel.TimerNumber(), "")
 	wg.Wait()
 }
 
@@ -97,11 +99,12 @@ func TestAfterFunc(t *testing.T) {
 
 	wg.Add(3)
 	cw.Start()
-	AfterFunc(0.5*SECOND_MS, f)
-	AfterFunc(1.5*SECOND_MS, f)
-	AfterFunc(61.5*SECOND_MS, f)
-	time.Sleep(0.1e9)
-	gxlog.CInfo("after add 3 timer, timer number:%d", defaultTimerWheel.TimerNumber())
+	AfterFunc(TimeSecondDuration(0.5), f)
+	AfterFunc(TimeSecondDuration(1.5), f)
+	AfterFunc(TimeSecondDuration(61.5), f)
+
+	time.Sleep(TimeSecondDuration(0.01))
+	assert.Equalf(t, 3, defaultTimerWheel.TimerNumber(), "")
 	wg.Wait()
 }
 
@@ -122,10 +125,11 @@ func TestTimer_Reset(t *testing.T) {
 
 	wg.Add(1)
 	cw.Start()
-	timer = AfterFunc(1.5*SECOND_MS, f)
-	timer.Reset(3.5 * SECOND_MS)
-	time.Sleep(0.2e9)
-	gxlog.CInfo("timer number:%d", defaultTimerWheel.TimerNumber())
+	timer = AfterFunc(TimeSecondDuration(1.5), f)
+	timer.Reset(TimeSecondDuration(3.5))
+
+	time.Sleep(TimeSecondDuration(0.01))
+	assert.Equalf(t, 1, defaultTimerWheel.TimerNumber(), "")
 	wg.Wait()
 }
 
@@ -141,13 +145,15 @@ func TestTimer_Stop(t *testing.T) {
 		gxlog.CInfo("timer costs:%dms", cw.Count()/1e6)
 	}
 
-	timer = AfterFunc(4.5*SECOND_MS, f)
+	timer = AfterFunc(TimeSecondDuration(4.5), f)
 	// 添加是异步进行的，所以sleep一段时间再去检测timer number
 	time.Sleep(1e9)
-	gxlog.CInfo("timer number:%d", defaultTimerWheel.TimerNumber())
+	assert.Equalf(t, 1, defaultTimerWheel.TimerNumber(), "before stop")
 	timer.Stop()
 	// 删除是异步进行的，所以sleep一段时间再去检测timer number
 	time.Sleep(1e9)
-	gxlog.CInfo("after stop, timer number:%d", defaultTimerWheel.TimerNumber())
+
+	time.Sleep(TimeSecondDuration(0.01))
+	assert.Equalf(t, 0, defaultTimerWheel.TimerNumber(), "after stop")
 	time.Sleep(3e9)
 }

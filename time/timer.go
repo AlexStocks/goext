@@ -17,17 +17,6 @@ import (
 	"github.com/AlexStocks/goext/log"
 )
 
-const (
-	MAX_TIMER_LEVEL = 5
-)
-
-type TimerType int32
-
-const (
-	ETimerOnce TimerType = 0X1 << 0
-	ETimerLoop TimerType = 0X1 << 1
-)
-
 var (
 	ErrTimeChannelFull   = fmt.Errorf("timer channel full")
 	ErrTimeChannelClosed = fmt.Errorf("timer channel closed")
@@ -56,30 +45,26 @@ var (
 )
 
 const (
-	MAX_MS     = 1000
-	MAX_SECOND = 60
-	MAX_MINUTE = 60
-	MAX_HOUR   = 24
-	MAX_DAY    = 31
-	MS         = 1e6
-	SECOND_MS  = 1 * MAX_MS * MS
-	MINUTE_MS  = 1 * MAX_SECOND * SECOND_MS
-	HOUR_MS    = 1 * MAX_MINUTE * MINUTE_MS
-	DAY_MS     = 1 * MAX_HOUR * HOUR_MS
+	maxMS     = 1000
+	maxSecond = 60
+	maxMinute = 60
+	maxHour   = 24
+	maxDay    = 31
 	// ticker interval不能设置到这种精度，
 	// 实际运行时ticker的时间间隔会在1.001ms上下浮动,
 	// 当ticker interval小于1ms的时候，会导致TimerWheel.hand
 	// 和timeWheel.inc不增长，造成时间错乱：例如本来
 	// 1.5s运行的函数在持续2.1s之后才被执行
-	// MINIMUM_DIFF = 1.001 * MS
-	MINIMUM_DIFF = 10 * MS
+	// minDiff = 1.001 * MS
+	minDiff       = 10e6
+	maxTimerLevel = 5
 )
 
-func MS_NUM(expire int64) int64     { return expire / MS }
-func SECOND_NUM(expire int64) int64 { return expire / SECOND_MS }
-func MINUTE_NUM(expire int64) int64 { return expire / MINUTE_MS }
-func HOUR_NUM(expire int64) int64   { return expire / HOUR_MS }
-func DAY_NUM(expire int64) int64    { return expire / DAY_MS }
+func msNum(expire int64) int64     { return expire / int64(time.Millisecond) }
+func secondNum(expire int64) int64 { return expire / int64(time.Minute) }
+func minuteNum(expire int64) int64 { return expire / int64(time.Minute) }
+func hourNum(expire int64) int64   { return expire / int64(time.Hour) }
+func dayNum(expire int64) int64    { return expire / (maxHour * int64(time.Hour)) }
 
 // if the return error is not nil, the related timer will be closed.
 type TimerFunc func(ID TimerID, expire time.Time, arg interface{}) error
@@ -142,17 +127,23 @@ const (
 )
 
 var (
-	limit   = [MAX_TIMER_LEVEL + 1]int64{MAX_MS, MAX_SECOND, MAX_MINUTE, MAX_HOUR, MAX_DAY}
-	msLimit = [MAX_TIMER_LEVEL + 1]int64{MS, SECOND_MS, MINUTE_MS, HOUR_MS, DAY_MS}
+	limit   = [maxTimerLevel + 1]int64{maxMS, maxSecond, maxMinute, maxHour, maxDay}
+	msLimit = [maxTimerLevel + 1]int64{
+		int64(time.Millisecond),
+		int64(time.Second),
+		int64(time.Minute),
+		int64(time.Hour),
+		int64(maxHour * time.Hour),
+	}
 )
 
 // timer based on multiple wheels
 type TimerWheel struct {
-	start  int64                               // start clock
-	clock  int64                               // current time in nanosecond
-	number int64                               // timer node number
-	hand   [MAX_TIMER_LEVEL]int64              // clock
-	slot   [MAX_TIMER_LEVEL]*gxxorlist.XorList // timer list
+	start  int64                             // start clock
+	clock  int64                             // current time in nanosecond
+	number int64                             // timer node number
+	hand   [maxTimerLevel]int64              // clock
+	slot   [maxTimerLevel]*gxxorlist.XorList // timer list
 
 	timerQ chan timerNodeAction
 
@@ -164,12 +155,12 @@ type TimerWheel struct {
 func NewTimerWheel() *TimerWheel {
 	w := &TimerWheel{
 		clock:  atomic.LoadInt64(&curGxTime),
-		ticker: time.NewTicker(MINIMUM_DIFF), // 这个精度如果太低，会影响curGxTime，进而影响timerNode的trig的值
+		ticker: time.NewTicker(time.Duration(minDiff)), // 这个精度如果太低，会影响curGxTime，进而影响timerNode的trig的值
 		timerQ: make(chan timerNodeAction, timerNodeQueueSize),
 	}
 	w.start = w.clock
 
-	for i := 0; i < MAX_TIMER_LEVEL; i++ {
+	for i := 0; i < maxTimerLevel; i++ {
 		w.slot[i] = gxxorlist.New()
 	}
 
@@ -260,7 +251,7 @@ func (w *TimerWheel) run() {
 		}
 
 		err = node.timerRun(node.ID, UnixNano2Time(clock), node.arg)
-		if err == nil && node.typ == ETimerLoop {
+		if err == nil && node.typ == eTimerLoop {
 			array = append(array, node)
 			// w.insertTimerNode(node)
 		} else {
@@ -360,13 +351,13 @@ func (w *TimerWheel) insertTimerNode(node timerNode) {
 	switch {
 	case diff <= 0:
 		idx = 0
-	case DAY_NUM(diff) != 0:
+	case dayNum(diff) != 0:
 		idx = 4
-	case HOUR_NUM(diff) != 0:
+	case hourNum(diff) != 0:
 		idx = 3
-	case MINUTE_NUM(diff) != 0:
+	case minuteNum(diff) != 0:
 		idx = 2
-	case SECOND_NUM(diff) != 0:
+	case secondNum(diff) != 0:
 		idx = 1
 	default:
 		idx = 0
@@ -391,13 +382,13 @@ func (w *TimerWheel) timerCascade(level int) {
 		case cur.trig <= clock:
 			guard = false
 		case level == 1:
-			guard = SECOND_NUM(diff) > 0
+			guard = secondNum(diff) > 0
 		case level == 2:
-			guard = MINUTE_NUM(diff) > 0
+			guard = minuteNum(diff) > 0
 		case level == 3:
-			guard = HOUR_NUM(diff) > 0
+			guard = hourNum(diff) > 0
 		case level == 4:
-			guard = DAY_NUM(diff) > 0
+			guard = dayNum(diff) > 0
 		}
 
 		if guard {
@@ -419,25 +410,25 @@ func (w *TimerWheel) timerUpdate(curTime time.Time) int {
 		idx    int32
 		diff   int64
 		maxIdx int32
-		inc    [MAX_TIMER_LEVEL + 1]int64
+		inc    [maxTimerLevel + 1]int64
 	)
 
 	now = curTime.UnixNano()
 	clock = atomic.LoadInt64(&w.clock)
 	diff = now - clock
 	diff += w.deltaDiff(clock)
-	if diff < MINIMUM_DIFF*0.7 {
+	if diff < minDiff*0.7 {
 		return -1
 	}
 	atomic.StoreInt64(&w.clock, now)
 
-	for idx = MAX_TIMER_LEVEL - 1; 0 <= idx; idx-- {
+	for idx = maxTimerLevel - 1; 0 <= idx; idx-- {
 		inc[idx] = diff / msLimit[idx]
 		diff %= msLimit[idx]
 	}
 
 	maxIdx = 0
-	for idx = 0; idx < MAX_TIMER_LEVEL; idx++ {
+	for idx = 0; idx < maxTimerLevel; idx++ {
 		if 0 != inc[idx] {
 			w.hand[idx] += inc[idx]
 			inc[idx+1] += w.hand[idx] / limit[idx]
@@ -469,6 +460,13 @@ func (w *TimerWheel) Close() {
 ////////////////////////////////////////////////
 // timer
 ////////////////////////////////////////////////
+
+type TimerType int32
+
+const (
+	eTimerOnce TimerType = 0X1 << 0
+	eTimerLoop TimerType = 0X1 << 1
+)
 
 // 异步通知timerWheel添加一个timer，有可能失败
 func (w *TimerWheel) AddTimer(f TimerFunc, typ TimerType, period int64, arg interface{}) (*Timer, error) {
@@ -532,7 +530,7 @@ func (w *TimerWheel) NewTimer(d time.Duration) *Timer {
 		C: c,
 	}
 
-	timer, err := w.AddTimer(sendTime, ETimerOnce, int64(d), c)
+	timer, err := w.AddTimer(sendTime, eTimerOnce, int64(d), c)
 	if err == nil {
 		t.ID = timer.ID
 		t.w = timer.w
@@ -560,7 +558,7 @@ func goFunc(_ TimerID, _ time.Time, arg interface{}) error {
 }
 
 func (w *TimerWheel) AfterFunc(d time.Duration, f func()) *Timer {
-	t, _ := w.AddTimer(goFunc, ETimerOnce, int64(d), f)
+	t, _ := w.AddTimer(goFunc, eTimerOnce, int64(d), f)
 
 	return t
 }
@@ -576,7 +574,7 @@ func (w *TimerWheel) Sleep(d time.Duration) {
 func (w *TimerWheel) NewTicker(d time.Duration) *Ticker {
 	c := make(chan time.Time, 1)
 
-	timer, err := w.AddTimer(sendTime, ETimerLoop, int64(d), c)
+	timer, err := w.AddTimer(sendTime, eTimerLoop, int64(d), c)
 	if err == nil {
 		timer.C = c
 		return (*Ticker)(timer)
@@ -587,7 +585,7 @@ func (w *TimerWheel) NewTicker(d time.Duration) *Ticker {
 }
 
 func (w *TimerWheel) TickFunc(d time.Duration, f func()) *Ticker {
-	t, err := w.AddTimer(goFunc, ETimerLoop, int64(d), f)
+	t, err := w.AddTimer(goFunc, eTimerLoop, int64(d), f)
 	if err == nil {
 		return (*Ticker)(t)
 	}

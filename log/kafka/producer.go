@@ -83,7 +83,7 @@ func NewProducer(
 	}
 	kafkaConfig.Producer.Compression = compressionType
 
-	kafkaConfig.Metadata.RefreshFrequency = gxtime.TimeSecondDuration(updateMetaDataInterval)
+	kafkaConfig.Metadata.RefreshFrequency = gxtime.TimeSecondDuration(float64(updateMetaDataInterval))
 
 	kafkaProducer, err := sarama.NewSyncProducer(brokers, kafkaConfig)
 	if err != nil {
@@ -214,7 +214,7 @@ func NewAsyncProducer(
 		kafkaConfig.Producer.RequiredAcks = sarama.WaitForLocal
 	}
 
-	kafkaConfig.Metadata.RefreshFrequency = gxtime.TimeSecondDuration(updateMetaDataInterval)
+	kafkaConfig.Metadata.RefreshFrequency = gxtime.TimeSecondDuration(float64(updateMetaDataInterval))
 
 	kafkaProducer, err := sarama.NewAsyncProducer(brokers, kafkaConfig)
 	if err != nil {
