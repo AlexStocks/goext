@@ -4,43 +4,53 @@
 
 package gxsync
 
-// import (
-// 	"sync/atomic"
-// )
+import (
+	"sync/atomic"
+)
+
+//type TryLock struct {
+//	lock int32
+//}
 //
-// type TryLock struct {
-// 	lock int32
-// }
+//func (l *TryLock) Lock() bool {
+//	return atomic.CompareAndSwapInt32(&(l.lock), 0, 1)
+//}
 //
-// func (l *TryLock)Lock() bool {
-// 	return atomic.CompareAndSwapInt32(&(l.lock), 0, 1)
-// }
-//
-// func (l *TryLock)Unlock() {
+//func (l *TryLock) Unlock() {
 //	atomic.StoreInt32(&(l.lock), 0)
-// }
+//}
 
-type TryLock struct {
-	lock chan Empty
+// ref: https://github.com/LK4D4/trylock/blob/master/trylock.go
+import (
+	"sync"
+	"unsafe"
+)
+
+const mutexLocked = 1 << iota
+
+// Mutex is simple sync.Mutex + ability to try to Lock.
+type Mutex struct {
+	in sync.Mutex
 }
 
-func NewTryLock() *TryLock {
-	return &TryLock{lock: make(chan Empty, 1)}
+// Lock locks m.
+// If the lock is already in use, the calling goroutine
+// blocks until the mutex is available.
+func (m *Mutex) Lock() {
+	m.in.Lock()
 }
 
-func (l *TryLock) Lock() {
-	l.lock <- Empty{}
+// Unlock unlocks m.
+// It is a run-time error if m is not locked on entry to Unlock.
+//
+// A locked Mutex is not associated with a particular goroutine.
+// It is allowed for one goroutine to lock a Mutex and then
+// arrange for another goroutine to unlock it.
+func (m *Mutex) Unlock() {
+	m.in.Unlock()
 }
 
-func (l *TryLock) Trylock() bool {
-	select {
-	case l.lock <- Empty{}:
-		return true
-	default:
-		return false
-	}
-}
-
-func (l *TryLock) Unlock() {
-	<-l.lock
+// TryLock tries to lock m. It returns true in case of success, false otherwise.
+func (m *Mutex) TryLock() bool {
+	return atomic.CompareAndSwapInt32((*int32)(unsafe.Pointer(&m.in)), 0, mutexLocked)
 }
