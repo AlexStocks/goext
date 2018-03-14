@@ -5,6 +5,12 @@
 ## dev list ##
 ---
 
+- 2018/03/14
+	> feature
+	* add sync/drwlock
+	* add time/gxtime parser
+	* add sync/trylock
+
 - 2018/01/26
 	> feature
 	* add context

@@ -6,11 +6,7 @@
 package gxsync
 
 import (
-	"fmt"
-	"os"
-	"runtime"
 	"sync"
-	"time"
 )
 
 // cpus maps (non-consecutive) CPUID values to integer indices.
@@ -19,7 +15,6 @@ var cpus map[uint64]int
 // init will construct the cpus map so that CPUIDs can be looked up to
 // determine a particular core's lock index.
 func init() {
-	start := time.Now()
 	cpus = map_cpus()
 }
 
