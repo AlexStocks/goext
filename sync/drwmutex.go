@@ -21,7 +21,6 @@ var cpus map[uint64]int
 func init() {
 	start := time.Now()
 	cpus = map_cpus()
-	fmt.Fprintf(os.Stderr, "%d/%d cpus found in %v: %v\n", len(cpus), runtime.NumCPU(), time.Now().Sub(start), cpus)
 }
 
 type paddedRWMutex struct {
