@@ -59,7 +59,6 @@ func (mx DRWMutex) Unlock() {
 // relatively slow, depending on the underlying system architechture, and so
 // its result should be cached if possible.
 func (mx DRWMutex) RLocker() sync.Locker {
-	fmt.Printf("cpu() = %d, cpus len:%d, mx len:%d\n", cpu(), len(cpus), len(mx))
 	return mx[cpus[cpu()]].mu.RLocker()
 }
 
