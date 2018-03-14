@@ -5,3 +5,5 @@
 // Package gxsync provides some synchronization primitives such as
 // trylock & semaphore.
 package gxsync
+
+// the drwmutex only support linux on amd64 platform.
