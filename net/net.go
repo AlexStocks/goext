@@ -38,3 +38,11 @@ func WSSHostAddress2(host string, port string, path string) string {
 func HostPort(addr string) (string, string, error) {
 	return net.SplitHostPort(addr)
 }
+
+func IsUDPAddrEqual(addr0 *net.UDPAddr, addr1 *net.UDPAddr) bool {
+	if addr0 != nil && addr1 != nil && addr0.IP.Equal(addr1.IP) && addr0.Port == addr1.Port && addr0.Zone == addr1.Zone {
+		return true
+	}
+
+	return false
+}

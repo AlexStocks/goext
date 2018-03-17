@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2018/03/17
+	> feature
+	* add gxnet.IsUDPAddrEqual
+
 - 2018/03/14
 	> feature
 	* add sync/drwlock
