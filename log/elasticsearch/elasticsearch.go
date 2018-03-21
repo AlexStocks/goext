@@ -37,7 +37,7 @@ func CreateEsClient(hosts []string) (EsClient, error) {
 }
 
 // https://github.com/olivere/elastic/issues/457
-func buildEsIndexSettings(shardNum int32, replicaNum int32, refreshInterval int32) string {
+func buildEsIndexSettings(shardNum, replicaNum, refreshInterval int32) string {
 	return fmt.Sprintf(`{
 		"settings" : {
 			"number_of_shards": %d,
@@ -47,8 +47,8 @@ func buildEsIndexSettings(shardNum int32, replicaNum int32, refreshInterval int3
 	}`, shardNum, replicaNum, refreshInterval)
 }
 
-func buildEsIndexSettingsWithTimestamp(shardNum int32, replicaNum int32, refreshInterval int32,
-	indexType string, timestampField string, timestampFormat string) string {
+func buildEsIndexSettingsWithTimestamp(shardNum, replicaNum, refreshInterval int32,
+	indexType, timestampField, timestampFormat string) string {
 
 	return fmt.Sprintf(`{
 		"settings" : {
@@ -69,7 +69,7 @@ func buildEsIndexSettingsWithTimestamp(shardNum int32, replicaNum int32, refresh
 	}`, shardNum, replicaNum, refreshInterval, indexType, timestampField, timestampFormat)
 }
 
-func (ec EsClient) CreateEsIndex(index string, shardNum int32, replicaNum int32, refreshInterval int32) error {
+func (ec EsClient) CreateEsIndex(index string, shardNum, replicaNum, refreshInterval int32) error {
 	var (
 		err    error
 		exists bool
@@ -96,8 +96,8 @@ func (ec EsClient) CreateEsIndex(index string, shardNum int32, replicaNum int32,
 	return nil
 }
 
-func (ec EsClient) CreateEsIndexWithTimestamp(index string, shardNum int32, replicaNum int32, refreshInterval int32,
-	indexType string, timestampField string, timestampFormat string) error {
+func (ec EsClient) CreateEsIndexWithTimestamp(index string, shardNum, replicaNum, refreshInterval int32,
+	indexType, timestampField, timestampFormat string) error {
 	var (
 		err    error
 		exists bool
@@ -139,9 +139,64 @@ func (ec EsClient) DeleteEsIndex(index string) error {
 	return nil
 }
 
+// [template](https://github.com/inloco/kafka-elasticsearch-injector/blob/master/src/elasticsearch/elasticsearch_test.go#L39)
+//`
+//{
+//	"template": "my-topic-*",
+//	"settings": {},
+//	"mappings": {
+//	  "my-topic": {
+//		"_source": {
+//		  "enabled": "true"
+//		},
+//		"dynamic_templates": [
+//		  {
+//			"strings": {
+//			  "mapping": {
+//				"index": "not_analyzed",
+//				"type": "string"
+//			  },
+//			  "match_mapping_type": "string"
+//			}
+//		  }
+//		],
+//		"properties": {
+//		  "id": {
+//		  	"type": "keyword"
+//		  }
+//		}
+//	  }
+//	},
+//	"aliases": {}
+//}
+//`
+// set mapping & settings
+func (ec EsClient) SetTemplate(index, template string, force bool) error {
+	var (
+		err   error
+		exist bool
+	)
+	if !force {
+		exist, err = ec.Client.IndexTemplateExists(index).DoC(context.Background())
+		if err != nil {
+			return errors.Wrapf(err, "client.IndexTemplateExists(index:%s)", index)
+		}
+	} else {
+		exist = false
+	}
+	if !exist {
+		_, err := ec.IndexPutTemplate(index).BodyString(template).DoC(context.Background())
+		if err != nil {
+			return errors.Wrapf(err, "IndexPutTemplate(index:%s)", index)
+		}
+	}
+
+	return nil
+}
+
 // InsertWithDocId 插入@msg
 // !!! 如果@msg的类型是string 或者 []byte，则被当做Json String类型直接存进去
-func (ec EsClient) Insert(index string, typ string, msg interface{}) error {
+func (ec EsClient) Insert(index, typ string, msg interface{}) error {
 	var (
 		err      error
 		ok       bool
@@ -179,7 +234,7 @@ func (ec EsClient) Insert(index string, typ string, msg interface{}) error {
 
 // InsertWithDocId 插入@msg时候指定@docID
 // !!! 如果@msg的类型是string 或者 []byte，则被当做Json String类型直接存进去
-func (ec EsClient) InsertWithDocId(index string, typ string, docID string, msg interface{}) error {
+func (ec EsClient) InsertWithDocId(index, typ, docID string, msg interface{}) error {
 	var (
 		err      error
 		ok       bool
@@ -192,19 +247,22 @@ func (ec EsClient) InsertWithDocId(index string, typ string, docID string, msg i
 	case string:
 		_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyString(msg.(string)).DoC(ctx)
 		if err != nil {
-			return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%s)", index, typ, docID, msg)
+			return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%s)",
+				index, typ, docID, msg)
 		}
 
 	default:
 		if msgBytes, ok = msg.([]byte); ok {
 			_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyString(string(msgBytes)).DoC(ctx)
 			if err != nil {
-				return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%s)", index, typ, docID, (string)(msgBytes))
+				return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%s)",
+					index, typ, docID, (string)(msgBytes))
 			}
 		} else {
 			_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyJson(msg).DoC(ctx)
 			if err != nil {
-				return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%#v)", index, typ, docID, msg)
+				return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%#v)",
+					index, typ, docID, msg)
 			}
 		}
 	}
@@ -216,7 +274,7 @@ func (ec EsClient) InsertWithDocId(index string, typ string, docID string, msg i
 // !!! 如果@arr[0]的类型是string 或者 []byte，则被当做Json String类型直接存进去
 // https://www.elastic.co/guide/en/elasticsearch/guide/current/bulk.html
 // A good place to start is with batches of 1,000 to 5,000 documents
-func (ec EsClient) BulkInsert(index string, typ string, arr []interface{}) error {
+func (ec EsClient) BulkInsert(index, typ string, arr []interface{}) error {
 	var (
 		err  error
 		ctx  context.Context
