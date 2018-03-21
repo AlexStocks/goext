@@ -5,9 +5,9 @@
 ## dev list ##
 ---
 
-- 2018/03/17
+- 2018/03/21
 	> feature
-	* add gxnet.IsUDPAddrEqual
+	* add gxnet.IsSameAddr
 
 - 2018/03/14
 	> feature
