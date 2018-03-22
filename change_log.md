@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2018/03/22
+	> feature
+	* add gxjson
+
 - 2018/03/21
 	> feature
 	* add gxnet.IsSameAddr
