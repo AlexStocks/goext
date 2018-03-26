@@ -7,7 +7,7 @@ import (
 
 func TestNewLogger(t *testing.T) {
 	// var conf = Conf{Name: "test", Dir: "./log/", Level: "DEBUG", Console: false, Daily: true, BackupNum: 2}
-	var conf = Conf{Name: "test", Dir: "./log/", Level: "Info", Console: false, Daily: true, BackupNum: 2}
+	var conf = Conf{Name: "test", Dir: "./log/", Level: "Info", Console: true, Daily: true, BackupNum: 2}
 
 	var (
 		err    error
