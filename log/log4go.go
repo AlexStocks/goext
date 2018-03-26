@@ -2,7 +2,7 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-// package gxlog is based on log4go.
+// based on log4go.
 package gxlog
 
 import (
@@ -30,6 +30,7 @@ type Conf struct {
 	Console   bool   // whether output log to console
 	Daily     bool   // whether rotate log file at mid-night every day
 	BackupNum int    // log file backup number. the oldest is deleted.
+	BufSize   int    // async logger buffer size
 }
 
 type Logger struct {
@@ -57,7 +58,7 @@ func NewLogger(conf Conf) (Logger, error) {
 
 	// create file writer for all log level
 	fileName = comLogFileName(conf.Name, conf.Dir, false)
-	fileLogger = log4go.NewFileLogWriter(fileName, true)
+	fileLogger = log4go.NewFileLogWriter(fileName, true, conf.BufSize)
 	if fileLogger == nil {
 		return Logger{logger}, fmt.Errorf("log4go.NewFileLogWriter(%s) = nil", fileName)
 	}
@@ -72,7 +73,7 @@ func NewLogger(conf Conf) (Logger, error) {
 
 	// create file writer for warning & fatal & critical
 	fileName = comLogFileName(conf.Name, conf.Dir, true)
-	fileLogger = log4go.NewFileLogWriter(fileName, true)
+	fileLogger = log4go.NewFileLogWriter(fileName, true, conf.BufSize)
 	if fileLogger == nil {
 		return Logger{logger}, fmt.Errorf("log4go.NewFileLogWriter(%s) = nil", fileName)
 	}

@@ -24,6 +24,7 @@
     <property name="format">[%D %T] [%L] (%S) %M</property>
     <property name="rotate">false</property> <!-- true enables log rotation, otherwise append -->
     <property name="maxsize">0M</property> <!-- \d+[KMG]? Suffixes are in terms of 2**10 -->
+    <property name="bufsize">4K</property> <!-- \d+[KMG]? Suffixes are in terms of 2**10 -->
     <property name="maxlines">0K</property> <!-- \d+[KMG]? Suffixes are in terms of thousands -->
     <property name="daily">true</property> <!-- Automatically rotates when a log message is written after midnight -->
   </filter>
@@ -34,6 +35,7 @@
     <property name="filename">log/trace.xml</property>
     <property name="rotate">true</property> <!-- true enables log rotation, otherwise append -->
     <property name="maxsize">100M</property> <!-- \d+[KMG]? Suffixes are in terms of 2**10 -->
+    <property name="bufsize">4K</property> <!-- \d+[KMG]? Suffixes are in terms of 2**10 -->
     <property name="maxrecords">6K</property> <!-- \d+[KMG]? Suffixes are in terms of thousands -->
     <property name="daily">false</property> <!-- Automatically rotates when a log message is written after midnight -->
   </filter>

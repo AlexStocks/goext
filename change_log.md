@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2018/03/26
+	> feature
+	* add async logger
+
 - 2018/03/22
 	> feature
 	* add gxjson
