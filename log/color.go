@@ -82,7 +82,7 @@ func CInfo(format string, args ...interface{}) {
 }
 
 func CWarn(format string, args ...interface{}) {
-	CPrintfln(BYellow, format, args...)
+	CPrintfln(BMagenta, format, args...)
 }
 
 func CError(format string, args ...interface{}) {
