@@ -2,11 +2,13 @@
 package gxlog
 
 import (
+	"encoding/json"
 	"testing"
 )
 
+// attention: 不管是同步还是一部情况下，json log文件性能都比print log文件性能差
+
 func TestNewLogger(t *testing.T) {
-	// var conf = Conf{Name: "test", Dir: "./log/", Level: "DEBUG", Console: false, Daily: true, BackupNum: 2, Json:true}
 	var conf = Conf{
 		Name:      "test",
 		Dir:       "./log/",
@@ -14,7 +16,7 @@ func TestNewLogger(t *testing.T) {
 		Console:   true,
 		Daily:     true,
 		BackupNum: 2,
-		Json:      true,
+		Json:      false,
 	}
 
 	var (
@@ -34,8 +36,51 @@ func TestNewLogger(t *testing.T) {
 	logger.Close()
 }
 
+func TestJsonLogger(t *testing.T) {
+	var conf = Conf{
+		Name:      "test",
+		Dir:       "./log/",
+		Level:     "Info",
+		Console:   true,
+		Daily:     true,
+		BackupNum: 2,
+		Json:      true,
+	}
+
+	var (
+		err      error
+		logBytes []byte
+		logStr   string
+		logger   Logger
+	)
+
+	logBytes, err = json.Marshal(
+		struct {
+			Name string `json:"name,omitempty"`
+			Age  int    `json:"age,omitempty"`
+		}{Name: "Alex",
+			Age: 35,
+		},
+	)
+	if err != nil {
+		t.Errorf("json marshal error:%s", err)
+	}
+
+	if logger, err = NewLogger(conf); err != nil {
+		t.Errorf("NewLogger(conf{%#v}) = error{%#v}", conf, err)
+	}
+
+	logStr = string(logBytes)
+	logger.Debug(json.Marshal(logStr))
+	logger.Info(logStr)
+	logger.Warn(logStr)
+	logger.Error(logStr)
+	logger.Critic(logStr)
+
+	logger.Close()
+}
+
 func TestAsyncLogger(t *testing.T) {
-	// var conf = Conf{Name: "test", Dir: "./log/", Level: "DEBUG", Console: false, Daily: true, BackupNum: 2}
 	var conf = Conf{
 		Name:      "test",
 		Dir:       "./log/",
@@ -138,6 +183,12 @@ func TestMultiLoggers(t *testing.T) {
 // BenchmarkSyncLogger-4   	   50000	     22340 ns/op
 // BenchmarkSyncLogger-4   	   50000	     23471 ns/op
 // Avg: 22988 ns/op
+//
+// if json is true:
+// BenchmarkSyncLogger-4   	   50000	     27798 ns/op
+// BenchmarkSyncLogger-4   	   50000	     25841 ns/op
+// BenchmarkSyncLogger-4   	   50000	     24782 ns/op
+// Avg: 26140 ns/op
 func BenchmarkSyncLogger(b *testing.B) {
 	var conf = Conf{
 		Name:      "test",
@@ -146,7 +197,7 @@ func BenchmarkSyncLogger(b *testing.B) {
 		Console:   false,
 		Daily:     true,
 		BackupNum: 2,
-		Json:      false,
+		Json:      true,
 	}
 
 	var (
@@ -187,16 +238,22 @@ func BenchmarkSyncLogger(b *testing.B) {
 // Avg: 17067 ns/op
 //
 // bufsize: 4096
-// BenchmarkAsyncLogger-4   	  100000	     17060 ns/op
-// BenchmarkAsyncLogger-4   	  100000	     15785 ns/op
-// BenchmarkAsyncLogger-4   	  100000	     16543 ns/op
-// Avg: 16463 ns/op
+// BenchmarkAsyncLogger-4   	  100000	     15004 ns/op
+// BenchmarkAsyncLogger-4   	  100000	     14785 ns/op
+// BenchmarkAsyncLogger-4   	  100000	     15883 ns/op
+// Avg: 15224 ns/op
 //
 // bufsize: 8192
 // BenchmarkAsyncLogger-4   	  100000	     18529 ns/op
 // BenchmarkAsyncLogger-4   	  100000	     18035 ns/op
 // BenchmarkAsyncLogger-4   	  100000	     18536 ns/op
 // Avg:  18366 ns/op
+//
+//  if bufsize is 4k, json is true:
+// BenchmarkAsyncLogger-4   	  100000	     16646 ns/op
+// BenchmarkAsyncLogger-4   	  100000	     16494 ns/op
+// BenchmarkAsyncLogger-4   	  100000	     16762 ns/op
+// Avg:  16644 ns/op
 func BenchmarkAsyncLogger(b *testing.B) {
 	var conf = Conf{
 		Name:      "test",
@@ -206,7 +263,7 @@ func BenchmarkAsyncLogger(b *testing.B) {
 		Daily:     true,
 		BackupNum: 2,
 		BufSize:   4096,
-		Json:      false,
+		Json:      true,
 	}
 
 	var (
