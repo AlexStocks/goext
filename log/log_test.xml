@@ -4,6 +4,8 @@
     <type>console</type>
     <!-- level is (:?FINEST|FINE|DEBUG|TRACE|INFO|WARNING|ERROR) -->
     <level>DEBUG</level>
+    <property name="json">true</property> <!-- true enables json log format, its priority is high than format -->
+    <property name="format">[%D %T] [%L] (%S) %M</property> <!-- log format, if json is false this option is enable -->
   </filter>
   <filter enabled="true">
     <tag>file</tag>
@@ -21,7 +23,8 @@
        It ignores unknown format strings (and removes them)
        Recommended: "[%D %T] [%L] (%S) %M"
     -->
-    <property name="format">[%D %T] [%L] (%S) %M</property>
+    <property name="json">true</property> <!-- true enables json log format, its priority is high than format -->
+    <property name="format">[%D %T] [%L] (%S) %M</property> <!-- log format, if json is false this option is enable -->
     <property name="rotate">false</property> <!-- true enables log rotation, otherwise append -->
     <property name="maxsize">0M</property> <!-- \d+[KMG]? Suffixes are in terms of 2**10 -->
     <property name="bufsize">4K</property> <!-- \d+[KMG]? Suffixes are in terms of 2**10 -->

@@ -31,6 +31,7 @@ type Conf struct {
 	Daily     bool   // whether rotate log file at mid-night every day
 	BackupNum int    // log file backup number. the oldest is deleted.
 	BufSize   int    // async logger buffer size
+	Json      bool   // whether output json log
 }
 
 type Logger struct {
@@ -53,7 +54,7 @@ func NewLogger(conf Conf) (Logger, error) {
 
 	logger = log4go.NewLogger()
 	if conf.Console {
-		logger.AddFilter("stdout", logLevel(conf.Level), log4go.NewConsoleLogWriter())
+		logger.AddFilter("stdout", logLevel(conf.Level), log4go.NewConsoleLogWriter(conf.Json))
 	}
 
 	// create file writer for all log level
@@ -62,6 +63,7 @@ func NewLogger(conf Conf) (Logger, error) {
 	if fileLogger == nil {
 		return Logger{logger}, fmt.Errorf("log4go.NewFileLogWriter(%s) = nil", fileName)
 	}
+	fileLogger.SetJson(conf.Json)
 	fileLogger.SetFormat(log4go.FORMAT_DEFAULT)
 	if conf.Daily {
 		fileLogger.SetRotateDaily(true)
@@ -77,6 +79,7 @@ func NewLogger(conf Conf) (Logger, error) {
 	if fileLogger == nil {
 		return Logger{logger}, fmt.Errorf("log4go.NewFileLogWriter(%s) = nil", fileName)
 	}
+	fileLogger.SetJson(conf.Json)
 	fileLogger.SetFormat(log4go.FORMAT_DEFAULT)
 	if conf.Daily {
 		fileLogger.SetRotateDaily(true)

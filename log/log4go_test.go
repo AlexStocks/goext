@@ -6,8 +6,16 @@ import (
 )
 
 func TestNewLogger(t *testing.T) {
-	// var conf = Conf{Name: "test", Dir: "./log/", Level: "DEBUG", Console: false, Daily: true, BackupNum: 2}
-	var conf = Conf{Name: "test", Dir: "./log/", Level: "Info", Console: true, Daily: true, BackupNum: 2}
+	// var conf = Conf{Name: "test", Dir: "./log/", Level: "DEBUG", Console: false, Daily: true, BackupNum: 2, Json:true}
+	var conf = Conf{
+		Name:      "test",
+		Dir:       "./log/",
+		Level:     "Info",
+		Console:   true,
+		Daily:     true,
+		BackupNum: 2,
+		Json:      true,
+	}
 
 	var (
 		err    error
@@ -28,7 +36,16 @@ func TestNewLogger(t *testing.T) {
 
 func TestAsyncLogger(t *testing.T) {
 	// var conf = Conf{Name: "test", Dir: "./log/", Level: "DEBUG", Console: false, Daily: true, BackupNum: 2}
-	var conf = Conf{Name: "test", Dir: "./log/", Level: "Info", Console: false, Daily: true, BackupNum: 2, BufSize: 4096}
+	var conf = Conf{
+		Name:      "test",
+		Dir:       "./log/",
+		Level:     "Info",
+		Console:   true,
+		Daily:     true,
+		BackupNum: 2,
+		BufSize:   4096,
+		Json:      true,
+	}
 
 	var (
 		err    error
@@ -67,7 +84,16 @@ func TestNewLoggerWithConfFile(t *testing.T) {
 }
 
 func TestMultiLoggers(t *testing.T) {
-	var conf = Conf{Name: "test1", Dir: "./log/", Level: "Info", Console: false, Daily: true, BackupNum: 2, BufSize: 4096}
+	var conf = Conf{
+		Name:      "test1",
+		Dir:       "./log/",
+		Level:     "Info",
+		Console:   false,
+		Daily:     true,
+		BackupNum: 2,
+		BufSize:   4096,
+		Json:      false,
+	}
 
 	var (
 		err     error
@@ -77,7 +103,16 @@ func TestMultiLoggers(t *testing.T) {
 	if logger1, err = NewLogger(conf); err != nil {
 		t.Errorf("NewLogger(conf{%#v}) = error{%#v}", conf, err)
 	}
-	conf = Conf{Name: "test2", Dir: "./log/", Level: "Info", Console: false, Daily: true, BackupNum: 2, BufSize: 4096}
+	conf = Conf{
+		Name:      "test2",
+		Dir:       "./log/",
+		Level:     "Info",
+		Console:   false,
+		Daily:     true,
+		BackupNum: 2,
+		BufSize:   4096,
+		Json:      false,
+	}
 	if logger2, err = NewLogger(conf); err != nil {
 		t.Errorf("NewLogger(conf{%#v}) = error{%#v}", conf, err)
 	}
@@ -104,7 +139,15 @@ func TestMultiLoggers(t *testing.T) {
 // BenchmarkSyncLogger-4   	   50000	     23471 ns/op
 // Avg: 22988 ns/op
 func BenchmarkSyncLogger(b *testing.B) {
-	var conf = Conf{Name: "test", Dir: "./log/", Level: "DEBUG", Console: false, Daily: true, BackupNum: 2}
+	var conf = Conf{
+		Name:      "test",
+		Dir:       "./log/",
+		Level:     "DEBUG",
+		Console:   false,
+		Daily:     true,
+		BackupNum: 2,
+		Json:      false,
+	}
 
 	var (
 		err    error
@@ -155,7 +198,16 @@ func BenchmarkSyncLogger(b *testing.B) {
 // BenchmarkAsyncLogger-4   	  100000	     18536 ns/op
 // Avg:  18366 ns/op
 func BenchmarkAsyncLogger(b *testing.B) {
-	var conf = Conf{Name: "test", Dir: "./log/", Level: "DEBUG", Console: false, Daily: true, BackupNum: 2, BufSize: 4096}
+	var conf = Conf{
+		Name:      "test",
+		Dir:       "./log/",
+		Level:     "DEBUG",
+		Console:   false,
+		Daily:     true,
+		BackupNum: 2,
+		BufSize:   4096,
+		Json:      false,
+	}
 
 	var (
 		err    error
