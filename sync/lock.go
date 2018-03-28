@@ -30,14 +30,14 @@ const mutexLocked = 1 << iota
 
 // Mutex is simple sync.Mutex + ability to try to Lock.
 type Mutex struct {
-	in sync.Mutex
+	lock sync.Mutex
 }
 
 // Lock locks m.
 // If the lock is already in use, the calling goroutine
 // blocks until the mutex is available.
 func (m *Mutex) Lock() {
-	m.in.Lock()
+	m.lock.Lock()
 }
 
 // Unlock unlocks m.
@@ -47,15 +47,15 @@ func (m *Mutex) Lock() {
 // It is allowed for one goroutine to lock a Mutex and then
 // arrange for another goroutine to unlock it.
 func (m *Mutex) Unlock() {
-	m.in.Unlock()
+	m.lock.Unlock()
 }
 
 // TryLock tries to lock m. It returns true in case of success, false otherwise.
 func (m *Mutex) TryLock() bool {
-	return atomic.CompareAndSwapInt32((*int32)(unsafe.Pointer(&m.in)), 0, mutexLocked)
+	return atomic.CompareAndSwapInt32((*int32)(unsafe.Pointer(&m.lock)), 0, mutexLocked)
 }
 
 // IsLocked returns the lock state
 func (m *Mutex) IsLocked() bool {
-	return atomic.LoadInt32((*int32)(unsafe.Pointer(&m.mu))) == mutexLocked
+	return atomic.LoadInt32((*int32)(unsafe.Pointer(&m.lock))) == mutexLocked
 }
