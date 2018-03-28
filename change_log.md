@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2018/03/27
+	> feature
+	* add json logger
+
 - 2018/03/26
 	> feature
 	* add async logger

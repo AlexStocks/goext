@@ -54,3 +54,8 @@ func (m *Mutex) Unlock() {
 func (m *Mutex) TryLock() bool {
 	return atomic.CompareAndSwapInt32((*int32)(unsafe.Pointer(&m.in)), 0, mutexLocked)
 }
+
+// IsLocked returns the lock state
+func (m *Mutex) IsLocked() bool {
+	return atomic.LoadInt32((*int32)(unsafe.Pointer(&m.mu))) == mutexLocked
+}
