@@ -8,6 +8,7 @@
 - 2018/03/29
 	> feature
 	* add compress/zip
+	* add compress/gzip
 
 - 2018/03/27
 	> feature
