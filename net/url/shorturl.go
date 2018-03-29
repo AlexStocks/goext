@@ -19,7 +19,7 @@ import (
 )
 
 import (
-	"github.com/pkg/errors"
+	"github.com/juju/errors"
 )
 
 const (
@@ -95,19 +95,19 @@ func GenSinaShortURL(uri string) (string, error) {
 	c := http.Client{Transport: &http.Transport{Dial: httpDial}}
 	rsp, err := c.Get(SinaShortURL + uri)
 	if err != nil {
-		return "", errors.Wrapf(err, "http.Get(%s)", SinaShortURL+uri)
+		return "", errors.Annotatef(err, "http.Get(%s)", SinaShortURL+uri)
 	}
 
 	defer rsp.Body.Close()
 	body, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
-		return "", errors.Wrapf(err, "ioutil.ReadAll")
+		return "", errors.Annotatef(err, "ioutil.ReadAll")
 	}
 
 	res := &[]SinaResult{}
 	err = json.Unmarshal([]byte(body), &res)
 	if err != nil {
-		return "", errors.Wrapf(err, "json.Unmarshal")
+		return "", errors.Annotatef(err, "json.Unmarshal")
 	}
 
 	return (*res)[0].UrlShort, nil
@@ -135,19 +135,19 @@ func GenSinaShortURLByGoogd(uri string) (string, error) {
 	c := http.Client{Transport: &http.Transport{Dial: httpDial}}
 	rsp, err := c.Get(GoogdShortURL + uri)
 	if err != nil {
-		return "", errors.Wrapf(err, "http.Get(%s)", GoogdShortURL+uri)
+		return "", errors.Annotatef(err, "http.Get(%s)", GoogdShortURL+uri)
 	}
 
 	defer rsp.Body.Close()
 	body, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
-		return "", errors.Wrapf(err, "ioutil.ReadAll")
+		return "", errors.Annotatef(err, "ioutil.ReadAll")
 	}
 
 	res := &GoogdResults{}
 	err = json.Unmarshal([]byte(body), &res)
 	if err != nil {
-		return "", errors.Wrapf(err, "json.Unmarshal")
+		return "", errors.Annotatef(err, "json.Unmarshal")
 	}
 
 	return res.Urls[0].UrlShort, nil
@@ -186,13 +186,13 @@ func GenBaiduShortURL(uri string) (string, error) {
 			rsp.StatusCode, body)
 	}
 	if err != nil {
-		return "", errors.Wrapf(err, "ioutil.ReadAll")
+		return "", errors.Annotatef(err, "ioutil.ReadAll")
 	}
 
 	res := &BaiduResult{}
 	err = json.Unmarshal([]byte(body), &res)
 	if err != nil {
-		return "", errors.Wrapf(err, "json.Unmarshal(body:%s)", body)
+		return "", errors.Annotatef(err, "json.Unmarshal(body:%s)", body)
 	}
 
 	return res.UrlShort, nil

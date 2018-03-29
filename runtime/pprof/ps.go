@@ -8,12 +8,12 @@ package gxpprof
 
 import (
 	"github.com/google/gops/agent"
-	"github.com/pkg/errors"
+	"github.com/juju/errors"
 )
 
 func Gops(addr string) error {
 	if err := agent.Listen(agent.Options{Addr: addr}); err != nil {
-		return errors.Wrapf(err, "gops/agent.Listen()")
+		return errors.Annotatef(err, "gops/agent.Listen()")
 	}
 
 	return nil

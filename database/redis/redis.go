@@ -20,7 +20,7 @@ import (
 
 import (
 	"github.com/garyburd/redigo/redis"
-	xerrors "github.com/pkg/errors"
+	xerrors "github.com/juju/errors"
 )
 
 // Sentinel provides a way to add high availability (HA) to Redis Pool using
@@ -405,24 +405,24 @@ func (s *Sentinel) addInstance(sentinelAddr string, inst RawInstance) error {
 	_, err := conn.Do("sentinel", "monitor", inst.Name, inst.Addr.IP, inst.Addr.Port, inst.Epoch)
 	if err != nil {
 		// error: ERR Duplicated master name
-		return xerrors.Wrapf(err, "sentinelAddr:%s, command:sentinel monitor %s %s %d %d",
+		return xerrors.Annotatef(err, "sentinelAddr:%s, command:sentinel monitor %s %s %d %d",
 			sentinelAddr, inst.Name, inst.Addr.IP, inst.Addr.Port, inst.Epoch)
 	}
 
 	_, err = conn.Do("sentinel", "set", inst.Name, "down-after-milliseconds", inst.Sdowntime*1000)
 	if err != nil {
-		return xerrors.Wrapf(err, "sentinelAddr:%s, command:sentinel down-after-milliseconds %s %d",
+		return xerrors.Annotatef(err, "sentinelAddr:%s, command:sentinel down-after-milliseconds %s %d",
 			sentinelAddr, inst.Name, inst.Sdowntime*1000)
 	}
 
 	_, err = conn.Do("sentinel", "set", inst.Name, "parallel-syncs", 1)
 	if err != nil {
-		return xerrors.Wrapf(err, "sentinelAddr:%s, command:sentinel parallel-syncs %s 1", sentinelAddr, inst.Name)
+		return xerrors.Annotatef(err, "sentinelAddr:%s, command:sentinel parallel-syncs %s 1", sentinelAddr, inst.Name)
 	}
 
 	_, err = conn.Do("sentinel", "set", inst.Name, "failover-timeout", inst.FailoverTimeout*1000)
 	if err != nil {
-		return xerrors.Wrapf(err, "sentinelAddr:%s, command:sentinel failover-timeout %s %d",
+		return xerrors.Annotatef(err, "sentinelAddr:%s, command:sentinel failover-timeout %s %d",
 			sentinelAddr, inst.Name, inst.FailoverTimeout*1000)
 	}
 
@@ -430,7 +430,7 @@ func (s *Sentinel) addInstance(sentinelAddr string, inst RawInstance) error {
 		_, err := conn.Do("sentinel", "set", inst.Name, "client-reconfig-script", inst.NotifyScript)
 		if err != nil {
 			//  ERR Client reconfiguration script seems non existing or non executable
-			return xerrors.Wrapf(err, "sentinelAddr:%s, command:sentinel client-reconfig-script %s %s",
+			return xerrors.Annotatef(err, "sentinelAddr:%s, command:sentinel client-reconfig-script %s %s",
 				sentinelAddr, inst.Name, inst.NotifyScript)
 		}
 	}
@@ -458,7 +458,7 @@ func (s *Sentinel) removeInstance(sentinelAddr string, name string) error {
 
 	if _, err := redis.String(conn.Do("sentinel", "remove", name)); err != nil {
 		// error: ERR No such master with that name
-		return xerrors.Wrapf(err, "remove %s from sentinel %s", name, sentinelAddr)
+		return xerrors.Annotatef(err, "remove %s from sentinel %s", name, sentinelAddr)
 	}
 
 	return nil
@@ -612,7 +612,7 @@ func handleMasterSwitchInfo(msg [][]byte) (MasterSwitchInfo, error) {
 	addr := fmt.Sprintf("%s:%s", string(msg[1]), string(msg[2]))
 	tcpAddr, err = net.ResolveTCPAddr("tcp4", addr)
 	if err != nil {
-		return info, xerrors.Wrapf(err, "net.ResolveTCPAddr(tcp4, addr:%#v)", addr)
+		return info, xerrors.Annotatef(err, "net.ResolveTCPAddr(tcp4, addr:%#v)", addr)
 	}
 	info.OldMaster.IP = tcpAddr.IP.String()
 	info.OldMaster.Port = uint32(tcpAddr.Port)
@@ -620,7 +620,7 @@ func handleMasterSwitchInfo(msg [][]byte) (MasterSwitchInfo, error) {
 	addr = fmt.Sprintf("%s:%s", string(msg[3]), string(msg[4]))
 	tcpAddr, err = net.ResolveTCPAddr("tcp4", addr)
 	if err != nil {
-		return info, xerrors.Wrapf(err, "net.ResolveTCPAddr(tcp4, addr:%#v)", addr)
+		return info, xerrors.Annotatef(err, "net.ResolveTCPAddr(tcp4, addr:%#v)", addr)
 	}
 	info.NewMaster.IP = tcpAddr.IP.String()
 	info.NewMaster.Port = uint32(tcpAddr.Port)

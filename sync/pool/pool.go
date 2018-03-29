@@ -6,7 +6,7 @@
 package gxpool
 
 import (
-	"errors"
+	"github.com/juju/errors"
 )
 
 var (

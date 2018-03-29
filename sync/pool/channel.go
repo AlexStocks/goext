@@ -5,8 +5,11 @@
 package gxpool
 
 import (
-	"errors"
 	"sync"
+)
+
+import (
+	"github.com/juju/errors"
 )
 
 // channelPool implements the Pool interface based on buffered channels.

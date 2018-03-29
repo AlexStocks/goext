@@ -6,10 +6,13 @@
 package gxrand
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"time"
+)
+
+import (
+	"github.com/juju/errors"
 )
 
 // CalRedPacket provides tencent red packet algorithm

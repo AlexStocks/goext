@@ -8,11 +8,8 @@
 package gxredis
 
 import (
-	"errors"
-)
-
-import (
 	"github.com/garyburd/redigo/redis"
+	"github.com/juju/errors"
 )
 
 // CheckRole wraps GetRole in a test to verify if the role matches an expected

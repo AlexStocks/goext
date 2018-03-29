@@ -9,6 +9,7 @@
 	> feature
 	* add compress/zip
 	* add compress/gzip
+	* use juju/errors as default errors
 
 - 2018/03/27
 	> feature

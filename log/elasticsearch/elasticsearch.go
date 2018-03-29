@@ -15,7 +15,7 @@ import (
 import (
 	"github.com/AlexStocks/goext/log"
 	// Log "github.com/AlexStocks/log4go"
-	"github.com/pkg/errors"
+	"github.com/juju/errors"
 	es "gopkg.in/olivere/elastic.v3"
 )
 
@@ -80,7 +80,7 @@ func (ec EsClient) CreateEsIndex(index string, shardNum, replicaNum, refreshInte
 	ctx = context.Background()
 	exists, err = ec.IndexExists(index).DoC(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "CreateRcIndex(index:%s, shardNum:%s, replicaNum:%d, refreshInterval:%d)",
+		return errors.Annotatef(err, "CreateRcIndex(index:%s, shardNum:%s, replicaNum:%d, refreshInterval:%d)",
 			index, shardNum, replicaNum, refreshInterval)
 	}
 	if exists {
@@ -90,7 +90,7 @@ func (ec EsClient) CreateEsIndex(index string, shardNum, replicaNum, refreshInte
 	body = buildEsIndexSettings(shardNum, replicaNum, refreshInterval)
 	_, err = ec.CreateIndex(index).BodyString(body).DoC(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "CreateEsIndex(body:%s)", body)
+		return errors.Annotatef(err, "CreateEsIndex(body:%s)", body)
 	}
 
 	return nil
@@ -108,7 +108,7 @@ func (ec EsClient) CreateEsIndexWithTimestamp(index string, shardNum, replicaNum
 	ctx = context.Background()
 	exists, err = ec.IndexExists(index).DoC(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "CreateRcIndex(index:%s, shardNum:%s, replicaNum:%d, refreshInterval:%d)",
+		return errors.Annotatef(err, "CreateRcIndex(index:%s, shardNum:%s, replicaNum:%d, refreshInterval:%d)",
 			index, shardNum, replicaNum, refreshInterval)
 	}
 	if exists {
@@ -118,7 +118,7 @@ func (ec EsClient) CreateEsIndexWithTimestamp(index string, shardNum, replicaNum
 	body = buildEsIndexSettingsWithTimestamp(shardNum, replicaNum, refreshInterval, indexType, timestampField, timestampFormat)
 	_, err = ec.CreateIndex(index).BodyString(body).DoC(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "CreateEsIndex(body:%s)", body)
+		return errors.Annotatef(err, "CreateEsIndex(body:%s)", body)
 	}
 
 	return nil
@@ -133,7 +133,7 @@ func (ec EsClient) DeleteEsIndex(index string) error {
 	ctx = context.Background()
 	_, err = ec.DeleteIndex(index).DoC(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "DeleteEsIndex(index:%s)", index)
+		return errors.Annotatef(err, "DeleteEsIndex(index:%s)", index)
 	}
 
 	return nil
@@ -179,7 +179,7 @@ func (ec EsClient) SetTemplate(index, template string, force bool) error {
 	if !force {
 		exist, err = ec.Client.IndexTemplateExists(index).DoC(context.Background())
 		if err != nil {
-			return errors.Wrapf(err, "client.IndexTemplateExists(index:%s)", index)
+			return errors.Annotatef(err, "client.IndexTemplateExists(index:%s)", index)
 		}
 	} else {
 		exist = false
@@ -187,7 +187,7 @@ func (ec EsClient) SetTemplate(index, template string, force bool) error {
 	if !exist {
 		_, err := ec.IndexPutTemplate(index).BodyString(template).DoC(context.Background())
 		if err != nil {
-			return errors.Wrapf(err, "IndexPutTemplate(index:%s)", index)
+			return errors.Annotatef(err, "IndexPutTemplate(index:%s)", index)
 		}
 	}
 
@@ -212,19 +212,19 @@ func (ec EsClient) Insert(index, typ string, msg interface{}) error {
 	case string:
 		_, err = ec.Index().Index(index).Type(typ).BodyString(msg.(string)).DoC(ctx)
 		if err != nil {
-			return errors.Wrapf(err, "Insert(index:%s, type:%s, msg:%s)", index, typ, msg)
+			return errors.Annotatef(err, "Insert(index:%s, type:%s, msg:%s)", index, typ, msg)
 		}
 
 	default:
 		if msgBytes, ok = msg.([]byte); ok {
 			_, err = ec.Index().Index(index).Type(typ).BodyString(string(msgBytes)).DoC(ctx)
 			if err != nil {
-				return errors.Wrapf(err, "Insert(index:%s, type:%s, msg:%s)", index, typ, (string)(msgBytes))
+				return errors.Annotatef(err, "Insert(index:%s, type:%s, msg:%s)", index, typ, (string)(msgBytes))
 			}
 		} else {
 			_, err = ec.Index().Index(index).Type(typ).BodyJson(msg).DoC(ctx)
 			if err != nil {
-				return errors.Wrapf(err, "Insert(index:%s, type:%s, msg:%#v)", index, typ, msg)
+				return errors.Annotatef(err, "Insert(index:%s, type:%s, msg:%#v)", index, typ, msg)
 			}
 		}
 	}
@@ -247,7 +247,7 @@ func (ec EsClient) InsertWithDocId(index, typ, docID string, msg interface{}) er
 	case string:
 		_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyString(msg.(string)).DoC(ctx)
 		if err != nil {
-			return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%s)",
+			return errors.Annotatef(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%s)",
 				index, typ, docID, msg)
 		}
 
@@ -255,13 +255,13 @@ func (ec EsClient) InsertWithDocId(index, typ, docID string, msg interface{}) er
 		if msgBytes, ok = msg.([]byte); ok {
 			_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyString(string(msgBytes)).DoC(ctx)
 			if err != nil {
-				return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%s)",
+				return errors.Annotatef(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%s)",
 					index, typ, docID, (string)(msgBytes))
 			}
 		} else {
 			_, err = ec.Index().Index(index).Type(typ).Id(docID).BodyJson(msg).DoC(ctx)
 			if err != nil {
-				return errors.Wrapf(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%#v)",
+				return errors.Annotatef(err, "InsertWithDocId(index:%s, type:%s, docID:%s, msg:%#v)",
 					index, typ, docID, msg)
 			}
 		}
@@ -308,7 +308,7 @@ func (ec EsClient) BulkInsert(index, typ string, arr []interface{}) error {
 	ctx = context.Background()
 	rsp, err = bulk.DoC(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "BulkInsert(@arr len:%d)", len(arr))
+		return errors.Annotatef(err, "BulkInsert(@arr len:%d)", len(arr))
 	}
 	if rsp.Errors {
 		// for i, f := range rsp.Failed() {
