@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2018/03/29
+	> feature
+	* add compress/zip
+
 - 2018/03/27
 	> feature
 	* add json logger
