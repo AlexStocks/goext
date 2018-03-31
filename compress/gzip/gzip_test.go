@@ -1,6 +1,8 @@
 package gxgzip
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestDoGzipCompress(t *testing.T) {
 	var str = "hello, world"

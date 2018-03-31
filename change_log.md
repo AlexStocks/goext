@@ -7,6 +7,10 @@
 
 - 2018/03/29
 	> feature
+	* add strings/IsNil
+
+- 2018/03/29
+	> feature
 	* add compress/zip
 	* add compress/gzip
 	* use juju/errors as default errors
