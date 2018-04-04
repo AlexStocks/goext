@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2018/04/04
+	> bugfix
+	* check error when unzip/ungzip
+	
 - 2018/03/29
 	> feature
 	* add strings/IsNil

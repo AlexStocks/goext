@@ -11,6 +11,10 @@ import (
 	"io"
 )
 
+import (
+	"github.com/juju/errors"
+)
+
 // DoZlibCompresss do zip compress
 func DoZlibCompress(src []byte) []byte {
 	var in bytes.Buffer
@@ -21,10 +25,13 @@ func DoZlibCompress(src []byte) []byte {
 }
 
 // DoZlibUncompresss do unzip compress
-func DoZlibUncompress(compressSrc []byte) []byte {
+func DoZlibUncompress(compressSrc []byte) ([]byte, error) {
 	b := bytes.NewReader(compressSrc)
 	var out bytes.Buffer
-	r, _ := zlib.NewReader(b)
+	r, err := zlib.NewReader(b)
+	if err != nil {
+		return nil, errors.Annotate(err, "fialed to ungzip")
+	}
 	io.Copy(&out, r)
-	return out.Bytes()
+	return out.Bytes(), nil
 }

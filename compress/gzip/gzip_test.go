@@ -7,8 +7,8 @@ import (
 func TestDoGzipCompress(t *testing.T) {
 	var str = "hello, world"
 	zipStr := DoGzipCompress([]byte(str))
-	uncompressString := DoGzipUncompress(zipStr)
-	if string(uncompressString) != str {
-		t.Errorf("str:%q, uncompress string:%q", str, string(uncompressString))
+	uncompressString, err := DoGzipUncompress(zipStr)
+	if string(uncompressString) != str || err != nil {
+		t.Errorf("str:%q, uncompress string:%q, err:%s", str, string(uncompressString), err)
 	}
 }
