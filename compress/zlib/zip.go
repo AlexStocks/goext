@@ -30,7 +30,7 @@ func DoZlibUncompress(compressSrc []byte) ([]byte, error) {
 	var out bytes.Buffer
 	r, err := zlib.NewReader(b)
 	if err != nil {
-		return nil, errors.Annotate(err, "fialed to ungzip")
+		return nil, errors.Annotate(err, "fialed to unzip")
 	}
 	io.Copy(&out, r)
 	return out.Bytes(), nil
