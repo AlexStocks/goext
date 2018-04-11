@@ -80,7 +80,7 @@ func NewLeaseClient(client *ecv3.Client, options ...LeaseClientOption) (*LeaseCl
 }
 
 // Client is the etcd client that is attached to the session.
-func (s *LeaseClient) Client() *ecv3.Client {
+func (s *LeaseClient) EtcdClient() *ecv3.Client {
 	return s.client
 }
 

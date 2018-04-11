@@ -13,13 +13,14 @@ import (
 // and an abstraction over varying implementations
 // {consul, etcd, zookeeper, ...}
 type Registry interface {
-	// Register(conf ServiceConfig) error
-	Register(conf interface{}) error
+	Register(service interface{}, opts ...RegisterOption) error
+	Deregister(service interface{}) error
 	GetService(string) ([]*Service, error)
 	ListServices() ([]*Service, error)
-	Watch() (Watcher, error)
-	Close()
+	Watch(opts ...WatchOption) (Watcher, error)
+	// Close()
 	String() string
+	Options() Options
 }
 
 const (
@@ -27,5 +28,5 @@ const (
 )
 
 var (
-	ErrorRegistryNotFound = jerrors.NewErr("registry not found")
+	ErrorRegistryNotFound = jerrors.Errorf("registry not found")
 )

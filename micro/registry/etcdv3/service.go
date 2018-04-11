@@ -1,11 +1,11 @@
-// Package etcdv3 provides an etcd version 3 registry
+// Package etcdv3 provides an etcd version 3 gxregistry
 package etcdv3
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path"
 	"strings"
 	"sync"
@@ -14,37 +14,37 @@ import (
 
 import (
 	"github.com/AlexStocks/goext/database/etcd"
-	ecv3 "github.com/coreos/etcd/clientv3"
-	"github.com/micro/go-micro/cmd"
-	"github.com/micro/go-micro/registry"
+	"github.com/AlexStocks/goext/micro/registry"
+	etcdv3 "github.com/coreos/etcd/clientv3"
+	jerrors "github.com/juju/errors"
 
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	hash "github.com/mitchellh/hashstructure"
 )
 
 var (
-	prefix = "/micro-registry"
+	prefix = "/micro-gxregistry"
 )
 
 type etcdv3Registry struct {
 	client  *gxetcd.LeaseClient
-	options registry.Options
+	options gxregistry.Options
 	sync.Mutex
 	register map[string]uint64
-	leases   map[string]ecv3.LeaseID
+	leases   map[string]etcdv3.LeaseID
 }
 
 func init() {
-	cmd.DefaultRegistries["etcdv3"] = NewRegistry
+	// cmd.DefaultRegistries["etcdv3"] = NewRegistry
 }
 
-func encode(s *registry.Service) string {
+func encode(s *gxregistry.Service) string {
 	b, _ := json.Marshal(s)
 	return string(b)
 }
 
-func decode(ds []byte) *registry.Service {
-	var s *registry.Service
+func decode(ds []byte) *gxregistry.Service {
+	var s *gxregistry.Service
 	json.Unmarshal(ds, &s)
 	return s
 }
@@ -59,11 +59,17 @@ func servicePath(s string) string {
 	return path.Join(prefix, strings.Replace(s, "/", "-", -1))
 }
 
-func (e *etcdv3Registry) Options() registry.Options {
+func (e *etcdv3Registry) Options() gxregistry.Options {
 	return e.options
 }
 
-func (e *etcdv3Registry) Deregister(s *registry.Service) error {
+func (e *etcdv3Registry) Deregister(sv interface{}) error {
+	// s *gxregistry.Service
+	s, ok := sv.(*gxregistry.Service)
+	if !ok {
+		return jerrors.Errorf("@service:%+v type is not gxregistry.Service", sv)
+	}
+
 	if len(s.Nodes) == 0 {
 		return errors.New("Require at least one node")
 	}
@@ -79,7 +85,7 @@ func (e *etcdv3Registry) Deregister(s *registry.Service) error {
 	defer cancel()
 
 	for _, node := range s.Nodes {
-		_, err := e.client.Delete(ctx, nodePath(s.Name, node.Id))
+		_, err := e.client.EtcdClient().Delete(ctx, nodePath(s.Name, node.Id))
 		if err != nil {
 			return err
 		}
@@ -87,7 +93,11 @@ func (e *etcdv3Registry) Deregister(s *registry.Service) error {
 	return nil
 }
 
-func (e *etcdv3Registry) Register(s *registry.Service, opts ...registry.RegisterOption) error {
+func (e *etcdv3Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) error {
+	s, ok := sv.(*gxregistry.Service)
+	if !ok {
+		return jerrors.Errorf("@service:%+v type is not gxregistry.Service", sv)
+	}
 	if len(s.Nodes) == 0 {
 		return errors.New("Require at least one node")
 	}
@@ -96,7 +106,7 @@ func (e *etcdv3Registry) Register(s *registry.Service, opts ...registry.Register
 	//refreshing lease if existing
 	leaseID, ok := e.leases[s.Name]
 	if ok {
-		if _, err := e.client.KeepAliveOnce(context.TODO(), leaseID); err != nil {
+		if _, err := e.client.EtcdClient().KeepAliveOnce(context.TODO(), leaseID); err != nil {
 			if err != rpctypes.ErrLeaseNotFound {
 				return err
 			}
@@ -122,14 +132,14 @@ func (e *etcdv3Registry) Register(s *registry.Service, opts ...registry.Register
 		return nil
 	}
 
-	service := &registry.Service{
+	service := &gxregistry.Service{
 		Name:      s.Name,
 		Version:   s.Version,
 		Metadata:  s.Metadata,
 		Endpoints: s.Endpoints,
 	}
 
-	var options registry.RegisterOptions
+	var options gxregistry.RegisterOptions
 	for _, o := range opts {
 		o(&options)
 	}
@@ -137,20 +147,20 @@ func (e *etcdv3Registry) Register(s *registry.Service, opts ...registry.Register
 	ctx, cancel := context.WithTimeout(context.Background(), e.options.Timeout)
 	defer cancel()
 
-	var lgr *ecv3.LeaseGrantResponse
+	var lgr *etcdv3.LeaseGrantResponse
 	if options.TTL.Seconds() > 0 {
-		lgr, err = e.client.Grant(ctx, int64(options.TTL.Seconds()))
+		lgr, err = e.client.EtcdClient().Grant(ctx, int64(options.TTL.Seconds()))
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, node := range s.Nodes {
-		service.Nodes = []*registry.Node{node}
+		service.Nodes = []*gxregistry.Node{node}
 		if lgr != nil {
-			_, err = e.client.Put(ctx, nodePath(service.Name, node.Id), encode(service), ecv3.WithLease(lgr.ID))
+			_, err = e.client.EtcdClient().Put(ctx, nodePath(service.Name, node.Id), encode(service), etcdv3.WithLease(lgr.ID))
 		} else {
-			_, err = e.client.Put(ctx, nodePath(service.Name, node.Id), encode(service))
+			_, err = e.client.EtcdClient().Put(ctx, nodePath(service.Name, node.Id), encode(service))
 		}
 		if err != nil {
 			return err
@@ -169,26 +179,27 @@ func (e *etcdv3Registry) Register(s *registry.Service, opts ...registry.Register
 	return nil
 }
 
-func (e *etcdv3Registry) GetService(name string) ([]*registry.Service, error) {
+func (e *etcdv3Registry) GetService(name string) ([]*gxregistry.Service, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.options.Timeout)
 	defer cancel()
 
-	rsp, err := e.client.Get(ctx, servicePath(name)+"/", ecv3.WithPrefix(), ecv3.WithSort(ecv3.SortByKey, ecv3.SortDescend))
+	rsp, err := e.client.EtcdClient().Get(ctx, servicePath(name)+"/", etcdv3.WithPrefix(), etcdv3.WithSort(etcdv3.SortByKey,
+		etcdv3.SortDescend))
 	if err != nil {
 		return nil, err
 	}
 
 	if len(rsp.Kvs) == 0 {
-		return nil, registry.ErrNotFound
+		return nil, gxregistry.ErrorRegistryNotFound
 	}
 
-	serviceMap := map[string]*registry.Service{}
+	serviceMap := map[string]*gxregistry.Service{}
 
 	for _, n := range rsp.Kvs {
 		if sn := decode(n.Value); sn != nil {
 			s, ok := serviceMap[sn.Version]
 			if !ok {
-				s = &registry.Service{
+				s = &gxregistry.Service{
 					Name:      sn.Name,
 					Version:   sn.Version,
 					Metadata:  sn.Metadata,
@@ -203,27 +214,27 @@ func (e *etcdv3Registry) GetService(name string) ([]*registry.Service, error) {
 		}
 	}
 
-	var services []*registry.Service
+	var services []*gxregistry.Service
 	for _, service := range serviceMap {
 		services = append(services, service)
 	}
 	return services, nil
 }
 
-func (e *etcdv3Registry) ListServices() ([]*registry.Service, error) {
-	var services []*registry.Service
+func (e *etcdv3Registry) ListServices() ([]*gxregistry.Service, error) {
+	var services []*gxregistry.Service
 	nameSet := make(map[string]struct{})
 
 	ctx, cancel := context.WithTimeout(context.Background(), e.options.Timeout)
 	defer cancel()
 
-	rsp, err := e.client.Get(ctx, prefix, ecv3.WithPrefix(), ecv3.WithSort(ecv3.SortByKey, ecv3.SortDescend))
+	rsp, err := e.client.EtcdClient().Get(ctx, prefix, etcdv3.WithPrefix(), etcdv3.WithSort(etcdv3.SortByKey, etcdv3.SortDescend))
 	if err != nil {
 		return nil, err
 	}
 
 	if len(rsp.Kvs) == 0 {
-		return []*registry.Service{}, nil
+		return []*gxregistry.Service{}, nil
 	}
 
 	for _, n := range rsp.Kvs {
@@ -232,7 +243,7 @@ func (e *etcdv3Registry) ListServices() ([]*registry.Service, error) {
 		}
 	}
 	for k := range nameSet {
-		service := &registry.Service{}
+		service := &gxregistry.Service{}
 		service.Name = k
 		services = append(services, service)
 	}
@@ -240,37 +251,27 @@ func (e *etcdv3Registry) ListServices() ([]*registry.Service, error) {
 	return services, nil
 }
 
-func (e *etcdv3Registry) Watch(opts ...registry.WatchOption) (registry.Watcher, error) {
-	return newEtcdv3Watcher(e, e.options.Timeout, opts...)
+func (e *etcdv3Registry) Watch(opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
+	return nil, nil
+	// return newEtcdv3Watcher(e, e.options.Timeout, opts...)
 }
 
 func (e *etcdv3Registry) String() string {
-	return "etcdv3"
+	return "etcdv3Registry"
 }
 
-func NewRegistry(opts ...registry.Option) registry.Registry {
-	config := ecv3.Config{
+func NewRegistry(opts ...gxregistry.Option) gxregistry.Registry {
+	config := etcdv3.Config{
 		Endpoints: []string{"127.0.0.1:2379"},
 	}
 
-	var options registry.Options
+	var options gxregistry.Options
 	for _, o := range opts {
 		o(&options)
 	}
 
 	if options.Timeout == 0 {
 		options.Timeout = 5 * time.Second
-	}
-
-	if options.Secure || options.TLSConfig != nil {
-		tlsConfig := options.TLSConfig
-		if tlsConfig == nil {
-			tlsConfig = &tls.Config{
-				InsecureSkipVerify: true,
-			}
-		}
-
-		config.TLS = tlsConfig
 	}
 
 	var cAddrs []string
@@ -287,12 +288,19 @@ func NewRegistry(opts ...registry.Option) registry.Registry {
 		config.Endpoints = cAddrs
 	}
 
-	cli, _ := ecv3.New(config)
+	cli, err := etcdv3.New(config)
+	if err != nil {
+		panic(fmt.Errorf("etcdv3.New(config:%+v) = error:%s", config, err))
+	}
+	gxcli, err := gxetcd.NewLeaseClient(cli)
+	if err != nil {
+		panic(fmt.Errorf("gxetcd.NewLeaseClient() = error:%s", err))
+	}
 	e := &etcdv3Registry{
-		client:   cli,
+		client:   gxcli,
 		options:  options,
 		register: make(map[string]uint64),
-		leases:   make(map[string]ecv3.LeaseID),
+		leases:   make(map[string]etcdv3.LeaseID),
 	}
 
 	return e
