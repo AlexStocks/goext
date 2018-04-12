@@ -1,4 +1,9 @@
+// Copyright 2016 ~ 2018 AlexStocks(https://github.com/AlexStocks).
+// All rights reserved.  Use of this source code is
+// governed by Apache License 2.0.
+
 // Package etcdv3 provides an etcd version 3 gxregistry
+// ref: https://github.com/micro/go-plugins/blob/master/registry/etcdv3/etcdv3.go
 package etcdv3
 
 import (
@@ -26,7 +31,7 @@ var (
 	prefix = "/micro-gxregistry"
 )
 
-type etcdv3Registry struct {
+type Registry struct {
 	client  *gxetcd.LeaseClient
 	options gxregistry.Options
 	sync.Mutex
@@ -59,11 +64,11 @@ func servicePath(s string) string {
 	return path.Join(prefix, strings.Replace(s, "/", "-", -1))
 }
 
-func (e *etcdv3Registry) Options() gxregistry.Options {
+func (e *Registry) Options() gxregistry.Options {
 	return e.options
 }
 
-func (e *etcdv3Registry) Deregister(sv interface{}) error {
+func (e *Registry) Deregister(sv interface{}) error {
 	// s *gxregistry.Service
 	s, ok := sv.(*gxregistry.Service)
 	if !ok {
@@ -93,7 +98,7 @@ func (e *etcdv3Registry) Deregister(sv interface{}) error {
 	return nil
 }
 
-func (e *etcdv3Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) error {
+func (e *Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) error {
 	s, ok := sv.(*gxregistry.Service)
 	if !ok {
 		return jerrors.Errorf("@service:%+v type is not gxregistry.Service", sv)
@@ -179,7 +184,7 @@ func (e *etcdv3Registry) Register(sv interface{}, opts ...gxregistry.RegisterOpt
 	return nil
 }
 
-func (e *etcdv3Registry) GetService(name string) ([]*gxregistry.Service, error) {
+func (e *Registry) GetService(name string) ([]*gxregistry.Service, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.options.Timeout)
 	defer cancel()
 
@@ -221,7 +226,7 @@ func (e *etcdv3Registry) GetService(name string) ([]*gxregistry.Service, error) 
 	return services, nil
 }
 
-func (e *etcdv3Registry) ListServices() ([]*gxregistry.Service, error) {
+func (e *Registry) ListServices() ([]*gxregistry.Service, error) {
 	var services []*gxregistry.Service
 	nameSet := make(map[string]struct{})
 
@@ -251,13 +256,13 @@ func (e *etcdv3Registry) ListServices() ([]*gxregistry.Service, error) {
 	return services, nil
 }
 
-func (e *etcdv3Registry) Watch(opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
+func (e *Registry) Watch(opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
 	return nil, nil
 	// return newEtcdv3Watcher(e, e.options.Timeout, opts...)
 }
 
-func (e *etcdv3Registry) String() string {
-	return "etcdv3Registry"
+func (e *Registry) String() string {
+	return "Registry"
 }
 
 func NewRegistry(opts ...gxregistry.Option) gxregistry.Registry {
@@ -296,12 +301,11 @@ func NewRegistry(opts ...gxregistry.Option) gxregistry.Registry {
 	if err != nil {
 		panic(fmt.Errorf("gxetcd.NewLeaseClient() = error:%s", err))
 	}
-	e := &etcdv3Registry{
+
+	return &Registry{
 		client:   gxcli,
 		options:  options,
 		register: make(map[string]uint64),
 		leases:   make(map[string]etcdv3.LeaseID),
 	}
-
-	return e
 }

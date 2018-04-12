@@ -7,17 +7,64 @@ package gxetcd
 
 import (
 	"context"
-	"time"
 )
 
 import (
 	log "github.com/AlexStocks/log4go"
 	ecv3 "github.com/coreos/etcd/clientv3"
+	"time"
 )
 
 const (
 	defaultLeaseClientTTL = 60e9
 )
+
+type leaseClientOptions struct {
+	ttl     time.Duration
+	leaseID ecv3.LeaseID
+	ctx     context.Context
+}
+
+//////////////////////////////////////////
+// Lease Client Option
+//////////////////////////////////////////
+
+// LeaseClientOption configures LeaseClient.
+type LeaseClientOption func(*leaseClientOptions)
+
+// WithTTL configures the session's TTL in seconds.
+// If TTL is <= 0, the default 60 seconds TTL will be used.
+func WithTTL(ttl time.Duration) LeaseClientOption {
+	return func(so *leaseClientOptions) {
+		if ttl > 0 {
+			so.ttl = ttl
+		}
+	}
+}
+
+// WithLease specifies the existing leaseID to be used for the session.
+// This is useful in process restart scenario, for example, to reclaim
+// leadership from an election prior to restart.
+func WithLease(leaseID ecv3.LeaseID) LeaseClientOption {
+	return func(so *leaseClientOptions) {
+		so.leaseID = leaseID
+	}
+}
+
+// WithContext assigns a context to the session instead of defaulting to
+// using the client context. This is useful for canceling NewLeaseClient and
+// Close operations immediately without having to close the client. If the
+// context is canceled before Close() completes, the session's lease will be
+// abandoned and left to expire instead of being revoked.
+func WithContext(ctx context.Context) LeaseClientOption {
+	return func(so *leaseClientOptions) {
+		so.ctx = ctx
+	}
+}
+
+//////////////////////////////////////////
+// Lease Client
+//////////////////////////////////////////
 
 // LeaseClient represents a lease kept alive for the lifetime of a client.
 // Fault-tolerant applications may use sessions to reason about liveness.
@@ -61,13 +108,13 @@ func NewLeaseClient(client *ecv3.Client, options ...LeaseClientOption) (*LeaseCl
 		defer close(done)
 		for {
 			select {
-			// case s.opts.ctx.Done():
+			// case c.opts.ctx.Done():
 			// 	return
 			case msg, ok := <-keepAlive:
 				// eat messages until keep alive channel closes
 				if !ok {
 					log.Info("keep alive channel closed")
-					// s.revoke()
+					// c.revoke()
 					return
 				} else {
 					log.Debug("Recv msg from keepAlive: %s", msg.String())
@@ -80,70 +127,41 @@ func NewLeaseClient(client *ecv3.Client, options ...LeaseClientOption) (*LeaseCl
 }
 
 // Client is the etcd client that is attached to the session.
-func (s *LeaseClient) EtcdClient() *ecv3.Client {
-	return s.client
+func (c *LeaseClient) EtcdClient() *ecv3.Client {
+	return c.client
 }
 
 // Lease is the lease ID for keys bound to the session.
-func (s *LeaseClient) Lease() ecv3.LeaseID { return s.id }
+func (c *LeaseClient) Lease() ecv3.LeaseID { return c.id }
+
+// TTL return the ttl of LeaseClient's lease
+func (c *LeaseClient) TTL() int64 {
+	rsp, err := c.client.TimeToLive(context.TODO(), c.id)
+	if err != nil {
+		return 0
+	}
+
+	return rsp.TTL
+}
 
 // Done returns a channel that closes when the lease is orphaned, expires, or
 // is otherwise no longer being refreshed.
-func (s *LeaseClient) Done() <-chan struct{} { return s.done }
+func (c *LeaseClient) Done() <-chan struct{} { return c.done }
 
 // Stop ends the refresh for the session lease. This is useful
 // in case the state of the client connection is indeterminate (revoke
 // would fail) or when transferring lease ownership.
-func (s *LeaseClient) Stop() {
-	s.cancel()
-	<-s.done
+func (c *LeaseClient) Stop() {
+	c.cancel()
+	<-c.done
 }
 
 // Close orphans the session and revokes the session lease.
-func (s *LeaseClient) Close() error {
-	s.Stop()
+func (c *LeaseClient) Close() error {
+	c.Stop()
 	// if revoke takes longer than the ttl, lease is expired anyway
-	ctx, cancel := context.WithTimeout(s.opts.ctx, s.opts.ttl)
-	_, err := s.client.Revoke(ctx, s.id)
+	ctx, cancel := context.WithTimeout(c.opts.ctx, c.opts.ttl)
+	_, err := c.client.Revoke(ctx, c.id)
 	cancel()
 	return err
-}
-
-type leaseClientOptions struct {
-	ttl     time.Duration
-	leaseID ecv3.LeaseID
-	ctx     context.Context
-}
-
-// LeaseClientOption configures LeaseClient.
-type LeaseClientOption func(*leaseClientOptions)
-
-// WithTTL configures the session's TTL in seconds.
-// If TTL is <= 0, the default 60 seconds TTL will be used.
-func WithTTL(ttl time.Duration) LeaseClientOption {
-	return func(so *leaseClientOptions) {
-		if ttl > 0 {
-			so.ttl = ttl
-		}
-	}
-}
-
-// WithLease specifies the existing leaseID to be used for the session.
-// This is useful in process restart scenario, for example, to reclaim
-// leadership from an election prior to restart.
-func WithLease(leaseID ecv3.LeaseID) LeaseClientOption {
-	return func(so *leaseClientOptions) {
-		so.leaseID = leaseID
-	}
-}
-
-// WithContext assigns a context to the session instead of defaulting to
-// using the client context. This is useful for canceling NewLeaseClient and
-// Close operations immediately without having to close the client. If the
-// context is canceled before Close() completes, the session's lease will be
-// abandoned and left to expire instead of being revoked.
-func WithContext(ctx context.Context) LeaseClientOption {
-	return func(so *leaseClientOptions) {
-		so.ctx = ctx
-	}
 }

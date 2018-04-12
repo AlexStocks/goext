@@ -1,29 +1,38 @@
+// Copyright 2016 ~ 2018 AlexStocks(https://github.com/AlexStocks).
+// All rights reserved.  Use of this source code is
+// governed by Apache License 2.0.
+
+// Package etcdv3 provides an etcd version 3 gxregistry
+// ref: https://github.com/micro/go-plugins/blob/master/gxregistry/etcdv3/etcdv3.go
 package etcdv3
 
 import (
 	"context"
 	"errors"
 	"time"
-
-	"github.com/coreos/etcd/clientv3"
-	"github.com/micro/go-micro/registry"
 )
 
-type etcdv3Watcher struct {
-	stop    chan bool
+import (
+	"github.com/AlexStocks/goext/database/etcd"
+	"github.com/AlexStocks/goext/micro/registry"
+	"github.com/coreos/etcd/clientv3"
+)
+
+type Watcher struct {
+	stop    chan struct{}
 	w       clientv3.WatchChan
-	client  *clientv3.Client
+	client  *gxetcd.LeaseClient
 	timeout time.Duration
 }
 
-func newEtcdv3Watcher(r *etcdv3Registry, timeout time.Duration, opts ...registry.WatchOption) (registry.Watcher, error) {
-	var wo registry.WatchOptions
+func NewWatcher(r *Registry, timeout time.Duration, opts ...gxregistry.WatchOption) gxregistry.Watcher {
+	var options gxregistry.WatchOptions
 	for _, o := range opts {
-		o(&wo)
+		o(&options)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	stop := make(chan bool, 1)
+	stop := make(chan struct{}, 1)
 
 	go func() {
 		<-stop
@@ -31,36 +40,36 @@ func newEtcdv3Watcher(r *etcdv3Registry, timeout time.Duration, opts ...registry
 	}()
 
 	watchPath := prefix
-	if len(wo.Service) > 0 {
-		watchPath = servicePath(wo.Service) + "/"
+	if len(options.Service) > 0 {
+		watchPath = servicePath(options.Service) + "/"
 	}
 
-	return &etcdv3Watcher{
+	return &Watcher{
 		stop:    stop,
-		w:       r.client.Watch(ctx, watchPath, clientv3.WithPrefix(), clientv3.WithPrevKV()),
+		w:       r.client.EtcdClient().Watch(ctx, watchPath, clientv3.WithPrefix(), clientv3.WithPrevKV()),
 		client:  r.client,
 		timeout: timeout,
-	}, nil
+	}
 }
 
-func (ew *etcdv3Watcher) Next() (*registry.Result, error) {
-	for wresp := range ew.w {
+func (w *Watcher) Next() (*gxregistry.Result, error) {
+	for wresp := range w.w {
 		if wresp.Err() != nil {
 			return nil, wresp.Err()
 		}
 		for _, ev := range wresp.Events {
 			service := decode(ev.Kv.Value)
-			var action string
+			var action gxregistry.ServiceEventType
 
 			switch ev.Type {
 			case clientv3.EventTypePut:
 				if ev.IsCreate() {
-					action = "create"
+					action = gxregistry.ServiceAdd
 				} else if ev.IsModify() {
-					action = "update"
+					action = gxregistry.ServiceUpdate
 				}
 			case clientv3.EventTypeDelete:
-				action = "delete"
+				action = gxregistry.ServiceDel
 
 				// get service from prevKv
 				service = decode(ev.PrevKv.Value)
@@ -69,7 +78,7 @@ func (ew *etcdv3Watcher) Next() (*registry.Result, error) {
 			if service == nil {
 				continue
 			}
-			return &registry.Result{
+			return &gxregistry.Result{
 				Action:  action,
 				Service: service,
 			}, nil
@@ -78,11 +87,15 @@ func (ew *etcdv3Watcher) Next() (*registry.Result, error) {
 	return nil, errors.New("could not get next")
 }
 
-func (ew *etcdv3Watcher) Stop() {
+func (w *Watcher) Valid() bool {
+	return w.client.TTL() > 0
+}
+
+func (w *Watcher) Stop() {
 	select {
-	case <-ew.stop:
+	case <-w.stop:
 		return
 	default:
-		close(ew.stop)
+		close(w.stop)
 	}
 }
