@@ -28,7 +28,7 @@ type RegisterOptions struct {
 }
 
 type WatchOptions struct {
-	// the root registry path
+	// the root registry path, suck as "/dubbo/"
 	Root string
 	// Specify a service to watch
 	// If blank, the watch is for all services

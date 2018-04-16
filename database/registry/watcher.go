@@ -7,11 +7,49 @@ package gxregistry
 
 import (
 	"fmt"
+	"strconv"
 )
 
 import (
 	jerrors "github.com/juju/errors"
 )
+
+//////////////////////////////////////////
+// service role
+//////////////////////////////////////////
+
+type ServiceRoleType int32
+
+const (
+	Provider ServiceRoleType = 0
+	Cosumer  ServiceRoleType = 1
+)
+
+var (
+	ServiceRoleType_name = map[int32]string{
+		0: "Provider",
+		1: "Cosumer",
+	}
+	ServiceRoleType_value = map[string]int32{
+		"Provider": 0,
+		"Cosumer":  1,
+	}
+)
+
+func (x ServiceRoleType) String() string {
+	s, ok := ServiceRoleType_name[int32(x)]
+	if ok {
+		return s
+	}
+	return strconv.Itoa(int(x))
+}
+
+func (x *ServiceRoleType) Get(r string) {
+	s, ok := ServiceRoleType_value[r]
+	if ok {
+		*x = ServiceRoleType(s)
+	}
+}
 
 //////////////////////////////////////////
 // service url event type

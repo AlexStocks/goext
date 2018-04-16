@@ -1,20 +1,12 @@
-/******************************************************
-# DESC    : service registry
-# AUTHOR  : Alex Stocks
-# VERSION : 1.0
-# LICENCE : Apache Licence 2.0
-# EMAIL   : alexstocks@foxmail.com
-# MOD     : 2016-06-08 19:23
-# FILE    : registry.go
-******************************************************/
+// Copyright 2016 ~ 2018 AlexStocks(https://github.com/AlexStocks).
+// All rights reserved.  Use of this source code is
+// governed by Apache License 2.0.
 
-package zookeeper
+// Package gxzookeeper provides a zookeeper registry
+package gxzookeeper
 
 import (
-	"fmt"
-	"os"
 	"sync"
-	"time"
 )
 
 import (
@@ -22,201 +14,206 @@ import (
 )
 
 import (
-	"github.com/AlexStocks/dubbogo/common"
-	"github.com/AlexStocks/dubbogo/registry"
+	jerrors "github.com/juju/errors"
+	hash "github.com/mitchellh/hashstructure"
+)
+
+import (
+	"github.com/AlexStocks/goext/database/registry"
+	"github.com/AlexStocks/goext/database/zookeeper"
 )
 
 //////////////////////////////////////////////
-// DubboType
-//////////////////////////////////////////////
-
-type DubboType int
-
-const (
-	CONSUMER = iota
-	CONFIGURATOR
-	ROUTER
-	PROVIDER
-)
-
-var (
-	DubboNodes              = [...]string{"consumers", "configurators", "routers", "providers"}
-	DubboRole               = [...]string{"consumer", "", "", "provider"} //
-	RegistryZkClient string = "zk registry"
-	processID               = ""
-	localIp                 = ""
-)
-
-func init() {
-	processID = fmt.Sprintf("%d", os.Getpid())
-	localIp, _ = common.GetLocalIP(localIp)
-}
-
-func (t DubboType) String() string {
-	return DubboNodes[t]
-}
-
-func (t DubboType) Role() string {
-	return DubboRole[t]
-}
-
-//////////////////////////////////////////////
-// zookeeperRegistry
+// Registry
 //////////////////////////////////////////////
 
 const (
-	DEFAULT_REGISTRY_TIMEOUT = 1
+	kRegistryZkClient = "zk registry"
 )
 
-type serviceZKPath struct {
-	path string
-	node string
+type Registry struct {
+	client     *gxzookeeper.Client
+	options    gxregistry.Options
+	sync.Mutex                   // lock for client + register
+	register   map[string]uint64 // service name -> hash(gxregistry.Service)
 }
 
-// 从目前消费者的功能来看，它实现:
-// 1 消费者在每个服务下的/dubbo/service/consumers下注册
-// 2 消费者watch /dubbo/service/providers变动
-// 3 zk连接创建的时候，监控连接的可用性
-type zookeeperRegistry struct {
-	common.ApplicationConfig
-	registry.RegistryConfig                // ZooKeeperServers []string
-	birth                   int64          // time of file birth, seconds since Epoch; 0 if unknown
-	wg                      sync.WaitGroup // wg+done for zk restart
-	done                    chan struct{}
-	// watcher *zookeeperWatcher
-	sync.Mutex // lock for client + services
-	client     *zookeeperClient
-	services   map[string]registry.ServiceConfigIf // service name -> service config
-	// zkPath -> zkData, 存储了当前使用者在各个服务下面注册的node,
-	// 如果注册了temp node，则zkData为空，如果注册了temp seq node,则zkData非空
-	// registers map[string]string
-}
-
-func newZookeeperRegistry(opts registry.Options) (*zookeeperRegistry, error) {
+func NewRegistry(opts ...gxregistry.Option) (*Registry, error) {
 	var (
-		// ok       bool
-		err  error
-		this *zookeeperRegistry
+		err     error
+		r       *Registry
+		options gxregistry.Options
 	)
 
-	this = &zookeeperRegistry{
-		RegistryConfig:    opts.RegistryConfig,
-		ApplicationConfig: opts.ApplicationConfig,
-		birth:             time.Now().Unix(),
-		done:              make(chan struct{}),
+	for _, o := range opts {
+		o(&options)
 	}
-	if this.Name == "" {
-		this.Name = common.NAME
+	if options.Timeout == 0 {
+		options.Timeout = gxregistry.DefaultTimeout
 	}
-	if this.Version == "" {
-		this.Version = common.VERSION
+	if options.Root == "" {
+		options.Root = gxregistry.DefaultServiceRoot
 	}
-	if this.RegistryConfig.Timeout == 0 {
-		this.RegistryConfig.Timeout = DEFAULT_REGISTRY_TIMEOUT
-	}
-	err = this.validateZookeeperClient()
+
+	r = &Registry{options: options}
+	err = r.validateZookeeperClient()
 	if err != nil {
 		return nil, err
 	}
+	r.register = make(map[string]uint64)
 
-	// this.registers = make(map[string]string)
-	this.services = make(map[string]registry.ServiceConfigIf)
-
-	return this, nil
+	return r, nil
 }
 
-func (this *zookeeperRegistry) validateZookeeperClient() error {
-	var (
-		err error
-	)
+func (r *Registry) Options() gxregistry.Options {
+	return r.options
+}
 
-	err = nil
-	this.Lock()
-	if this.client == nil {
-		this.client, err = newZookeeperClient(RegistryZkClient, this.Address, this.RegistryConfig.Timeout)
+func (r *Registry) validateZookeeperClient() error {
+	var err error
+	r.Lock()
+	if r.client == nil {
+		r.client, err = gxzookeeper.NewClient(kRegistryZkClient, r.options.Addrs, r.options.Timeout)
 		if err != nil {
 			log.Warn("newZookeeperClient(name{%s}, zk addresss{%v}, timeout{%d}) = error{%v}",
-				RegistryZkClient, this.Address, this.Timeout, err)
+				kRegistryZkClient, r.options.Addrs, r.options.Timeout, err)
 		}
 	}
-	this.Unlock()
+	r.Unlock()
 
 	return err
 }
 
-func (this *zookeeperRegistry) GetService(string) ([]*registry.ServiceURL, error) {
-	return nil, nil
-}
+func (r *Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) error {
+	s, ok := sv.(*gxregistry.Service)
+	if !ok {
+		return jerrors.Errorf("@service:%+v type is not gxregistry.Service", sv)
+	}
+	if len(s.Nodes) == 0 {
+		return jerrors.Errorf("Require at least one node")
+	}
 
-func (this *zookeeperRegistry) ListServices() ([]*registry.ServiceURL, error) {
-	return nil, nil
-}
-
-func (this *zookeeperRegistry) Watch() (registry.Watcher, error) {
-	return nil, nil
-}
-
-func (this *zookeeperRegistry) Close() {
-	this.client.Close()
-}
-
-func (this *zookeeperRegistry) registerZookeeperNode(root string, data []byte) error {
-	var (
-		err    error
-		zkPath string
-	)
-
-	// 假设root是/dubbo/com.ofpay.demo.api.UserProvider/consumers/jsonrpc，则创建完成的时候zkPath
-	// 是/dubbo/com.ofpay.demo.api.UserProvider/consumers/jsonrpc/0000000000之类的临时节点.
-	// 这个节点在连接有效的时候回一直存在，直到退出的时候才会被删除。
-	// 所以如果连接有效的话，想要删除/dubbo/com.ofpay.demo.api.UserProvider/consumers/jsonrpc的话，必须先把这个临时节点删除掉
-	this.Lock()
-	defer this.Unlock()
-	err = this.client.Create(root)
+	// create hash of service; uint64
+	h, err := hash.Hash(s, nil)
 	if err != nil {
-		log.Error("zk.Create(root{%s}) = err{%v}", root, err)
 		return err
 	}
-	zkPath, err = this.client.RegisterTempSeq(root, data)
-	// 创建完临时节点，zkPath = /dubbo/com.ofpay.demo.api.UserProvider/consumers/jsonrpc/0000000000
-	if err != nil {
-		log.Error("createTempSeqNode(root{%s}) = error{%v}", root, err)
-		return err
+
+	// get existing hash
+	r.Lock()
+	v, ok := r.register[s.Name]
+	r.Unlock()
+
+	// the service is unchanged, skip registering
+	if ok && v == h {
+		return nil
 	}
-	// this.registers[root] = string(data) // root = /dubbo/com.ofpay.demo.api.UserProvider/consumers/jsonrpc
-	log.Debug("create a zookeeper node:%s", zkPath)
+
+	service := &gxregistry.Service{Metadata: s.Metadata}
+	service.ServiceAttr = s.ServiceAttr
+
+	var options gxregistry.RegisterOptions
+	for _, o := range opts {
+		o(&options)
+	}
+
+	// register every node
+	var zkPath string
+	for _, node := range s.Nodes {
+		r.Lock()
+		defer r.Unlock()
+		zkPath = service.NodePath(r.options.Root, *node)
+		err = r.client.CreateZkPath(zkPath)
+		if err != nil {
+			log.Error("zkClient.CreateZkPath(root{%s})", zkPath, err)
+			return err
+		}
+		service.Nodes = []*gxregistry.Node{node}
+		sn, err := gxregistry.EncodeService(service)
+		if err != nil {
+			return jerrors.Annotatef(err, "gxregister.EncodeService(service:%+v)", service)
+		}
+		_, err = r.client.RegisterTempSeq(zkPath, []byte(sn))
+		if err != nil {
+			return jerrors.Annotatef(err, "gxregister.RegisterTempSeq(path:%s)", zkPath)
+		}
+	}
+
+	r.Lock()
+	// save our hash of the service
+	r.register[s.Name] = h
+	r.Unlock()
 
 	return nil
 }
 
-func (this *zookeeperRegistry) registerTempZookeeperNode(root string, node string) error {
-	var (
-		err    error
-		zkPath string
-	)
+func (r *Registry) Unregister(svc interface{}) error {
+	s, ok := svc.(*gxregistry.Service)
+	if !ok {
+		return jerrors.Errorf("@service:%+v type is not gxregistry.Service", svc)
+	}
 
-	this.Lock()
-	defer this.Unlock()
-	err = this.client.Create(root)
-	if err != nil {
-		log.Error("zk.Create(root{%s}) = err{%v}", root, err)
-		return err
+	if len(s.Nodes) == 0 {
+		return jerrors.Errorf("Require at least one node")
 	}
-	zkPath, err = this.client.RegisterTemp(root, node)
-	if err != nil {
-		log.Error("RegisterTempNode(root{%s}, node{%s}) = error{%v}", root, node, err)
-		return err
+
+	r.Lock()
+	// delete our hash of the service
+	delete(r.register, s.Name)
+	r.Unlock()
+
+	for _, node := range s.Nodes {
+		if err := r.client.DeleteZkPath(s.NodePath(r.options.Root, *node)); err != nil {
+			return jerrors.Annotatef(err, "zkClient.DeleteZkPath(%s)", s.NodePath(r.options.Root, *node))
+		}
 	}
-	// this.registers[zkPath] = ""
-	log.Debug("create a zookeeper node:%s", zkPath)
 
 	return nil
 }
 
-func (this *zookeeperRegistry) Register(conf registry.ServiceConfig) error {
-	return nil
+func (r *Registry) GetService(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, error) {
+	svc := gxregistry.Service{ServiceAttr: attr}
+	path := svc.Path(r.options.Root)
+	children, err := r.client.GetChildren(path)
+	if err != nil {
+		return nil, jerrors.Annotatef(err, "zkClient.GetChildren(path:%s)", path)
+	}
+	if len(children) == 0 {
+		return nil, gxregistry.ErrorRegistryNotFound
+	}
+
+	serviceArray := []*gxregistry.Service{}
+	var node gxregistry.Node
+	for _, name := range children {
+		node.ID = name
+		zkPath := svc.NodePath(r.options.Root, node)
+		grandchildren, err := r.client.GetChildren(zkPath)
+		if err != nil {
+			return nil, jerrors.Annotatef(err, "gxzookeeper.GetChildren(node:%+v)", node)
+		}
+		if len(grandchildren) > 0 {
+			continue
+		}
+
+		childData, err := r.client.Get(zkPath)
+		if err != nil {
+			return nil, jerrors.Annotatef(err, "gxzookeeper.Get(name:%s)", zkPath)
+		}
+
+		sn, err := gxregistry.DecodeService(childData)
+		if err != nil {
+			return nil, jerrors.Annotate(err, "gxregistry.DecodeService()")
+		}
+		serviceArray = append(serviceArray, sn)
+	}
+
+	return serviceArray, nil
 }
 
-func (this *zookeeperRegistry) String() string {
+func (r *Registry) String() string {
 	return "zookeeper registry"
+}
+
+func (r *Registry) Close() {
+	r.client.Close()
 }

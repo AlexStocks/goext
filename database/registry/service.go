@@ -7,60 +7,116 @@ package gxregistry
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 )
 
+import (
+	"github.com/AlexStocks/goext/strings"
+	jerrors "github.com/juju/errors"
+)
+
+type ServiceAttr struct {
+	Group    string          `json:"group,omitempty"`
+	Name     string          `json:"name,omitempty"`     // service name
+	Protocol string          `json:"protocol,omitempty"` // codec
+	Version  string          `json:"version,omitempty"`
+	Role     ServiceRoleType `json:"role,omitempty"`
+}
+
 type Service struct {
-	Name      string            `json:"name"`
-	Version   string            `json:"version"`
-	Metadata  map[string]string `json:"metadata"`
-	Endpoints []*Endpoint       `json:"endpoints"`
-	Nodes     []*Node           `json:"nodes"`
+	ServiceAttr
+	Nodes    []*Node           `json:"nodes,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 type Node struct {
-	ID       string            `json:"id"`
-	Address  string            `json:"address"`
-	Port     int               `json:"port"`
-	Metadata map[string]string `json:"metadata"`
+	ID       string            `json:"id,omitempty"`
+	Address  string            `json:"address,omitempty"`
+	Port     int               `json:"port,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
-type Endpoint struct {
-	Name     string            `json:"name"`
-	Request  *Value            `json:"request"`
-	Response *Value            `json:"response"`
-	Metadata map[string]string `json:"metadata"`
+func (a ServiceAttr) Marshal() ([]byte, error) {
+	params := url.Values{}
+	params.Add("group", a.Group)
+	params.Add("service", a.Name)
+	params.Add("protocol", a.Protocol)
+	params.Add("version", a.Version)
+	params.Add("role", a.Role.String())
+
+	// encode result: group=bjtelecom&protocol=pb&service=shopping&type=add+service&version=1.0.1
+	// query escape: group%3Dbjtelecom%26protocol%3Dpb%26service%3Dshopping%26type%3Dadd%2Bservice%26version%3D1.0.1
+	return []byte(url.QueryEscape(params.Encode())), nil
 }
 
-type Value struct {
-	Name   string   `json:"name"`
-	Type   string   `json:"type"`
-	Values []*Value `json:"values"`
+func (a *ServiceAttr) Unmarshal(data []byte) error {
+	rawString, err := url.QueryUnescape(gxstrings.String(data))
+	if err != nil {
+		return jerrors.Annotatef(err, "url.QueryUnescape(data:%s)", gxstrings.String(data))
+	}
+
+	query, err := url.ParseQuery(rawString)
+	if err != nil {
+		return jerrors.Annotatef(err, "url.ParseQuery(string:%s)", rawString)
+	}
+
+	a.Group = query.Get("group")
+	a.Name = query.Get("service")
+	a.Protocol = query.Get("protocol")
+	a.Version = query.Get("version")
+	(&a.Role).Get(query.Get("role"))
+
+	return nil
 }
 
-func EncodeService(s *Service) string {
-	b, _ := json.Marshal(s)
-	return string(b)
+func EncodeService(s *Service) (string, error) {
+	b, err := json.Marshal(s)
+	if err != nil {
+		return "", jerrors.Annotatef(err, "json.Marshal(Service:%+v)", s)
+	}
+
+	return string(b), nil
 }
 
-func DecodeService(ds []byte) *Service {
+func DecodeService(ds []byte) (*Service, error) {
 	var s *Service
-	json.Unmarshal(ds, &s)
-	return s
+	err := json.Unmarshal(ds, &s)
+	if err != nil {
+		return nil, jerrors.Annotatef(err, "json.Unmarshal()")
+	}
+	return s, nil
 }
 
-func ServicePath(paths ...string) string {
+func registryPath(paths ...string) string {
 	var service strings.Builder
 	for _, path := range paths {
-		service.WriteString(path)
-		if !strings.HasSuffix(path, "/") {
-			service.WriteString("/")
+		if path != "" {
+			service.WriteString(path)
+			if !strings.HasSuffix(path, "/") {
+				service.WriteString("/")
+			}
 		}
 	}
 
 	return service.String()
 }
 
-func NodePath(nodeID string, paths ...string) string {
-	return ServicePath(paths...) + nodeID
+// Path example: /dubbo/shopping-bjtelecom-pb-1.0.1-provider/node1
+func (s *Service) Path(root string) string {
+	params := url.Values{}
+	params.Add("group", s.Group)
+	params.Add("service", s.Name)
+	params.Add("protocol", s.Protocol)
+	params.Add("version", s.Version)
+	params.Add("role", s.Role.String())
+	// encode result: group=bjtelecom&protocol=pb&service=shopping&type=add+service&version=1.0.1
+	// query escape: group%3Dbjtelecom%26protocol%3Dpb%26service%3Dshopping%26type%3Dadd%2Bservice%26version%3D1.0.1
+	service_path := url.QueryEscape(params.Encode())
+
+	return registryPath([]string{root, service_path}...)
+}
+
+func (s *Service) NodePath(root string, node Node) string {
+	return s.Path(root) + node.ID
 }

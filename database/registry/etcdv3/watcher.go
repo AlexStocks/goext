@@ -2,9 +2,9 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-// Package etcdv3 provides an etcd version 3 gxregistry
+// Package gxetcd provides an etcd version 3 gxregistry
 // ref: https://github.com/micro/go-plugins/blob/master/gxregistry/etcdv3/etcdv3.go
-package etcdv3
+package gxetcd
 
 import (
 	"context"
@@ -18,8 +18,10 @@ import (
 import (
 	"github.com/AlexStocks/goext/database/etcd"
 	"github.com/AlexStocks/goext/database/registry"
+	log "github.com/AlexStocks/log4go"
 )
 
+// watcher的watch系列函数暴露给registry，而Next函数则暴露给selector
 type Watcher struct {
 	done   chan struct{}
 	cancel context.CancelFunc
@@ -36,13 +38,16 @@ func NewWatcher(r *Registry, opts ...gxregistry.WatchOption) gxregistry.Watcher 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{}, 1)
 
-	var watchPath string
 	if options.Root == "" {
 		options.Root = gxregistry.DefaultServiceRoot
 	}
-	if len(options.Service) > 0 {
-		watchPath = gxregistry.ServicePath(options.Root, options.Service)
+	if len(options.Service) == 0 {
+		panic("options.Service is nil")
 	}
+	s := gxregistry.Service{
+		ServiceAttr: gxregistry.ServiceAttr{Name: options.Service},
+	}
+	watchPath := s.Path(options.Root)
 
 	w := r.client.EtcdClient().Watch(ctx, watchPath, clientv3.WithPrefix(), clientv3.WithPrevKV())
 	return &Watcher{
@@ -64,7 +69,11 @@ func (w *Watcher) Next() (*gxregistry.Result, error) {
 		}
 
 		for _, ev := range msg.Events {
-			service := gxregistry.DecodeService(ev.Kv.Value)
+			service, err := gxregistry.DecodeService(ev.Kv.Value)
+			if err != nil {
+				log.Warn("gxregistry.DecodeService() = error:%s", err)
+				continue
+			}
 			var action gxregistry.ServiceEventType
 
 			switch ev.Type {
@@ -78,7 +87,11 @@ func (w *Watcher) Next() (*gxregistry.Result, error) {
 				action = gxregistry.ServiceDel
 
 				// get service from prevKv
-				service = gxregistry.DecodeService(ev.PrevKv.Value)
+				service, err = gxregistry.DecodeService(ev.PrevKv.Value)
+				if err != nil {
+					log.Warn("gxregistry.DecodeService() = error:%s", err)
+					continue
+				}
 			}
 
 			if service == nil {

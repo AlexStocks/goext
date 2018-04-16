@@ -1,14 +1,9 @@
-/******************************************************
-# DESC    : zookeeper path watcher
-# AUTHOR  : Alex Stocks
-# VERSION : 1.0
-# LICENCE : Apache Licence 2.0
-# EMAIL   : alexstocks@foxmail.com
-# MOD     : 2016-06-26 19:30
-# FILE    : watch.go
-******************************************************/
+// Copyright 2018 AlexStocks(https://github.com/AlexStocks).
+// All rights reserved.  Use of this source code is
+// governed by Apache License 2.0.
 
-package zookeeper
+// Package gxzookeeper provides a zookeeper watcher
+package gxzookeeper
 
 import (
 	"errors"
@@ -25,6 +20,8 @@ import (
 import (
 	"github.com/AlexStocks/dubbogo/common"
 	"github.com/AlexStocks/dubbogo/registry"
+	"github.com/AlexStocks/goext/database/registry"
+	"github.com/AlexStocks/goext/database/zookeeper"
 )
 
 const (
@@ -34,9 +31,10 @@ const (
 )
 
 // watcher的watch系列函数暴露给zk registry，而Next函数则暴露给selector
-type zookeeperWatcher struct {
+type Watcher struct {
+	opts   gxregistry.WatchOptions
 	once   sync.Once
-	client *zookeeperClient
+	client *gxzookeeper.Client
 	events chan event // 通过这个channel把registry与selector连接了起来
 	wait   sync.WaitGroup
 }
@@ -46,19 +44,30 @@ type event struct {
 	err error
 }
 
-func newZookeeperWatcher(client *zookeeperClient) (registry.Watcher, error) {
-	this := &zookeeperWatcher{
+func NewWatcher(client *gxzookeeper.Client, opts ...gxregistry.WatchOption) registry.Watcher {
+	var options gxregistry.WatchOptions
+	for _, o := range opts {
+		o(&options)
+	}
+
+	if options.Root == "" {
+		options.Root = gxregistry.DefaultServiceRoot
+	}
+	if len(options.Service) == 0 {
+		panic("options.Service is nil")
+	}
+
+	return &Watcher{
+		opts:   options,
 		client: client,
 		events: make(chan event, Wactch_Event_Channel_Size),
 	}
-
-	return this, nil
 }
 
 // 这个函数退出，意味着要么收到了stop信号，要么watch的node不存在了
 // 除了下面的watchDir会调用这个函数外，func (this *zookeeperRegistry) registerZookeeperNode(root string, data []byte)也
 // 调用了这个函数
-func (this *zookeeperWatcher) watchServiceNode(zkPath string) bool {
+func (this *Watcher) watchServiceNode(zkPath string) bool {
 	this.wait.Add(1)
 	defer this.wait.Done()
 	var zkEvent zk.Event
@@ -94,7 +103,7 @@ func (this *zookeeperWatcher) watchServiceNode(zkPath string) bool {
 	return false
 }
 
-func (this *zookeeperWatcher) handleZkNodeEvent(zkPath string, children []string, conf registry.ServiceConfig) {
+func (this *Watcher) handleZkNodeEvent(zkPath string, children []string, conf registry.ServiceConfig) {
 	var (
 		err         error
 		newChildren []string
@@ -168,7 +177,7 @@ func (this *zookeeperWatcher) handleZkNodeEvent(zkPath string, children []string
 
 // zkPath 是/dubbo/com.xxx.service/[providers or consumers or configurators]
 // 关注zk path下面node的添加或者删除
-func (this *zookeeperWatcher) watchDir(zkPath string, conf registry.ServiceConfig) {
+func (this *Watcher) watchDir(zkPath string, conf registry.ServiceConfig) {
 	this.wait.Add(1)
 	defer this.wait.Done()
 
@@ -236,7 +245,7 @@ func (this *zookeeperWatcher) watchDir(zkPath string, conf registry.ServiceConfi
 // client.go:Watch -> watchService -> watchDir -> watchServiceNode
 //                            |
 //                            --------> watchServiceNode
-func (this *zookeeperWatcher) watchService(zkPath string, conf registry.ServiceConfig) {
+func (this *Watcher) watchService(zkPath string, conf registry.ServiceConfig) {
 	var (
 		err        error
 		dubboPath  string
@@ -250,7 +259,7 @@ func (this *zookeeperWatcher) watchService(zkPath string, conf registry.ServiceC
 		children = nil
 		log.Error("fail to get children of zk path{%s}", zkPath)
 		// 不要发送不必要的error给selector，以防止selector/cache/cache.go:(cacheSelector)watch
-		// 调用(zookeeperWatcher)Next获取error后，不断退出
+		// 调用(Watcher)Next获取error后，不断退出
 		// this.events <- event{nil, err}
 	}
 
@@ -289,7 +298,7 @@ func (this *zookeeperWatcher) watchService(zkPath string, conf registry.ServiceC
 	}(zkPath, conf)
 }
 
-func (this *zookeeperWatcher) Next() (*registry.Result, error) {
+func (this *Watcher) Next() (*registry.Result, error) {
 	select {
 	case <-this.client.done():
 		return nil, errors.New("watcher stopped")
@@ -298,11 +307,11 @@ func (this *zookeeperWatcher) Next() (*registry.Result, error) {
 	}
 }
 
-func (this *zookeeperWatcher) Valid() bool {
+func (this *Watcher) Valid() bool {
 	return this.client.zkConnValid()
 }
 
-func (this *zookeeperWatcher) Stop() {
+func (this *Watcher) Stop() {
 	this.once.Do(func() {
 		this.client.Close()
 	})

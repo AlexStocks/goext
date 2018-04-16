@@ -15,8 +15,7 @@ import (
 type Registry interface {
 	Register(service interface{}, opts ...RegisterOption) error
 	Unregister(service interface{}) error
-	GetService(string) ([]*Service, error)
-	ListServices() ([]*Service, error)
+	GetService(attr ServiceAttr) ([]*Service, error)
 	Watch(opts ...WatchOption) Watcher
 	Close() error
 	String() string

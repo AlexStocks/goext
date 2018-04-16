@@ -19,10 +19,10 @@ import (
 )
 
 var (
-	ErrZkClientConnNil = jerrors.Errorf("zookeeperclient{conn} is nil")
+	ErrZkClientConnNil = jerrors.Errorf("client{conn} is nil")
 )
 
-type ZookeeperClient struct {
+type Client struct {
 	name          string
 	zkAddrs       []string
 	sync.Mutex             // for conn
@@ -63,14 +63,14 @@ func stateToString(state zk.State) string {
 	return "zookeeper unknown state"
 }
 
-func NewClient(name string, zkAddrs []string, connTimeout time.Duration) (*ZookeeperClient, error) {
+func NewClient(name string, zkAddrs []string, connTimeout time.Duration) (*Client, error) {
 	var (
 		err   error
 		event <-chan zk.Event
-		c     *ZookeeperClient
+		c     *Client
 	)
 
-	c = &ZookeeperClient{
+	c = &Client{
 		name:          name,
 		zkAddrs:       zkAddrs,
 		done:          make(chan struct{}),
@@ -88,7 +88,7 @@ func NewClient(name string, zkAddrs []string, connTimeout time.Duration) (*Zooke
 	return c, nil
 }
 
-func (c *ZookeeperClient) handleZkEvent(session <-chan zk.Event) {
+func (c *Client) handleZkEvent(session <-chan zk.Event) {
 	var (
 		state int
 		event zk.Event
@@ -148,27 +148,27 @@ LOOP:
 	}
 }
 
-func (c *ZookeeperClient) RegisterEvent(zkPath string, event *chan struct{}) {
-	if zkPath == "" || event == nil {
+func (c *Client) RegisterEvent(path string, event *chan struct{}) {
+	if path == "" || event == nil {
 		return
 	}
 
 	c.Lock()
-	a := c.eventRegistry[zkPath]
+	a := c.eventRegistry[path]
 	a = append(a, event)
-	c.eventRegistry[zkPath] = a
+	c.eventRegistry[path] = a
 	c.Unlock()
-	log.Debug("zkClient{%s} register event{path:%s, ptr:%p}", c.name, zkPath, event)
+	log.Debug("zkClient{%s} register event{path:%s, ptr:%p}", c.name, path, event)
 }
 
-func (c *ZookeeperClient) UnregisterEvent(zkPath string, event *chan struct{}) {
-	if zkPath == "" {
+func (c *Client) UnregisterEvent(path string, event *chan struct{}) {
+	if path == "" {
 		return
 	}
 
 	c.Lock()
 	for {
-		a, ok := c.eventRegistry[zkPath]
+		a, ok := c.eventRegistry[path]
 		if !ok {
 			break
 		}
@@ -176,25 +176,25 @@ func (c *ZookeeperClient) UnregisterEvent(zkPath string, event *chan struct{}) {
 			if e == event {
 				arr := a
 				a = append(arr[:i], arr[i+1:]...)
-				log.Debug("zkClient{%s} unregister event{path:%s, event:%p}", c.name, zkPath, event)
+				log.Debug("zkClient{%s} unregister event{path:%s, event:%p}", c.name, path, event)
 			}
 		}
-		log.Debug("after zkClient{%s} unregister event{path:%s, event:%p}, array length %d", c.name, zkPath, event, len(a))
+		log.Debug("after zkClient{%s} unregister event{path:%s, event:%p}, array length %d", c.name, path, event, len(a))
 		if len(a) == 0 {
-			delete(c.eventRegistry, zkPath)
+			delete(c.eventRegistry, path)
 		} else {
-			c.eventRegistry[zkPath] = a
+			c.eventRegistry[path] = a
 		}
 		break
 	}
 	c.Unlock()
 }
 
-func (c *ZookeeperClient) Done() <-chan struct{} {
+func (c *Client) Done() <-chan struct{} {
 	return c.done
 }
 
-func (c *ZookeeperClient) Stop() bool {
+func (c *Client) Stop() bool {
 	select {
 	case <-c.done:
 		return true
@@ -205,7 +205,7 @@ func (c *ZookeeperClient) Stop() bool {
 	return false
 }
 
-func (c *ZookeeperClient) ValidateConnection() bool {
+func (c *Client) ValidateConnection() bool {
 	select {
 	case <-c.done:
 		return false
@@ -222,7 +222,7 @@ func (c *ZookeeperClient) ValidateConnection() bool {
 	return valid
 }
 
-func (c *ZookeeperClient) Close() {
+func (c *Client) Close() {
 	c.Stop()
 	c.wait.Wait()
 	c.Lock()
@@ -235,16 +235,15 @@ func (c *ZookeeperClient) Close() {
 }
 
 // 节点须逐级创建
-func (c *ZookeeperClient) CreateZkPath(basePath string) error {
+func (c *Client) CreateZkPath(basePath string) error {
 	var (
 		err     error
 		tmpPath string
 	)
 
-	log.Debug("ZookeeperClient.Create(basePath{%s})", basePath)
+	log.Debug("Client.Create(basePath{%s})", basePath)
 	for _, str := range strings.Split(basePath, "/")[1:] {
 		tmpPath = path.Join(tmpPath, "/", str)
-		// log.Debug("create zookeeper path: \"%s\"\n", tmpPath)
 		err = ErrZkClientConnNil
 		c.Lock()
 		if c.conn != nil {
@@ -252,11 +251,8 @@ func (c *ZookeeperClient) CreateZkPath(basePath string) error {
 		}
 		c.Unlock()
 		if err != nil {
-			if err == zk.ErrNodeExists {
-				log.Error("zk.create(\"%s\") exists\n", tmpPath)
-			} else {
-				log.Error("zk.create(\"%s\") error(%v)\n", tmpPath, err)
-				return err
+			if err != zk.ErrNodeExists {
+				return jerrors.Annotatef(err, "zk.Create(path:%s)", tmpPath)
 			}
 		}
 	}
@@ -266,49 +262,21 @@ func (c *ZookeeperClient) CreateZkPath(basePath string) error {
 
 // 像创建一样，删除节点的时候也只能从叶子节点逐级回退删除
 // 当节点还有子节点的时候，删除是不会成功的
-func (c *ZookeeperClient) DeleteZkPath(basePath string) error {
-	var (
-		err error
-	)
-
-	err = ErrZkClientConnNil
+func (c *Client) DeleteZkPath(basePath string) error {
+	err := ErrZkClientConnNil
 	c.Lock()
+	defer c.Unlock()
 	if c.conn != nil {
 		err = c.conn.Delete(basePath, -1)
+		if err != nil {
+			return jerrors.Annotatef(err, "zk.Delete(path:%s)", basePath)
+		}
 	}
-	c.Unlock()
 
-	return err
+	return nil
 }
 
-func (c *ZookeeperClient) RegisterTemp(basePath string, node string) (string, error) {
-	var (
-		err     error
-		data    []byte
-		zkPath  string
-		tmpPath string
-	)
-
-	err = ErrZkClientConnNil
-	data = []byte("")
-	zkPath = path.Join(basePath) + "/" + node
-	c.Lock()
-	if c.conn != nil {
-		tmpPath, err = c.conn.Create(zkPath, data, zk.FlagEphemeral, zk.WorldACL(zk.PermAll))
-	}
-	c.Unlock()
-	// log.Debug("ZookeeperClient.RegisterTemp(basePath{%s}) = tempPath{%s}", zkPath, tmpPath)
-	if err != nil {
-		log.Error("conn.Create(\"%s\", zk.FlagEphemeral) = error(%v)\n", zkPath, err)
-		// if err != zk.ErrNodeExists {
-		return "", err
-		// }
-	}
-	log.Debug("zkClient{%s} create a temp zookeeper node:%s\n", c.name, tmpPath)
-	return tmpPath, nil
-}
-
-func (c *ZookeeperClient) RegisterTempSeq(basePath string, data []byte) (string, error) {
+func (c *Client) RegisterTemp(path string, data []byte) (string, error) {
 	var (
 		err     error
 		tmpPath string
@@ -317,22 +285,40 @@ func (c *ZookeeperClient) RegisterTempSeq(basePath string, data []byte) (string,
 	err = ErrZkClientConnNil
 	c.Lock()
 	if c.conn != nil {
-		tmpPath, err = c.conn.Create(path.Join(basePath)+"/", data, zk.FlagEphemeral|zk.FlagSequence, zk.WorldACL(zk.PermAll))
+		tmpPath, err = c.conn.Create(path, data, zk.FlagEphemeral, zk.WorldACL(zk.PermAll))
 	}
 	c.Unlock()
-	log.Debug("ZookeeperClient.RegisterTempSeq(basePath{%s}) = tempPath{%s}", basePath, tmpPath)
 	if err != nil {
-		log.Error("zkClient{%s} conn.Create(\"%s\", \"%s\", zk.FlagEphemeral|zk.FlagSequence) error(%v)\n",
-			c.name, basePath, string(data), err)
 		// if err != zk.ErrNodeExists {
-		return "", err
+		return "", jerrors.Annotatef(err, "zk.Create(%s, ephemeral)", path)
 		// }
 	}
-	log.Debug("zkClient{%s} create a temp zookeeper node:%s\n", c.name, tmpPath)
+
 	return tmpPath, nil
 }
 
-func (c *ZookeeperClient) GetChildrenW(path string) ([]string, <-chan zk.Event, error) {
+func (c *Client) RegisterTempSeq(path string, data []byte) (string, error) {
+	var (
+		err     error
+		tmpPath string
+	)
+
+	err = ErrZkClientConnNil
+	c.Lock()
+	if c.conn != nil {
+		tmpPath, err = c.conn.Create(path, data, zk.FlagEphemeral|zk.FlagSequence, zk.WorldACL(zk.PermAll))
+	}
+	c.Unlock()
+	if err != nil {
+		// if err != zk.ErrNodeExists {
+		return "", jerrors.Annotatef(err, "zk.Create(%s, sequence | ephemeral)", path)
+		// }
+	}
+
+	return tmpPath, nil
+}
+
+func (c *Client) GetChildrenW(path string) ([]string, <-chan zk.Event, error) {
 	var (
 		err      error
 		children []string
@@ -350,8 +336,7 @@ func (c *ZookeeperClient) GetChildrenW(path string) ([]string, <-chan zk.Event, 
 		if err == zk.ErrNoNode {
 			return nil, nil, jerrors.Errorf("path{%s} has none children", path)
 		}
-		log.Error("zk.ChildrenW(path{%s}) = error(%v)", path, err)
-		return nil, nil, err
+		return nil, nil, jerrors.Annotatef(err, "zk.ChildrenW(%s)", path)
 	}
 	if stat == nil {
 		return nil, nil, jerrors.Errorf("path{%s} has none children", path)
@@ -363,7 +348,36 @@ func (c *ZookeeperClient) GetChildrenW(path string) ([]string, <-chan zk.Event, 
 	return children, watch, nil
 }
 
-func (c *ZookeeperClient) GetChildren(path string) ([]string, error) {
+func (c *Client) Get(path string) ([]byte, error) {
+	var (
+		err  error
+		data []byte
+		stat *zk.Stat
+	)
+
+	err = ErrZkClientConnNil
+	c.Lock()
+	if c.conn != nil {
+		data, stat, err = c.conn.Get(path)
+	}
+	c.Unlock()
+	if err != nil {
+		if err == zk.ErrNoNode {
+			return nil, jerrors.Errorf("path{%s} has none children", path)
+		}
+		return nil, jerrors.Annotatef(err, "zk.Children(path:%s)", path)
+	}
+	if stat == nil {
+		return nil, jerrors.Errorf("path{%s} has none children", path)
+	}
+	if len(data) == 0 {
+		return nil, jerrors.Errorf("path{%s} has none children", path)
+	}
+
+	return data, nil
+}
+
+func (c *Client) GetChildren(path string) ([]string, error) {
 	var (
 		err      error
 		children []string
@@ -380,10 +394,9 @@ func (c *ZookeeperClient) GetChildren(path string) ([]string, error) {
 		if err == zk.ErrNoNode {
 			return nil, jerrors.Errorf("path{%s} has none children", path)
 		}
-		log.Error("zk.Children(path{%s}) = error(%v)", path, err)
-		return nil, err
+		return nil, jerrors.Annotatef(err, "zk.Children(path:%s)", path)
 	}
-	if stat == nil {
+	if stat == nil || stat.NumChildren == 0 {
 		return nil, jerrors.Errorf("path{%s} has none children", path)
 	}
 	if len(children) == 0 {
@@ -393,7 +406,7 @@ func (c *ZookeeperClient) GetChildren(path string) ([]string, error) {
 	return children, nil
 }
 
-func (c *ZookeeperClient) ExistW(zkPath string) (<-chan zk.Event, error) {
+func (c *Client) ExistW(path string) (<-chan zk.Event, error) {
 	var (
 		exist bool
 		err   error
@@ -403,16 +416,14 @@ func (c *ZookeeperClient) ExistW(zkPath string) (<-chan zk.Event, error) {
 	err = ErrZkClientConnNil
 	c.Lock()
 	if c.conn != nil {
-		exist, _, watch, err = c.conn.ExistsW(zkPath)
+		exist, _, watch, err = c.conn.ExistsW(path)
 	}
 	c.Unlock()
 	if err != nil {
-		log.Error("zkClient{%s}.ExistsW(path{%s}) = error{%v}.", c.name, zkPath, err)
-		return nil, err
+		return nil, jerrors.Annotatef(err, "zk.ExistsW(path:%s)", path)
 	}
 	if !exist {
-		log.Warn("zkClient{%s}'s App zk path{%s} does not exist.", c.name, zkPath)
-		return nil, jerrors.Errorf("zkClient{%s} App zk path{%s} does not exist.", c.name, zkPath)
+		return nil, jerrors.Errorf("zkClient{%s} App zk path{%s} does not exist.", c.name, path)
 	}
 
 	return watch, nil
