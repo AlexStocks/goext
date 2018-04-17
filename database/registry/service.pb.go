@@ -1630,7 +1630,7 @@ func registryPath(paths ...string) string {
 
 // /dubbo/group%3Dbjtelecom%26protocol%3Dpb%26service%3Dshopping%26type%3Dadd%2Bservice%26version%3D1.0.1/node1
 func (s *Service) Path(root string) string {
-	saPath, _ := s.ServiceAttr.MarshalPath()
+	saPath, _ := s.Attr.MarshalPath()
 	return registryPath([]string{root, gxstrings.String(saPath)}...)
 }
 

@@ -50,8 +50,8 @@ func (suite *ServiceAddrTestSuite) TestServiceAttr_UnmarshalPath() {
 // Path example: /dubbo/shopping-bjtelecom-pb-1.0.1/node1
 func (suite *ServiceAddrTestSuite) TestService_NodePath() {
 	service := Service{
-		ServiceAttr: &suite.sa,
-		Nodes:       []*Node{&suite.node},
+		Attr:  &suite.sa,
+		Nodes: []*Node{&suite.node},
 	}
 	path := service.Path("/dubbo")
 	saStr := "group%3Dbjtelecom%26protocol%3Dpb%26role%3DProvider%26service%3Dshopping%26version%3D1.0.1"
