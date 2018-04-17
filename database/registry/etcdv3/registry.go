@@ -84,18 +84,25 @@ func (r *Registry) Options() gxregistry.Options {
 	return r.options
 }
 
-func (r *Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) error {
-	s, ok := sv.(*gxregistry.Service)
+func (r *Registry) Register(svc interface{}, opts ...gxregistry.RegisterOption) error {
+	s, ok := svc.(*gxregistry.Service)
 	if !ok {
-		return jerrors.Errorf("@service:%+v type is not gxregistry.Service", sv)
+		s1, ok := svc.(gxregistry.Service)
+		if !ok {
+			return jerrors.Errorf("@service:%+v type is not gxregistry.Service", svc)
+		}
+		s = &s1
 	}
+
 	if len(s.Nodes) == 0 {
 		return jerrors.Errorf("Require at least one node")
 	}
 
 	var leaseNotFound bool
+	serviceKey := s.Path(r.options.Root)
 	//refreshing lease if existing
-	leaseID, ok := r.leases[s.Name]
+	leaseID, ok := r.leases[serviceKey]
+	log.Debug("name:%s, ok:%v, leaseid:%#v", serviceKey, ok, leaseID)
 	if ok {
 		if _, err := r.client.EtcdClient().KeepAliveOnce(context.TODO(), leaseID); err != nil {
 			if err != rpctypes.ErrLeaseNotFound {
@@ -115,7 +122,7 @@ func (r *Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) e
 
 	// get existing hash
 	r.Lock()
-	v, ok := r.register[s.Name]
+	v, ok := r.register[serviceKey]
 	r.Unlock()
 
 	// the service is unchanged, skip registering
@@ -171,10 +178,10 @@ func (r *Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) e
 
 	r.Lock()
 	// save our hash of the service
-	r.register[s.Name] = h
+	r.register[serviceKey] = h
 	// save our leaseID of the service
 	if lgr != nil {
-		r.leases[s.Name] = lgr.ID
+		r.leases[serviceKey] = lgr.ID
 	}
 	r.Unlock()
 
@@ -184,18 +191,23 @@ func (r *Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) e
 func (r *Registry) Unregister(svc interface{}) error {
 	s, ok := svc.(*gxregistry.Service)
 	if !ok {
-		return jerrors.Errorf("@service:%+v type is not gxregistry.Service", svc)
+		s1, ok := svc.(gxregistry.Service)
+		if !ok {
+			return jerrors.Errorf("@service:%+v type is not gxregistry.Service", svc)
+		}
+		s = &s1
 	}
 
 	if len(s.Nodes) == 0 {
 		return jerrors.Errorf("Require at least one node")
 	}
 
+	serviceKey := s.Path(r.options.Root)
 	r.Lock()
 	// delete our hash of the service
-	delete(r.register, s.Name)
+	delete(r.register, serviceKey)
 	// delete our lease of the service
-	delete(r.leases, s.Name)
+	delete(r.leases, serviceKey)
 	r.Unlock()
 
 	ctx, cancel := context.WithTimeout(context.Background(), r.options.Timeout)
@@ -231,14 +243,14 @@ func (r *Registry) GetService(attr gxregistry.ServiceAttr) ([]*gxregistry.Servic
 		return nil, gxregistry.ErrorRegistryNotFound
 	}
 
-	serviceMap := map[string]*gxregistry.Service{}
+	serviceMap := map[gxregistry.ServiceAttr]*gxregistry.Service{}
 	for _, n := range rsp.Kvs {
 		if sn, err := gxregistry.DecodeService(n.Value); err == nil && sn != nil {
-			s, ok := serviceMap[sn.Version]
+			s, ok := serviceMap[sn.ServiceAttr]
 			if !ok {
 				s = &gxregistry.Service{Metadata: sn.Metadata}
 				s.ServiceAttr = sn.ServiceAttr
-				serviceMap[s.ServiceAttr.Version] = s
+				serviceMap[s.ServiceAttr] = s
 			}
 
 			for _, node := range sn.Nodes {

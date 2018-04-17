@@ -5,13 +5,13 @@ import (
 )
 
 import (
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
 type ServiceAddrTestSuite struct {
 	suite.Suite
-	sa ServiceAttr
+	sa   ServiceAttr
+	node Node
 }
 
 func (suite *ServiceAddrTestSuite) SetupSuite() {
@@ -22,6 +22,8 @@ func (suite *ServiceAddrTestSuite) SetupSuite() {
 		Version:  "1.0.1",
 		Role:     Provider,
 	}
+
+	suite.node = Node{ID: "node1", Address: "127.0.0.1", Port: 12345}
 }
 
 func (suite *ServiceAddrTestSuite) TearDownSuite() {
@@ -45,27 +47,22 @@ func (suite *ServiceAddrTestSuite) TestServiceAttr_Unmarshal() {
 	suite.Equalf(nil, err, "Unmarshal(sa:%+v)", suite.sa)
 }
 
-func TestServiceAddrTestSuite(t *testing.T) {
-	suite.Run(t, new(ServiceAddrTestSuite))
-}
-
 // Path example: /dubbo/shopping-bjtelecom-pb-1.0.1/node1
-func TestService_NodePath(t *testing.T) {
-	ast := assert.New(t)
-
-	node := Node{ID: "node1", Address: "127.0.0.1", Port: 12345}
+func (suite *ServiceAddrTestSuite) TestService_NodePath() {
 	service := Service{
-		ServiceAttr: ServiceAttr{
-			Group:    "bjtelecom",
-			Name:     "shopping",
-			Protocol: "pb",
-			Version:  "1.0.1",
-		},
-		Nodes: []*Node{&node},
+		ServiceAttr: suite.sa,
+		Nodes:       []*Node{&suite.node},
 	}
 	path := service.Path("/dubbo")
-	ast.Equalf("/dubbo/shopping-bjtelecom-pb-1.0.1/", path, "service:%+v, path:%s", service, path)
+	saStr := "group%3Dbjtelecom%26protocol%3Dpb%26role%3DProvider%26service%3Dshopping%26version%3D1.0.1"
+	suite.Equalf("/dubbo/"+saStr+"/", path, "service:%+v, path:%s", service, path)
+	suite.T().Logf("service path:%s", path)
 
-	path = service.NodePath("/dubbo", node)
-	ast.Equalf("/dubbo/shopping-bjtelecom-pb-1.0.1/node1", path, "service:%+v, path:%s", service, path)
+	path = service.NodePath("/dubbo", suite.node)
+	suite.Equalf("/dubbo/"+saStr+"/node1", path, "service:%+v, path:%s", service, path)
+	suite.T().Logf("node path:%s", path)
+}
+
+func TestServiceAddrTestSuite(t *testing.T) {
+	suite.Run(t, new(ServiceAddrTestSuite))
 }

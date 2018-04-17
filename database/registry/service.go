@@ -102,19 +102,10 @@ func registryPath(paths ...string) string {
 	return service.String()
 }
 
-// Path example: /dubbo/shopping-bjtelecom-pb-1.0.1-provider/node1
+// /dubbo/group%3Dbjtelecom%26protocol%3Dpb%26service%3Dshopping%26type%3Dadd%2Bservice%26version%3D1.0.1/node1
 func (s *Service) Path(root string) string {
-	params := url.Values{}
-	params.Add("group", s.Group)
-	params.Add("service", s.Name)
-	params.Add("protocol", s.Protocol)
-	params.Add("version", s.Version)
-	params.Add("role", s.Role.String())
-	// encode result: group=bjtelecom&protocol=pb&service=shopping&type=add+service&version=1.0.1
-	// query escape: group%3Dbjtelecom%26protocol%3Dpb%26service%3Dshopping%26type%3Dadd%2Bservice%26version%3D1.0.1
-	service_path := url.QueryEscape(params.Encode())
-
-	return registryPath([]string{root, service_path}...)
+	saPath, _ := s.Marshal()
+	return registryPath([]string{root, gxstrings.String(saPath)}...)
 }
 
 func (s *Service) NodePath(root string, node Node) string {
