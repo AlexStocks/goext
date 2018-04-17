@@ -30,18 +30,18 @@ func (suite *ServiceAddrTestSuite) TearDownSuite() {
 	suite.sa = ServiceAttr{}
 }
 
-func (suite *ServiceAddrTestSuite) TestServiceAttr_Marshal() {
-	saBytes, err := suite.sa.Marshal()
+func (suite *ServiceAddrTestSuite) TestServiceAttr_MarshalPath() {
+	saBytes, err := suite.sa.MarshalPath()
 	suite.T().Logf("sa string:%#v, err:%#v", string(saBytes), err)
 	saStr := "group%3Dbjtelecom%26protocol%3Dpb%26role%3DProvider%26service%3Dshopping%26version%3D1.0.1"
 	suite.Equalf([]byte(saStr), saBytes, "Marshal(sa:%+v)", suite.sa)
 	suite.Equalf(nil, err, "Marshal(sa:%+v)", suite.sa)
 }
 
-func (suite *ServiceAddrTestSuite) TestServiceAttr_Unmarshal() {
+func (suite *ServiceAddrTestSuite) TestServiceAttr_UnmarshalPath() {
 	var sa ServiceAttr
 	saStr := "group%3Dbjtelecom%26protocol%3Dpb%26role%3DProvider%26service%3Dshopping%26version%3D1.0.1"
-	err := (&sa).Unmarshal([]byte(saStr))
+	err := (&sa).UnmarshalPath([]byte(saStr))
 	suite.T().Logf("suite.sa:%+v, sa:%+v", suite.sa, sa)
 	suite.Equalf(sa, suite.sa, "Unmarshal(sa:%+v)", suite.sa)
 	suite.Equalf(nil, err, "Unmarshal(sa:%+v)", suite.sa)
@@ -50,7 +50,7 @@ func (suite *ServiceAddrTestSuite) TestServiceAttr_Unmarshal() {
 // Path example: /dubbo/shopping-bjtelecom-pb-1.0.1/node1
 func (suite *ServiceAddrTestSuite) TestService_NodePath() {
 	service := Service{
-		ServiceAttr: suite.sa,
+		ServiceAttr: &suite.sa,
 		Nodes:       []*Node{&suite.node},
 	}
 	path := service.Path("/dubbo")

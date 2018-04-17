@@ -14,14 +14,12 @@ import (
 import (
 	etcdv3 "github.com/coreos/etcd/clientv3"
 	jerrors "github.com/juju/errors"
-
-	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
-	hash "github.com/mitchellh/hashstructure"
 )
 
 import (
 	"github.com/AlexStocks/goext/database/etcd"
 	"github.com/AlexStocks/goext/database/registry"
+	"github.com/AlexStocks/goext/log"
 	log "github.com/AlexStocks/log4go"
 )
 
@@ -29,8 +27,7 @@ type Registry struct {
 	client  *gxetcd.LeaseClient
 	options gxregistry.Options
 	sync.Mutex
-	register map[string]uint64
-	leases   map[string]etcdv3.LeaseID
+	register map[gxregistry.ServiceAttr]gxregistry.Service
 }
 
 func NewRegistry(opts ...gxregistry.Option) gxregistry.Registry {
@@ -75,8 +72,7 @@ func NewRegistry(opts ...gxregistry.Option) gxregistry.Registry {
 	return &Registry{
 		client:   gxClient,
 		options:  options,
-		register: make(map[string]uint64),
-		leases:   make(map[string]etcdv3.LeaseID),
+		register: make(map[gxregistry.ServiceAttr]gxregistry.Service),
 	}
 }
 
@@ -84,131 +80,139 @@ func (r *Registry) Options() gxregistry.Options {
 	return r.options
 }
 
-func (r *Registry) Register(svc interface{}, opts ...gxregistry.RegisterOption) error {
-	s, ok := svc.(*gxregistry.Service)
-	if !ok {
-		s1, ok := svc.(gxregistry.Service)
-		if !ok {
-			return jerrors.Errorf("@service:%+v type is not gxregistry.Service", svc)
-		}
-		s = &s1
-	}
-
+// 如果s.nodes为空，则返回当前registry中的service
+// 若非空，则检查其中的每个node是否存在
+func (r *Registry) exist(s gxregistry.Service) (gxregistry.Service, bool) {
+	// get existing hash
+	r.Lock()
+	defer r.Unlock()
+	v, ok := r.register[*(s.ServiceAttr)]
 	if len(s.Nodes) == 0 {
-		return jerrors.Errorf("Require at least one node")
+		return v, ok
 	}
 
-	var leaseNotFound bool
-	serviceKey := s.Path(r.options.Root)
-	//refreshing lease if existing
-	leaseID, ok := r.leases[serviceKey]
-	log.Debug("name:%s, ok:%v, leaseid:%#v", serviceKey, ok, leaseID)
-	if ok {
-		if _, err := r.client.EtcdClient().KeepAliveOnce(context.TODO(), leaseID); err != nil {
-			if err != rpctypes.ErrLeaseNotFound {
-				return err
+	for i := range s.Nodes {
+		flag := false
+		for j := range v.Nodes {
+			if s.Nodes[i].Equal(v.Nodes[j]) {
+				flag = true
+				continue
 			}
-
-			// lease not found do register
-			leaseNotFound = true
+			// log.Debug("s.node:%s, v.node:%s", gxlog.PrettyString(s.Nodes[i]), gxlog.PrettyString(v.Nodes[j]))
+		}
+		if !flag {
+			log.Error("s.node:%s, v.nodes:%s", gxlog.PrettyString(s.Nodes[i]), gxlog.PrettyString(v.Nodes))
+			return v, false
 		}
 	}
 
-	// create hash of service; uint64
-	h, err := hash.Hash(s, nil)
-	if err != nil {
-		return err
+	return v, true
+}
+
+func (r *Registry) addService(s gxregistry.Service) {
+	if len(s.Nodes) == 0 {
+		return
 	}
 
 	// get existing hash
 	r.Lock()
-	v, ok := r.register[serviceKey]
-	r.Unlock()
-
-	// the service is unchanged, skip registering
-	if ok && v == h && !leaseNotFound {
-		return nil
+	defer r.Unlock()
+	v, ok := r.register[*s.ServiceAttr]
+	if !ok {
+		r.register[*s.ServiceAttr] = s
+		return
 	}
 
-	service := &gxregistry.Service{Metadata: s.Metadata}
-	service.ServiceAttr = s.ServiceAttr
-
-	var options gxregistry.RegisterOptions
-	for _, o := range opts {
-		o(&options)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), r.options.Timeout)
-	defer cancel()
-
-	var lgr *etcdv3.LeaseGrantResponse
-	if options.TTL.Seconds() > 0 {
-		lgr, err = r.client.EtcdClient().Grant(ctx, int64(options.TTL.Seconds()))
-		if err != nil {
-			return err
+	for i := range s.Nodes {
+		flag := false
+		for j := range v.Nodes {
+			if s.Nodes[i] == v.Nodes[j] {
+				flag = true
+			}
+		}
+		if !flag {
+			v.Nodes = append(v.Nodes, s.Nodes[i])
 		}
 	}
+	r.register[*s.ServiceAttr] = v
 
-	// register every node
-	for _, node := range s.Nodes {
-		service.Nodes = []*gxregistry.Node{node}
-		data, err := gxregistry.EncodeService(service)
-		if err != nil {
-			log.Warn("gxregistry.EncodeService(service:%+v) = error:%s", service, err)
-			continue
-		}
-		if lgr != nil {
-			_, err = r.client.EtcdClient().Put(
-				ctx,
-				service.NodePath(r.options.Root, *node),
-				data,
-				etcdv3.WithLease(lgr.ID),
-			)
-		} else {
-			_, err = r.client.EtcdClient().Put(
-				ctx,
-				service.NodePath(r.options.Root, *node),
-				data,
-			)
-		}
-		if err != nil {
-			return err
-		}
-	}
-
-	r.Lock()
-	// save our hash of the service
-	r.register[serviceKey] = h
-	// save our leaseID of the service
-	if lgr != nil {
-		r.leases[serviceKey] = lgr.ID
-	}
-	r.Unlock()
-
-	return nil
+	return
 }
 
-func (r *Registry) Unregister(svc interface{}) error {
-	s, ok := svc.(*gxregistry.Service)
-	if !ok {
-		s1, ok := svc.(gxregistry.Service)
-		if !ok {
-			return jerrors.Errorf("@service:%+v type is not gxregistry.Service", svc)
-		}
-		s = &s1
+func (r *Registry) deleteService(s gxregistry.Service) {
+	if len(s.Nodes) == 0 {
+		return
 	}
 
+	// get existing hash
+	r.Lock()
+	defer r.Unlock()
+	v, ok := r.register[*s.ServiceAttr]
+	if !ok {
+		return
+	}
+
+	for i := range s.Nodes {
+		for j := range v.Nodes {
+			if s.Nodes[i] == v.Nodes[j] {
+				v.Nodes = append(v.Nodes[:j], s.Nodes[j+1:]...)
+				break
+			}
+		}
+	}
+
+	return
+}
+
+func (r *Registry) Register(s gxregistry.Service) error {
 	if len(s.Nodes) == 0 {
 		return jerrors.Errorf("Require at least one node")
 	}
 
-	serviceKey := s.Path(r.options.Root)
-	r.Lock()
-	// delete our hash of the service
-	delete(r.register, serviceKey)
-	// delete our lease of the service
-	delete(r.leases, serviceKey)
-	r.Unlock()
+	if _, exist := r.exist(s); exist {
+		return gxregistry.ErrorAlreadyRegister
+	}
+
+	service := gxregistry.Service{Metadata: s.Metadata}
+	service.ServiceAttr = s.ServiceAttr
+
+	ctx, cancel := context.WithTimeout(context.Background(), r.options.Timeout)
+	defer cancel()
+
+	// register every node
+	for i, node := range s.Nodes {
+		service.Nodes = []*gxregistry.Node{node}
+		data, err := gxregistry.EncodeService(&service)
+		if err != nil {
+			service.Nodes = s.Nodes[:i]
+			r.unregister(service)
+			return jerrors.Annotatef(err, "gxregistry.EncodeService(service:%+v) = error:%s", service, err)
+		}
+		_, err = r.client.EtcdClient().Put(
+			ctx,
+			service.NodePath(r.options.Root, *node),
+			data,
+			etcdv3.WithLease(r.client.Lease()),
+		)
+		if err != nil {
+			service.Nodes = s.Nodes[:i]
+			r.unregister(service)
+			return jerrors.Annotatef(err, "etcdv3.Client.Put(path, data)",
+				service.NodePath(r.options.Root, *node), data)
+		}
+	}
+
+	// save the service
+	r.addService(s)
+	log.Debug("after add service, reg nodes:%s", gxlog.PrettyString(r.register))
+
+	return nil
+}
+
+func (r *Registry) unregister(s gxregistry.Service) error {
+	if len(s.Nodes) == 0 {
+		return jerrors.Errorf("Require at least one node")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), r.options.Timeout)
 	defer cancel()
@@ -223,11 +227,16 @@ func (r *Registry) Unregister(svc interface{}) error {
 	return nil
 }
 
-func (r *Registry) GetService(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, error) {
+func (r *Registry) Unregister(s gxregistry.Service) error {
+	r.deleteService(s)
+	return r.unregister(s)
+}
+
+func (r *Registry) GetService(attr gxregistry.ServiceAttr) (*gxregistry.Service, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.options.Timeout)
 	defer cancel()
 
-	svc := gxregistry.Service{ServiceAttr: attr}
+	svc := gxregistry.Service{ServiceAttr: &attr}
 	path := svc.Path(r.options.Root)
 	rsp, err := r.client.EtcdClient().Get(
 		ctx,
@@ -243,28 +252,18 @@ func (r *Registry) GetService(attr gxregistry.ServiceAttr) ([]*gxregistry.Servic
 		return nil, gxregistry.ErrorRegistryNotFound
 	}
 
-	serviceMap := map[gxregistry.ServiceAttr]*gxregistry.Service{}
+	service := &gxregistry.Service{ServiceAttr: &attr}
 	for _, n := range rsp.Kvs {
 		if sn, err := gxregistry.DecodeService(n.Value); err == nil && sn != nil {
-			s, ok := serviceMap[sn.ServiceAttr]
-			if !ok {
-				s = &gxregistry.Service{Metadata: sn.Metadata}
-				s.ServiceAttr = sn.ServiceAttr
-				serviceMap[s.ServiceAttr] = s
-			}
-
-			for _, node := range sn.Nodes {
-				s.Nodes = append(s.Nodes, node)
+			if sn.ServiceAttr == service.ServiceAttr {
+				for _, node := range sn.Nodes {
+					service.Nodes = append(service.Nodes, node)
+				}
 			}
 		}
 	}
 
-	var services []*gxregistry.Service
-	for _, service := range serviceMap {
-		services = append(services, service)
-	}
-
-	return services, nil
+	return service, nil
 }
 
 func (r *Registry) Watch(opts ...gxregistry.WatchOption) gxregistry.Watcher {
@@ -276,12 +275,6 @@ func (r *Registry) String() string {
 }
 
 func (r *Registry) Close() error {
-	r.Lock()
-	for _, l := range r.leases {
-		r.client.EtcdClient().Revoke(context.TODO(), l)
-	}
-	r.Unlock()
-
 	err := r.client.Close()
 	if err != nil {
 		return jerrors.Annotate(err, "gxetcd.LeaseClient.Close()")

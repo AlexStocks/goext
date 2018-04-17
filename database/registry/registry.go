@@ -11,11 +11,11 @@ import (
 
 // The registry provides an interface for service discovery
 // and an abstraction over varying implementations
-// {consul, etcd, zookeeper, ...}
+// {etcd, zookeeper, ...}
 type Registry interface {
-	Register(service interface{}, opts ...RegisterOption) error
-	Unregister(service interface{}) error
-	GetService(attr ServiceAttr) ([]*Service, error)
+	Register(service Service) error
+	Unregister(service Service) error
+	GetService(attr ServiceAttr) (*Service, error)
 	Watch(opts ...WatchOption) Watcher
 	Close() error
 	String() string
@@ -29,5 +29,6 @@ const (
 
 var (
 	ErrorRegistryNotFound = jerrors.Errorf("registry not found")
+	ErrorAlreadyRegister  = jerrors.Errorf("service has already been registered")
 	DefaultServiceRoot    = "/gxregistry"
 )

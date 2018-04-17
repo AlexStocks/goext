@@ -45,7 +45,7 @@ func NewWatcher(r *Registry, opts ...gxregistry.WatchOption) gxregistry.Watcher 
 		panic("options.Service is nil")
 	}
 	s := gxregistry.Service{
-		ServiceAttr: gxregistry.ServiceAttr{Name: options.Service},
+		ServiceAttr: &gxregistry.ServiceAttr{Name: options.Service},
 	}
 	watchPath := s.Path(options.Root)
 

@@ -20,13 +20,6 @@ type Options struct {
 	Context context.Context
 }
 
-type RegisterOptions struct {
-	TTL time.Duration
-	// Other options for implementations of the interface
-	// can be stored in a context
-	Context context.Context
-}
-
 type WatchOptions struct {
 	// the root registry path, suck as "/dubbo/"
 	Root string
@@ -39,8 +32,6 @@ type WatchOptions struct {
 }
 
 type Option func(*Options)
-
-type RegisterOption func(*RegisterOptions)
 
 // Addrs is the registry addresses to use
 func WithAddrs(addrs ...string) Option {
@@ -58,12 +49,6 @@ func WithTimeout(t time.Duration) Option {
 func WithRoot(root string) Option {
 	return func(o *Options) {
 		o.Root = root
-	}
-}
-
-func WithRegisterTTL(t time.Duration) RegisterOption {
-	return func(o *RegisterOptions) {
-		o.TTL = t
 	}
 }
 

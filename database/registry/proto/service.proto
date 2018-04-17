@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package gxregistry;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "role.proto";
+
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+// option (gogoproto.goproto_stringer_all) = false;
+// option (gogoproto.stringer_all) =  true;
+// option (gogoproto.populate_all) = true;
+// option (gogoproto.testgen_all) = true;
+// option (gogoproto.benchgen_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+
+message ServiceAttr {
+	string Group = 1;
+	string Name = 2;
+	string Protocol = 3;
+	string Version = 4;
+	ServiceRoleType Role = 5;
+}
+
+message Node {
+	string ID = 1;
+	string Address = 2;
+	int32 Port = 3;
+	map<string, string> Metadata = 4;
+}
+
+message Service {
+	ServiceAttr Attr = 1;
+	repeated Node Nodes = 2;
+	map<string, string> Metadata = 3;
+}
+
