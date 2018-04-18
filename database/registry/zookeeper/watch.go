@@ -72,7 +72,7 @@ func (this *Watcher) watchServiceNode(zkPath string) bool {
 	defer this.wait.Done()
 	var zkEvent zk.Event
 	for {
-		keyEventCh, err := this.client.existW(zkPath)
+		keyEventCh, err := this.client.ExistW(zkPath)
 		if err != nil {
 			log.Error("existW{key:%s} = error{%v}", zkPath, err)
 			return false
@@ -81,7 +81,8 @@ func (this *Watcher) watchServiceNode(zkPath string) bool {
 		select {
 		case zkEvent = <-keyEventCh:
 			log.Warn("get a zookeeper zkEvent{type:%s, server:%s, path:%s, state:%d-%s, err:%s}",
-				zkEvent.Type.String(), zkEvent.Server, zkEvent.Path, zkEvent.State, stateToString(zkEvent.State), zkEvent.Err)
+				zkEvent.Type.String(), zkEvent.Server, zkEvent.Path, zkEvent.State, gxzookeeper.StateToString(zkEvent.State),
+				zkEvent.Err)
 			switch zkEvent.Type {
 			case zk.EventNodeDataChanged:
 				log.Warn("zk.ExistW(key{%s}) = event{EventNodeDataChanged}", zkPath)
@@ -94,7 +95,7 @@ func (this *Watcher) watchServiceNode(zkPath string) bool {
 				//The Node was deleted - stop watching
 				return true
 			}
-		case <-this.client.done():
+		case <-this.client.Done():
 			// There is no way to stop existW so just quit
 			return false
 		}
@@ -108,7 +109,7 @@ func (this *Watcher) handleZkNodeEvent(zkPath string, children []string, conf re
 		err         error
 		newChildren []string
 	)
-	newChildren, err = this.client.getChildren(zkPath)
+	newChildren, err = this.client.GetChildren(zkPath)
 	if err != nil {
 		log.Error("path{%s} child nodes changed, zk.Children(path{%s} = error{%v}", zkPath, zkPath, err)
 		return
@@ -190,7 +191,7 @@ func (this *Watcher) watchDir(zkPath string, conf registry.ServiceConfig) {
 	defer close(event)
 	for {
 		// get current children for a zkPath
-		children, childEventCh, err := this.client.getChildrenW(zkPath)
+		children, childEventCh, err := this.client.GetChildrenW(zkPath)
 		if err != nil {
 			failTimes++
 			if MAX_TIMES <= failTimes {
@@ -206,19 +207,19 @@ func (this *Watcher) watchDir(zkPath string, conf registry.ServiceConfig) {
 					break CLEAR
 				}
 			}
-			this.client.registerEvent(zkPath, &event)
+			this.client.RegisterEvent(zkPath, &event)
 			select {
 			// 防止疯狂重试连接zookeeper
 			case <-time.After(common.TimeSecondDuration(failTimes * registry.REGISTRY_CONN_DELAY)):
-				this.client.unregisterEvent(zkPath, &event)
+				this.client.UnregisterEvent(zkPath, &event)
 				continue
-			case <-this.client.done():
-				this.client.unregisterEvent(zkPath, &event)
+			case <-this.client.Done():
+				this.client.UnregisterEvent(zkPath, &event)
 				log.Warn("client.done(), watch(path{%s}, ServiceConfig{%#v}) goroutine exit now...", zkPath, conf)
 				return
 			case <-event:
 				log.Info("get zk.EventNodeDataChange notify event")
-				this.client.unregisterEvent(zkPath, &event)
+				this.client.UnregisterEvent(zkPath, &event)
 				this.handleZkNodeEvent(zkPath, nil, conf)
 				continue
 			}
@@ -228,12 +229,13 @@ func (this *Watcher) watchDir(zkPath string, conf registry.ServiceConfig) {
 		select {
 		case zkEvent = <-childEventCh:
 			log.Warn("get a zookeeper zkEvent{type:%s, server:%s, path:%s, state:%d-%s, err:%s}",
-				zkEvent.Type.String(), zkEvent.Server, zkEvent.Path, zkEvent.State, stateToString(zkEvent.State), zkEvent.Err)
+				zkEvent.Type.String(), zkEvent.Server, zkEvent.Path, zkEvent.State, gxzookeeper.StateToString(zkEvent.State),
+				zkEvent.Err)
 			if zkEvent.Type != zk.EventNodeChildrenChanged {
 				continue
 			}
 			this.handleZkNodeEvent(zkEvent.Path, children, conf)
-		case <-this.client.done():
+		case <-this.client.Done():
 			// There is no way to stop GetW/ChildrenW so just quit
 			log.Warn("client.done(), watch(path{%s}, ServiceConfig{%#v}) goroutine exit now...", zkPath, conf)
 			return
@@ -254,7 +256,7 @@ func (this *Watcher) watchService(zkPath string, conf registry.ServiceConfig) {
 	)
 
 	// 先把现有的服务节点通过watch发送给selector
-	children, err = this.client.getChildren(zkPath)
+	children, err = this.client.GetChildren(zkPath)
 	if err != nil {
 		children = nil
 		log.Error("fail to get children of zk path{%s}", zkPath)
@@ -300,7 +302,7 @@ func (this *Watcher) watchService(zkPath string, conf registry.ServiceConfig) {
 
 func (this *Watcher) Next() (*registry.Result, error) {
 	select {
-	case <-this.client.done():
+	case <-this.client.Done():
 		return nil, errors.New("watcher stopped")
 	case r := <-this.events:
 		return r.res, r.err
@@ -308,7 +310,7 @@ func (this *Watcher) Next() (*registry.Result, error) {
 }
 
 func (this *Watcher) Valid() bool {
-	return this.client.zkConnValid()
+	return this.client.ValidateConnection()
 }
 
 func (this *Watcher) Stop() {

@@ -32,7 +32,7 @@ type Client struct {
 	eventRegistry map[string][]*chan struct{}
 }
 
-func stateToString(state zk.State) string {
+func StateToString(state zk.State) string {
 	switch state {
 	case zk.StateDisconnected:
 		return "zookeeper disconnected"
@@ -107,7 +107,7 @@ LOOP:
 
 		case event = <-session:
 			log.Warn("client{%s} get a zookeeper event{type:%s, server:%s, path:%s, state:%d-%s, err:%s}",
-				c.name, event.Type.String(), event.Server, event.Path, event.State, stateToString(event.State), event.Err)
+				c.name, event.Type.String(), event.Server, event.Path, event.State, StateToString(event.State), event.Err)
 			switch (int)(event.State) {
 			case (int)(zk.StateDisconnected):
 				log.Warn("zk{addr:%s} state is StateDisconnected, so close the zk client{name:%s}.", c.zkAddrs, c.name)

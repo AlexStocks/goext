@@ -7,6 +7,8 @@ package gxetcd
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"time"
 )
 
@@ -73,9 +75,9 @@ type Client struct {
 	client *ecv3.Client
 	opts   *clientOptions
 	id     ecv3.LeaseID
-
+	done   chan struct{}
+	sync.Mutex
 	cancel context.CancelFunc
-	done   <-chan struct{}
 }
 
 // NewClient gets the leased session for a client.
@@ -85,46 +87,46 @@ func NewClient(client *ecv3.Client, options ...ClientOption) (*Client, error) {
 		opt(opts)
 	}
 
-	id := opts.leaseID
+	c := &Client{client: client, opts: opts, id: opts.leaseID, done: make(chan struct{})}
+	log.Info("new etcd client %+v", c)
+
+	return c, nil
+}
+
+func (c *Client) KeepAlive() (<-chan *ecv3.LeaseKeepAliveResponse, error) {
+	c.Lock()
+	if c.cancel != nil {
+		c.cancel()
+		fmt.Println("do cancel")
+		c.cancel = nil
+	}
+	c.Unlock()
+
+	id := c.id
 	if id == ecv3.NoLease {
-		resp, err := client.Grant(opts.ctx, int64(opts.ttl))
+		resp, err := c.client.Grant(c.opts.ctx, int64(c.opts.ttl.Seconds()))
 		if err != nil {
-			return nil, err
+			return nil, jerrors.Annotatef(err, "etcdv3.Grant()")
 		}
 		id = ecv3.LeaseID(resp.ID)
 	}
+	c.id = id
+	// fmt.Printf("lease id:%#x\n", id)
 
-	ctx, cancel := context.WithCancel(opts.ctx)
-	keepAlive, err := client.KeepAlive(ctx, id)
+	ctx, cancel := context.WithCancel(c.opts.ctx)
+	keepAlive, err := c.client.KeepAlive(ctx, id)
 	if err != nil || keepAlive == nil {
+		c.client.Revoke(ctx, id)
+		c.id = ecv3.NoLease
 		cancel()
-		return nil, err
+		return nil, jerrors.Annotatef(err, "etcdv3.KeepAlive(id:%#X)", id)
 	}
 
-	done := make(chan struct{})
-	s := &Client{client: client, opts: opts, id: id, cancel: cancel, done: done}
+	c.Lock()
+	defer c.Unlock()
+	c.cancel = cancel
 
-	// keep the lease alive until client error or cancelled context
-	go func() {
-		defer close(done)
-		for {
-			select {
-			// case c.opts.ctx.Done():
-			// 	return
-			case msg, ok := <-keepAlive:
-				// eat messages until keep alive channel closes
-				if !ok {
-					log.Info("keep alive channel closed")
-					// c.revoke()
-					return
-				} else {
-					log.Debug("Recv msg from keepAlive: %s", msg.String())
-				}
-			}
-		}
-	}()
-
-	return s, nil
+	return keepAlive, nil
 }
 
 // Client is the etcd client that is attached to the session.
@@ -169,8 +171,13 @@ func (c *Client) Stop() {
 		return
 
 	default:
-		c.cancel()
-		<-c.done
+		c.Lock()
+		if c.cancel != nil {
+			c.cancel()
+			c.cancel = nil
+		}
+		c.Unlock()
+		close(c.done)
 		return
 	}
 }
@@ -178,9 +185,18 @@ func (c *Client) Stop() {
 // Close orphans the session and revokes the session lease.
 func (c *Client) Close() error {
 	c.Stop()
-	// if revoke takes longer than the ttl, lease is expired anyway
-	ctx, cancel := context.WithTimeout(c.opts.ctx, c.opts.ttl)
-	_, err := c.client.Revoke(ctx, c.id)
-	cancel()
-	return jerrors.Annotatef(err, "etcdv3.Remove(lieaseID:%+v)", c.id)
+	var err error
+	if c.id != ecv3.NoLease {
+		// if revoke takes longer than the ttl, lease is expired anyway
+		ctx, cancel := context.WithTimeout(c.opts.ctx, c.opts.ttl)
+		_, err = c.client.Revoke(ctx, c.id)
+		cancel()
+		c.id = ecv3.NoLease
+	}
+
+	if err != nil {
+		err = jerrors.Annotatef(err, "etcdv3.Remove(lieaseID:%+v)", c.id)
+	}
+
+	return err
 }

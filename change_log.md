@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2018/04/18
+	> improvement
+	* test gxetcd.Client
+
 - 2018/04/16
 	> feature
 	* add ServiceAttr Marshal/Unmarshal

@@ -84,7 +84,7 @@ func (r *Registry) validateZookeeperClient() error {
 	return err
 }
 
-func (r *Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) error {
+func (r *Registry) Register(sv interface{}) error {
 	s, ok := sv.(*gxregistry.Service)
 	if !ok {
 		return jerrors.Errorf("@service:%+v type is not gxregistry.Service", sv)
@@ -101,7 +101,7 @@ func (r *Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) e
 
 	// get existing hash
 	r.Lock()
-	v, ok := r.register[s.Name]
+	v, ok := r.register[s.Attr.Name]
 	r.Unlock()
 
 	// the service is unchanged, skip registering
@@ -110,12 +110,7 @@ func (r *Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) e
 	}
 
 	service := &gxregistry.Service{Metadata: s.Metadata}
-	service.ServiceAttr = s.ServiceAttr
-
-	var options gxregistry.RegisterOptions
-	for _, o := range opts {
-		o(&options)
-	}
+	service.Attr = s.Attr
 
 	// register every node
 	var zkPath string
@@ -141,7 +136,7 @@ func (r *Registry) Register(sv interface{}, opts ...gxregistry.RegisterOption) e
 
 	r.Lock()
 	// save our hash of the service
-	r.register[s.Name] = h
+	r.register[s.Attr.Name] = h
 	r.Unlock()
 
 	return nil
@@ -159,7 +154,7 @@ func (r *Registry) Unregister(svc interface{}) error {
 
 	r.Lock()
 	// delete our hash of the service
-	delete(r.register, s.Name)
+	delete(r.register, s.Attr.Name)
 	r.Unlock()
 
 	for _, node := range s.Nodes {
@@ -172,7 +167,7 @@ func (r *Registry) Unregister(svc interface{}) error {
 }
 
 func (r *Registry) GetService(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, error) {
-	svc := gxregistry.Service{ServiceAttr: attr}
+	svc := gxregistry.Service{Attr: &attr}
 	path := svc.Path(r.options.Root)
 	children, err := r.client.GetChildren(path)
 	if err != nil {
