@@ -22,7 +22,7 @@ import (
 )
 
 type Registry struct {
-	client  *gxetcd.LeaseClient
+	client  *gxetcd.Client
 	options gxregistry.Options
 	sync.Mutex
 	register map[gxregistry.ServiceAttr]gxregistry.Service
@@ -58,9 +58,9 @@ func NewRegistry(opts ...gxregistry.Option) gxregistry.Registry {
 	if err != nil {
 		panic(jerrors.Errorf("etcdv3.New(config:%+v) = error:%s", config, err))
 	}
-	gxClient, err := gxetcd.NewLeaseClient(client)
+	gxClient, err := gxetcd.NewClient(client, gxetcd.WithTTL(options.Timeout))
 	if err != nil {
-		panic(jerrors.Errorf("gxetcd.NewLeaseClient() = error:%s", err))
+		panic(jerrors.Errorf("gxetcd.NewClient() = error:%s", err))
 	}
 
 	if options.Root == "" {
@@ -265,7 +265,7 @@ func (r *Registry) GetService(attr gxregistry.ServiceAttr) (*gxregistry.Service,
 }
 
 func (r *Registry) Watch(opts ...gxregistry.WatchOption) gxregistry.Watcher {
-	return NewWatcher(r, opts...)
+	return NewWatcher(r.client, opts...)
 }
 
 func (r *Registry) String() string {
@@ -275,7 +275,7 @@ func (r *Registry) String() string {
 func (r *Registry) Close() error {
 	err := r.client.Close()
 	if err != nil {
-		return jerrors.Annotate(err, "gxetcd.LeaseClient.Close()")
+		return jerrors.Annotate(err, "gxetcd.Client.Close()")
 	}
 
 	return nil

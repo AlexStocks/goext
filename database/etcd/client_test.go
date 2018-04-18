@@ -2,6 +2,7 @@ package gxetcd
 
 import (
 	"testing"
+	"time"
 )
 
 import (
@@ -32,7 +33,20 @@ func (suite *ClientTestSuite) TearDownSuite() {
 }
 
 func (suite *ClientTestSuite) TestClient_TTL() {
-	suite.T().Logf("ttl:%d", suite.client.TTL())
+	suite.T().Logf("ttl:%s", time.Duration(suite.client.TTL()))
+}
+
+func (suite *ClientTestSuite) TestClient_Close() {
+	suite.client.Stop()
+	err := suite.client.Close()
+	suite.Equal(nil, err, "Client.Close() = error:%s", jerrors.ErrorStack(err))
+	flag := suite.client.IsClosed()
+	suite.Equal(true, flag)
+	err = suite.client.Close()
+	suite.NotEqual(nil, err, "Client.Close() = error:%s", jerrors.ErrorStack(err))
+	flag = suite.client.IsClosed()
+	suite.Equal(true, flag)
+	suite.T().Logf("Client.Close() = error:%s", jerrors.ErrorStack(err))
 }
 
 func TestClientTestSuite(t *testing.T) {

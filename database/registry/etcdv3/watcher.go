@@ -26,10 +26,10 @@ type Watcher struct {
 	done   chan struct{}
 	cancel context.CancelFunc
 	w      clientv3.WatchChan
-	client *gxetcd.LeaseClient
+	client *gxetcd.Client
 }
 
-func NewWatcher(r *Registry, opts ...gxregistry.WatchOption) gxregistry.Watcher {
+func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) gxregistry.Watcher {
 	var options gxregistry.WatchOptions
 	for _, o := range opts {
 		o(&options)
@@ -49,12 +49,12 @@ func NewWatcher(r *Registry, opts ...gxregistry.WatchOption) gxregistry.Watcher 
 	}
 	watchPath := s.Path(options.Root)
 
-	w := r.client.EtcdClient().Watch(ctx, watchPath, clientv3.WithPrefix(), clientv3.WithPrevKV())
+	w := client.EtcdClient().Watch(ctx, watchPath, clientv3.WithPrefix(), clientv3.WithPrevKV())
 	return &Watcher{
 		done:   done,
 		cancel: cancel,
 		w:      w,
-		client: r.client,
+		client: client,
 	}
 }
 
