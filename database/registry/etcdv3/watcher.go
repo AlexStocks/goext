@@ -97,7 +97,7 @@ func (w *Watcher) Next() (*gxregistry.Result, error) {
 			if service == nil {
 				continue
 			}
-			return &gxregistry.Result{
+			return &gxregistry.EventResult{
 				Action:  action,
 				Service: service,
 			}, nil

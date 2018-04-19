@@ -11,6 +11,7 @@
 		ServiceAttr
 		Node
 		Service
+		EventResult
 */
 package gxregistry
 
@@ -48,6 +49,51 @@ var (
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
+// ////////////////////////////////////////
+// service role
+// ////////////////////////////////////////
+type ServiceRoleType int32
+
+const (
+	Provider ServiceRoleType = 0
+	Cosumer  ServiceRoleType = 1
+)
+
+var ServiceRoleType_name = map[int32]string{
+	0: "Provider",
+	1: "Cosumer",
+}
+var ServiceRoleType_value = map[string]int32{
+	"Provider": 0,
+	"Cosumer":  1,
+}
+
+func (ServiceRoleType) EnumDescriptor() ([]byte, []int) { return fileDescriptorService, []int{0} }
+
+// ////////////////////////////////////////
+// service url event type
+// ////////////////////////////////////////
+type ServiceEventType int32
+
+const (
+	ServiceAdd    ServiceEventType = 0
+	ServiceDel    ServiceEventType = 2
+	ServiceUpdate ServiceEventType = 3
+)
+
+var ServiceEventType_name = map[int32]string{
+	0: "ServiceAdd",
+	2: "ServiceDel",
+	3: "ServiceUpdate",
+}
+var ServiceEventType_value = map[string]int32{
+	"ServiceAdd":    0,
+	"ServiceDel":    2,
+	"ServiceUpdate": 3,
+}
+
+func (ServiceEventType) EnumDescriptor() ([]byte, []int) { return fileDescriptorService, []int{1} }
+
 type ServiceAttr struct {
 	Group    string          `protobuf:"bytes,1,opt,name=Group,proto3" json:"Group,omitempty"`
 	Name     string          `protobuf:"bytes,2,opt,name=Name,proto3" json:"Name,omitempty"`
@@ -81,10 +127,37 @@ func (m *Service) Reset()                    { *m = Service{} }
 func (*Service) ProtoMessage()               {}
 func (*Service) Descriptor() ([]byte, []int) { return fileDescriptorService, []int{2} }
 
+// Result is returned by a call to Next on
+// the watcher. Actions can be create, update, delete
+type EventResult struct {
+	Action  ServiceEventType `protobuf:"varint,1,opt,name=Action,proto3,enum=gxregistry.ServiceEventType" json:"Action,omitempty"`
+	Service *Service         `protobuf:"bytes,2,opt,name=Service" json:"Service,omitempty"`
+}
+
+func (m *EventResult) Reset()                    { *m = EventResult{} }
+func (*EventResult) ProtoMessage()               {}
+func (*EventResult) Descriptor() ([]byte, []int) { return fileDescriptorService, []int{3} }
 func init() {
 	proto.RegisterType((*ServiceAttr)(nil), "gxregistry.ServiceAttr")
 	proto.RegisterType((*Node)(nil), "gxregistry.Node")
 	proto.RegisterType((*Service)(nil), "gxregistry.Service")
+	proto.RegisterType((*EventResult)(nil), "gxregistry.EventResult")
+	proto.RegisterEnum("gxregistry.ServiceRoleType", ServiceRoleType_name, ServiceRoleType_value)
+	proto.RegisterEnum("gxregistry.ServiceEventType", ServiceEventType_name, ServiceEventType_value)
+}
+func (x ServiceRoleType) String() string {
+	s, ok := ServiceRoleType_name[int32(x)]
+	if ok {
+		return s
+	}
+	return strconv.Itoa(int(x))
+}
+func (x ServiceEventType) String() string {
+	s, ok := ServiceEventType_name[int32(x)]
+	if ok {
+		return s
+	}
+	return strconv.Itoa(int(x))
 }
 func (this *ServiceAttr) VerboseEqual(that interface{}) error {
 	if that == nil {
@@ -350,6 +423,72 @@ func (this *Service) Equal(that interface{}) bool {
 	}
 	return true
 }
+func (this *EventResult) VerboseEqual(that interface{}) error {
+	if that == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that == nil && this != nil")
+	}
+
+	that1, ok := that.(*EventResult)
+	if !ok {
+		that2, ok := that.(EventResult)
+		if ok {
+			that1 = &that2
+		} else {
+			return fmt.Errorf("that is not of type *EventResult")
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return nil
+		}
+		return fmt.Errorf("that is type *EventResult but is nil && this != nil")
+	} else if this == nil {
+		return fmt.Errorf("that is type *EventResult but is not nil && this == nil")
+	}
+	if this.Action != that1.Action {
+		return fmt.Errorf("Action this(%v) Not Equal that(%v)", this.Action, that1.Action)
+	}
+	if !this.Service.Equal(that1.Service) {
+		return fmt.Errorf("Service this(%v) Not Equal that(%v)", this.Service, that1.Service)
+	}
+	return nil
+}
+func (this *EventResult) Equal(that interface{}) bool {
+	if that == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*EventResult)
+	if !ok {
+		that2, ok := that.(EventResult)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		if this == nil {
+			return true
+		}
+		return false
+	} else if this == nil {
+		return false
+	}
+	if this.Action != that1.Action {
+		return false
+	}
+	if !this.Service.Equal(that1.Service) {
+		return false
+	}
+	return true
+}
 func (this *ServiceAttr) GoString() string {
 	if this == nil {
 		return "nil"
@@ -413,6 +552,19 @@ func (this *Service) GoString() string {
 	mapStringForMetadata += "}"
 	if this.Metadata != nil {
 		s = append(s, "Metadata: "+mapStringForMetadata+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
+}
+func (this *EventResult) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&gxregistry.EventResult{")
+	s = append(s, "Action: "+fmt.Sprintf("%#v", this.Action)+",\n")
+	if this.Service != nil {
+		s = append(s, "Service: "+fmt.Sprintf("%#v", this.Service)+",\n")
 	}
 	s = append(s, "}")
 	return strings.Join(s, "")
@@ -581,6 +733,39 @@ func (m *Service) MarshalTo(dAtA []byte) (int, error) {
 	return i, nil
 }
 
+func (m *EventResult) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *EventResult) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	if m.Action != 0 {
+		dAtA[i] = 0x8
+		i++
+		i = encodeVarintService(dAtA, i, uint64(m.Action))
+	}
+	if m.Service != nil {
+		dAtA[i] = 0x12
+		i++
+		i = encodeVarintService(dAtA, i, uint64(m.Service.Size()))
+		n2, err := m.Service.MarshalTo(dAtA[i:])
+		if err != nil {
+			return 0, err
+		}
+		i += n2
+	}
+	return i, nil
+}
+
 func encodeFixed64Service(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	dAtA[offset+1] = uint8(v >> 8)
@@ -682,6 +867,19 @@ func (m *Service) Size() (n int) {
 	return n
 }
 
+func (m *EventResult) Size() (n int) {
+	var l int
+	_ = l
+	if m.Action != 0 {
+		n += 1 + sovService(uint64(m.Action))
+	}
+	if m.Service != nil {
+		l = m.Service.Size()
+		n += 1 + l + sovService(uint64(l))
+	}
+	return n
+}
+
 func sovService(x uint64) (n int) {
 	for {
 		n++
@@ -750,6 +948,17 @@ func (this *Service) String() string {
 		`Attr:` + strings.Replace(fmt.Sprintf("%v", this.Attr), "ServiceAttr", "ServiceAttr", 1) + `,`,
 		`Nodes:` + strings.Replace(fmt.Sprintf("%v", this.Nodes), "Node", "Node", 1) + `,`,
 		`Metadata:` + mapStringForMetadata + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *EventResult) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&EventResult{`,
+		`Action:` + fmt.Sprintf("%v", this.Action) + `,`,
+		`Service:` + strings.Replace(fmt.Sprintf("%v", this.Service), "Service", "Service", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1402,6 +1611,108 @@ func (m *Service) Unmarshal(dAtA []byte) error {
 				}
 			}
 			m.Metadata[mapkey] = mapvalue
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipService(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthService
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *EventResult) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowService
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: EventResult: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: EventResult: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Action", wireType)
+			}
+			m.Action = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Action |= (ServiceEventType(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Service", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowService
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthService
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Service == nil {
+				m.Service = &Service{}
+			}
+			if err := m.Service.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

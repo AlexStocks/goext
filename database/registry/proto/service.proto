@@ -3,7 +3,6 @@ syntax = "proto3";
 package gxregistry;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-import "role.proto";
 
 option (gogoproto.gostring_all) = true;
 option (gogoproto.equal_all) = true;
@@ -17,6 +16,15 @@ option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_getters_all) = false;
+
+
+//////////////////////////////////////////
+// service role
+//////////////////////////////////////////
+enum ServiceRoleType {
+	Provider = 0;
+	Cosumer = 1;
+}
 
 message ServiceAttr {
 	string Group = 1;
@@ -39,3 +47,18 @@ message Service {
 	map<string, string> Metadata = 3;
 }
 
+//////////////////////////////////////////
+// service url event type
+//////////////////////////////////////////
+enum ServiceEventType {
+    ServiceAdd = 0;
+	ServiceDel = 2;
+	ServiceUpdate = 3;
+}
+
+// Result is returned by a call to Next on
+// the watcher. Actions can be create, update, delete
+message EventResult {
+	ServiceEventType	Action = 1;
+	Service Service = 2;
+}

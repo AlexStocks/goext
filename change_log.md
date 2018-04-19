@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2018/04/19
+	> feature
+	* add handle etcd restart
+
 - 2018/04/18
 	> improvement
 	* test gxetcd.Client
