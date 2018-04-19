@@ -6,163 +6,167 @@
 ---
 
 - 2018/04/19
-	> feature
-	* add handle etcd restart
+  > feature
+  * add handle etcd restart
+
+  * add cache selector
+
+    ​
 
 - 2018/04/18
-	> improvement
-	* test gxetcd.Client
+  > improvement
+  * test gxetcd.Client
 
 - 2018/04/16
-	> feature
-	* add ServiceAttr Marshal/Unmarshal
+  > feature
+  * add ServiceAttr Marshal/Unmarshal
 
 - 2018/04/11
-	> feature
-	* add gxetcd
+  > feature
+  * add gxetcd
 
 - 2018/04/09
-	> feature
-	* add gxstrings/Builder
+  > feature
+  * add gxstrings/Builder
 
 - 2018/04/04
-	> bugfix
-	* check error when unzip/ungzip
+  > bugfix
+  * check error when unzip/ungzip
 
-	> feature
-	* add WriteFile, ReadTxt -> ReadFile
-
-- 2018/03/29
-	> feature
-	* add strings/IsNil
+  > feature
+  * add WriteFile, ReadTxt -> ReadFile
 
 - 2018/03/29
-	> feature
-	* add compress/zip
-	* add compress/gzip
-	* use juju/errors as default errors
+  > feature
+  * add strings/IsNil
+
+- 2018/03/29
+  > feature
+  * add compress/zip
+  * add compress/gzip
+  * use juju/errors as default errors
 
 - 2018/03/27
-	> feature
-	* add json logger
+  > feature
+  * add json logger
 
 - 2018/03/26
-	> feature
-	* add async logger
+  > feature
+  * add async logger
 
 - 2018/03/22
-	> feature
-	* add gxjson
+  > feature
+  * add gxjson
 
 - 2018/03/21
-	> feature
-	* add gxnet.IsSameAddr
+  > feature
+  * add gxnet.IsSameAddr
 
 - 2018/03/14
-	> feature
-	* add sync/drwlock
-	* add time/gxtime parser
-	* add sync/trylock
+  > feature
+  * add sync/drwlock
+  * add time/gxtime parser
+  * add sync/trylock
 
 - 2018/01/26
-	> feature
-	* add context
+  > feature
+  * add context
 
 - 2018/01/25
-	> feature
-	* add gxtimeticker
+  > feature
+  * add gxtimeticker
 
 - 2018/01/24
-	> feature
-	* add gxtime sleep
+  > feature
+  * add gxtime sleep
 
 - 2018/01/21
-	> feature
-	* add gxtime time wheel
+  > feature
+  * add gxtime time wheel
 
 - 2017/12/02
-	> feature
-	* add c like api strftime in time
+  > feature
+  * add c like api strftime in time
 
 - 2017/11/26
-	> improvement
-	* add GenSinaShortURLByGoogd because the source field is invalid in SinaShortURL
+  > improvement
+  * add GenSinaShortURLByGoogd because the source field is invalid in SinaShortURL
 
 - 2017/11/05
-	> feature
-	* add runtime/pprof by gops
+  > feature
+  * add runtime/pprof by gops
 
 - 2017/10/31
-	> feature
-	* add short url api
+  > feature
+  * add short url api
 
 - 2017/10/30
-	> improvement
-	* add leak check on file header: // +build !leak
+  > improvement
+  * add leak check on file header: // +build !leak
 
 - 2017/10/28
-	> feature
-	* gxlog.PrettyStruct -> gxlog.PrettyString in log/elasticsearch.go
+  > feature
+  * gxlog.PrettyStruct -> gxlog.PrettyString in log/elasticsearch.go
 
 - 2017/10/24
-	> feature
-	* add runtime/goroutine_pool
+  > feature
+  * add runtime/goroutine_pool
 
 - 2017/10/12
-	> feature
-	* add gxlog.ColorSprint & gxlog.ColorSprintln & ColorSprintf
+  > feature
+  * add gxlog.ColorSprint & gxlog.ColorSprintln & ColorSprintf
 
 - 2017/10/11
-	> feature
-	* add os.GetPkgPath
+  > feature
+  * add os.GetPkgPath
 
 - 2017/09/21
-	> bugfix
-	* check redis master is available or not in databases/redis/GetInstances
+  > bugfix
+  * check redis master is available or not in databases/redis/GetInstances
 
 - 2017/09/19
-	> feature
-	* subscribe +sdown redis channel to get crashed redis instance
+  > feature
+  * subscribe +sdown redis channel to get crashed redis instance
 
 - 2017/08/21
-	> improvement
-	* use gogoprotobuf for redis
+  > improvement
+  * use gogoprotobuf for redis
 
 - 2017/08/21
-	> feature
-	* add deque
+  > feature
+  * add deque
 
 - 2017/08/11
-	> feature
-	* add redis
+  > feature
+  * add redis
 
 - 2017/08/05
-	> feature
-	* add unbouned channel
+  > feature
+  * add unbouned channel
 
 - 2017/07/20
-	> feature
-	* colorful print
+  > feature
+  * colorful print
 
 - 2017/07/09
-	> feature
-	* add HashMap
+  > feature
+  * add HashMap
 
 - 2017/06/12
-	> feature
-	* add updateMetaDataInterval for kafka producer
+  > feature
+  * add updateMetaDataInterval for kafka producer
 
 - 2017/06/10
-	> feature
-	* add compression for kafka producer
+  > feature
+  * add compression for kafka producer
 
 - 2017/05/02
-	> feature
-	* add gxtime.Wheel:Now()
+  > feature
+  * add gxtime.Wheel:Now()
 
 - 2017/04/25
-	> feature
-	* add elasticsearch bulk insert
+  > feature
+  * add elasticsearch bulk insert
 
 - 2017/04/24
 
@@ -180,7 +184,7 @@
 - 2017/04/13
 
     > feature
-	* add container/gxset
+    * add container/gxset
 
 - 2017/04/02
     * feature: add log/elasticsearch
@@ -196,11 +200,11 @@
 
 - 2017/03/01
     * bug fix: use github.com/bsm/sarama-cluster to construct consumer group on kafka v0.10 instead of github.com/wvanbergen/kafka
-	* bug fix: use right license file
+    * bug fix: use right license file
 
 - 2017/02/07
     * add broadcaster sync/broadcast.go
-	* do not use this again and modify all
+    * do not use this again and modify all
 
 - 2017/01/22
     * add asynchronous kafka producer in log/kafka/producer.go

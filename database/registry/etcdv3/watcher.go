@@ -50,6 +50,7 @@ func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) gxregistr
 	watchPath := s.Path(options.Root)
 
 	w := client.EtcdClient().Watch(ctx, watchPath, clientv3.WithPrefix(), clientv3.WithPrevKV())
+
 	return &Watcher{
 		done:   done,
 		cancel: cancel,
@@ -58,7 +59,7 @@ func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) gxregistr
 	}
 }
 
-func (w *Watcher) Next() (*gxregistry.Result, error) {
+func (w *Watcher) Next() (*gxregistry.EventResult, error) {
 	for msg := range w.w {
 		if w.IsClosed() {
 			return nil, gxregistry.ErrWatcherClosed
@@ -107,6 +108,10 @@ func (w *Watcher) Next() (*gxregistry.Result, error) {
 }
 
 func (w *Watcher) Valid() bool {
+	if w.IsClosed() {
+		return false
+	}
+
 	return w.client.TTL() > 0
 }
 
