@@ -7,7 +7,6 @@ package gxetcd
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 )
@@ -74,9 +73,9 @@ func WithContext(ctx context.Context) ClientOption {
 type Client struct {
 	client *ecv3.Client
 	opts   *clientOptions
-	id     ecv3.LeaseID
 	done   chan struct{}
 	sync.Mutex
+	id     ecv3.LeaseID
 	cancel context.CancelFunc
 }
 
@@ -97,12 +96,11 @@ func (c *Client) KeepAlive() (<-chan *ecv3.LeaseKeepAliveResponse, error) {
 	c.Lock()
 	if c.cancel != nil {
 		c.cancel()
-		fmt.Println("do cancel")
 		c.cancel = nil
 	}
+	id := c.id
 	c.Unlock()
 
-	id := c.id
 	if id == ecv3.NoLease {
 		resp, err := c.client.Grant(c.opts.ctx, int64(c.opts.ttl.Seconds()))
 		if err != nil {
@@ -110,8 +108,10 @@ func (c *Client) KeepAlive() (<-chan *ecv3.LeaseKeepAliveResponse, error) {
 		}
 		id = ecv3.LeaseID(resp.ID)
 	}
+	c.Lock()
 	c.id = id
 	// fmt.Printf("lease id:%#x\n", id)
+	c.Unlock()
 
 	ctx, cancel := context.WithCancel(c.opts.ctx)
 	keepAlive, err := c.client.KeepAlive(ctx, id)
@@ -123,8 +123,8 @@ func (c *Client) KeepAlive() (<-chan *ecv3.LeaseKeepAliveResponse, error) {
 	}
 
 	c.Lock()
-	defer c.Unlock()
 	c.cancel = cancel
+	c.Unlock()
 
 	return keepAlive, nil
 }
@@ -176,8 +176,8 @@ func (c *Client) Stop() {
 			c.cancel()
 			c.cancel = nil
 		}
-		c.Unlock()
 		close(c.done)
+		c.Unlock()
 		return
 	}
 }
@@ -186,16 +186,19 @@ func (c *Client) Stop() {
 func (c *Client) Close() error {
 	c.Stop()
 	var err error
-	if c.id != ecv3.NoLease {
+	c.Lock()
+	id := c.id
+	c.id = ecv3.NoLease
+	c.Unlock()
+	if id != ecv3.NoLease {
 		// if revoke takes longer than the ttl, lease is expired anyway
 		ctx, cancel := context.WithTimeout(c.opts.ctx, c.opts.ttl)
-		_, err = c.client.Revoke(ctx, c.id)
+		_, err = c.client.Revoke(ctx, id)
 		cancel()
-		c.id = ecv3.NoLease
 	}
 
 	if err != nil {
-		err = jerrors.Annotatef(err, "etcdv3.Remove(lieaseID:%+v)", c.id)
+		err = jerrors.Annotatef(err, "etcdv3.Remove(lieaseID:%+v)", id)
 	}
 
 	return err

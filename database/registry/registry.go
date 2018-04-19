@@ -25,6 +25,7 @@ type Registry interface {
 const (
 	REGISTRY_CONN_DELAY = 3 // watchDir中使用，防止不断地对zk重连
 	DefaultTimeout      = 3e9
+	MaxFailTime         = 15e9 // fail retry wait time delay
 )
 
 var (

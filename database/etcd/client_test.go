@@ -7,6 +7,7 @@ import (
 )
 
 import (
+	"github.com/AlexStocks/goext/database/registry"
 	etcdv3 "github.com/coreos/etcd/clientv3"
 	jerrors "github.com/juju/errors"
 	"github.com/stretchr/testify/suite"
@@ -51,25 +52,34 @@ func (suite *ClientTestSuite) TestClient_TTL() {
 func (suite *ClientTestSuite) TestClient_Keepalive() {
 	// suite.T().Logf("start to test keep alvie")
 	fmt.Println("start to test keep alvie")
-	// time.Sleep(180e9) // wait etcd dead
 	keepAlive, err := suite.client.KeepAlive()
 	suite.Equal(nil, err, "etcd.KeepAlive()")
 	suite.wg.Add(1)
 	go func() {
+		var failTime int
 		defer suite.wg.Done()
+		failTime = 0
 		for {
 			select {
+			case <-suite.client.Done():
+				fmt.Println("keep alive goroutine exit now ...")
+				return
 			case msg, ok := <-keepAlive:
 				// eat messages until keep alive channel closes
 				if !ok {
 					fmt.Println("keep alive channel closed")
-					if suite.client.IsClosed() {
-						fmt.Println("keep alive goroutine exit now ...")
-						return
-					}
 					keepAlive, err = suite.client.KeepAlive()
 					suite.Equal(nil, err, "etcd.KeepAlive()")
+					failTime <<= 1
+					if failTime == 0 {
+						failTime = 1e8
+					} else if gxregistry.MaxFailTime < failTime {
+						failTime = gxregistry.MaxFailTime
+					}
+					fmt.Printf("%d, sleep time:%s\n", failTime/1e8, time.Duration(failTime))
+					time.Sleep(time.Duration(failTime)) // to avoid connecting the registry tool frequently
 				} else {
+					failTime = 0
 					fmt.Printf("Recv msg from keepAlive: %s\n", msg.String())
 				}
 			case <-time.After(2e9):
@@ -78,7 +88,7 @@ func (suite *ClientTestSuite) TestClient_Keepalive() {
 		}
 	}()
 
-	time.Sleep(10e9)
+	time.Sleep(120e9)
 	// suite.T().Logf("finish testing keep alvie")
 	fmt.Println("finish testing keep alvie")
 }

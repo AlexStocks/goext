@@ -6,6 +6,7 @@ import (
 )
 
 import (
+	"fmt"
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/log"
 	"github.com/stretchr/testify/suite"
@@ -19,11 +20,6 @@ type RegisterTestSuite struct {
 }
 
 func (suite *RegisterTestSuite) SetupSuite() {
-	suite.reg = NewRegistry(
-		gxregistry.WithAddrs([]string{"127.0.0.1:2379", "127.0.0.1:12379", "127.0.0.1:22379"}...),
-		gxregistry.WithTimeout(3e9),
-		gxregistry.WithRoot("/etcd_test"),
-	)
 
 	suite.sa = gxregistry.ServiceAttr{
 		Group:    "bjtelecom",
@@ -37,13 +33,26 @@ func (suite *RegisterTestSuite) SetupSuite() {
 }
 
 func (suite *RegisterTestSuite) TearDownSuite() {
+}
+
+func (suite *RegisterTestSuite) SetupTest() {
+	suite.reg = NewRegistry(
+		// gxregistry.WithAddrs([]string{"127.0.0.1:2379", "127.0.0.1:12379", "127.0.0.1:22379"}...),
+		gxregistry.WithAddrs([]string{"127.0.0.1:2379"}...),
+		gxregistry.WithTimeout(3e9),
+		gxregistry.WithRoot("/etcd_test"),
+	)
+}
+
+func (suite *RegisterTestSuite) TearDownTest() {
 	suite.reg.Close()
 }
 
 func (suite *RegisterTestSuite) TestRegistry_Options() {
 	opts := suite.reg.Options()
 	suite.Equalf("/etcd_test", opts.Root, "reg.Options.Root")
-	suite.Equalf([]string{"127.0.0.1:2379", "127.0.0.1:12379", "127.0.0.1:22379"}, opts.Addrs, "reg.Options.Addrs")
+	// suite.Equalf([]string{"127.0.0.1:2379", "127.0.0.1:12379", "127.0.0.1:22379"}, opts.Addrs, "reg.Options.Addrs")
+	suite.Equalf([]string{"127.0.0.1:2379"}, opts.Addrs, "reg.Options.Addrs")
 	suite.Equalf(time.Duration(3e9), opts.Timeout, "reg.Options.Timeout")
 }
 
@@ -95,6 +104,18 @@ func (suite *RegisterTestSuite) TestRegistry_Register() {
 	service1, err = suite.reg.GetService(suite.sa)
 	suite.T().Log("services:", gxlog.ColorSprintln(service1))
 	suite.Equalf(gxregistry.ErrorRegistryNotFound, err, "GetService(ServiceAttr:%#v)", suite.sa)
+}
+
+func (suite *RegisterTestSuite) TestRegistry_EtcdRestart() {
+	fmt.Println("start to test etcd restart ... ")
+	node1 := gxregistry.Node{ID: "node1", Address: "127.0.0.1", Port: 12346}
+	service := gxregistry.Service{Attr: &suite.sa, Nodes: []*gxregistry.Node{&suite.node, &node1}}
+	err := suite.reg.Register(service)
+	suite.Equalf(nil, err, "Register(service:%+v)", service)
+
+	time.Sleep(120e9)
+	// suite.T().Logf("finish testing keep alvie")
+	fmt.Println("finish testing keep alvie ... ")
 }
 
 func TestRegisterTestSuite(t *testing.T) {

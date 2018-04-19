@@ -9,6 +9,7 @@ package gxetcd
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 import (
@@ -19,13 +20,20 @@ import (
 import (
 	"github.com/AlexStocks/goext/database/etcd"
 	"github.com/AlexStocks/goext/database/registry"
+	log "github.com/AlexStocks/log4go"
 )
 
 type Registry struct {
-	client  *gxetcd.Client
-	options gxregistry.Options
+	etcdClient *etcdv3.Client
+	client     *gxetcd.Client
+	options    gxregistry.Options
+
+	done chan struct{}
+	wg   sync.WaitGroup
+
 	sync.Mutex
-	register map[gxregistry.ServiceAttr]gxregistry.Service
+	sync.Once
+	serviceRegistry map[gxregistry.ServiceAttr]gxregistry.Service
 }
 
 func NewRegistry(opts ...gxregistry.Option) gxregistry.Registry {
@@ -67,10 +75,77 @@ func NewRegistry(opts ...gxregistry.Option) gxregistry.Registry {
 		options.Root = gxregistry.DefaultServiceRoot
 	}
 
-	return &Registry{
-		client:   gxClient,
-		options:  options,
-		register: make(map[gxregistry.ServiceAttr]gxregistry.Service),
+	r := &Registry{
+		etcdClient:      client,
+		client:          gxClient,
+		options:         options,
+		done:            make(chan struct{}),
+		serviceRegistry: make(map[gxregistry.ServiceAttr]gxregistry.Service),
+	}
+
+	r.wg.Add(1)
+	go r.handleEtcdRestart()
+
+	return r
+}
+
+func (r *Registry) handleEtcdRestart() {
+	var (
+		failTime     int
+		registerFlag bool
+	)
+	defer r.wg.Done()
+
+	keepAlive, err := r.client.KeepAlive()
+	if err != nil {
+		log.Warn("gxetcd.KeepAlive() = error:%+v", err)
+	}
+
+LOOP:
+	for {
+		select {
+		case <-r.done:
+			log.Warn("Registry.done closed. Registry.handleEtcdRestart exit now ...")
+			break LOOP
+		case msg, ok := <-keepAlive:
+			// eat messages until keep alive channel closes
+			if !ok {
+				registerFlag = true
+				log.Warn("etcd keep alive channel closed")
+				keepAlive, err = r.client.KeepAlive()
+				if err != nil {
+					log.Warn("gxetcd.KeepAlive() = error:%+v", err)
+				}
+				failTime <<= 1
+				if failTime == 0 {
+					failTime = 1e8
+				} else if gxregistry.MaxFailTime < failTime {
+					failTime = gxregistry.MaxFailTime
+				}
+				time.Sleep(time.Duration(failTime)) // to avoid connecting the registry tool frequently
+			} else {
+				failTime = 0
+				// the etcd has restarted. now we need to register all services
+				if registerFlag {
+					services := []gxregistry.Service{}
+					r.Lock()
+					for _, s := range r.serviceRegistry {
+						services = append(services, s)
+					}
+					r.Unlock()
+					failure := false
+					for idx := range services {
+						if err = r.register(services[idx]); err != nil {
+							failure = true
+							log.Warn("Registry.register(service:{%#v}) = err:%+v", services[idx], err)
+							break
+						}
+					}
+					registerFlag = failure // when fails to register all services,  just register again.
+				}
+				log.Debug("Recv msg from etcd KeepAlive: %s\n", msg.String())
+			}
+		}
 	}
 }
 
@@ -84,7 +159,7 @@ func (r *Registry) exist(s gxregistry.Service) (gxregistry.Service, bool) {
 	// get existing hash
 	r.Lock()
 	defer r.Unlock()
-	v, ok := r.register[*(s.Attr)]
+	v, ok := r.serviceRegistry[*(s.Attr)]
 	if len(s.Nodes) == 0 {
 		return v, ok
 	}
@@ -114,9 +189,9 @@ func (r *Registry) addService(s gxregistry.Service) {
 	// get existing hash
 	r.Lock()
 	defer r.Unlock()
-	v, ok := r.register[*s.Attr]
+	v, ok := r.serviceRegistry[*s.Attr]
 	if !ok {
-		r.register[*s.Attr] = s
+		r.serviceRegistry[*s.Attr] = s
 		return
 	}
 
@@ -131,7 +206,7 @@ func (r *Registry) addService(s gxregistry.Service) {
 			v.Nodes = append(v.Nodes, s.Nodes[i])
 		}
 	}
-	r.register[*s.Attr] = v
+	r.serviceRegistry[*s.Attr] = v
 
 	return
 }
@@ -144,7 +219,7 @@ func (r *Registry) deleteService(s gxregistry.Service) {
 	// get existing hash
 	r.Lock()
 	defer r.Unlock()
-	v, ok := r.register[*s.Attr]
+	v, ok := r.serviceRegistry[*s.Attr]
 	if !ok {
 		return
 	}
@@ -157,27 +232,19 @@ func (r *Registry) deleteService(s gxregistry.Service) {
 			}
 		}
 	}
-	r.register[*s.Attr] = v
+	r.serviceRegistry[*s.Attr] = v
 
 	return
 }
 
-func (r *Registry) Register(s gxregistry.Service) error {
-	if len(s.Nodes) == 0 {
-		return jerrors.Errorf("Require at least one node")
-	}
-
-	if _, exist := r.exist(s); exist {
-		return gxregistry.ErrorAlreadyRegister
-	}
-
+func (r *Registry) register(s gxregistry.Service) error {
 	service := gxregistry.Service{Metadata: s.Metadata}
 	service.Attr = s.Attr
 
 	ctx, cancel := context.WithTimeout(context.Background(), r.options.Timeout)
 	defer cancel()
 
-	// register every node
+	// serviceRegistry every node
 	for i, node := range s.Nodes {
 		service.Nodes = []*gxregistry.Node{node}
 		data, err := gxregistry.EncodeService(&service)
@@ -200,9 +267,25 @@ func (r *Registry) Register(s gxregistry.Service) error {
 		}
 	}
 
+	return nil
+}
+
+func (r *Registry) Register(s gxregistry.Service) error {
+	if len(s.Nodes) == 0 {
+		return jerrors.Errorf("Require at least one node")
+	}
+
+	if _, exist := r.exist(s); exist {
+		return gxregistry.ErrorAlreadyRegister
+	}
+
+	err := r.register(s)
+	if err != nil {
+		return jerrors.Annotate(err, "Registry.register")
+	}
+
 	// save the service
 	r.addService(s)
-	// log.Debug("after add service, reg nodes:%s", gxlog.PrettyString(r.register))
 
 	return nil
 }
@@ -273,10 +356,19 @@ func (r *Registry) String() string {
 }
 
 func (r *Registry) Close() error {
-	err := r.client.Close()
-	if err != nil {
-		return jerrors.Annotate(err, "gxetcd.Client.Close()")
+	var err error
+	r.Lock()
+	if r.etcdClient != nil {
+		close(r.done)
+		err = r.client.Close()
+		if err != nil {
+			err = jerrors.Annotate(err, "gxetcd.Client.Close()")
+		}
+		r.etcdClient.Close()
+		r.wg.Wait()
+		r.etcdClient = nil
 	}
+	r.Unlock()
 
-	return nil
+	return err
 }
