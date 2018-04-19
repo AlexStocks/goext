@@ -16,7 +16,7 @@ type Registry interface {
 	Register(service Service) error
 	Unregister(service Service) error
 	GetService(attr ServiceAttr) (*Service, error)
-	Watch(opts ...WatchOption) Watcher
+	Watch(opts ...WatchOption) (Watcher, error)
 	Close() error
 	String() string
 	Options() Options

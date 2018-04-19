@@ -347,7 +347,7 @@ func (r *Registry) GetService(attr gxregistry.ServiceAttr) (*gxregistry.Service,
 	return service, nil
 }
 
-func (r *Registry) Watch(opts ...gxregistry.WatchOption) gxregistry.Watcher {
+func (r *Registry) Watch(opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
 	return NewWatcher(r.client, opts...)
 }
 

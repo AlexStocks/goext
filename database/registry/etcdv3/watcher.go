@@ -29,7 +29,7 @@ type Watcher struct {
 	client *gxetcd.Client
 }
 
-func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) gxregistry.Watcher {
+func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
 	var options gxregistry.WatchOptions
 	for _, o := range opts {
 		o(&options)
@@ -42,7 +42,7 @@ func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) gxregistr
 		options.Root = gxregistry.DefaultServiceRoot
 	}
 	if len(options.Service) == 0 {
-		panic("options.Service is nil")
+		return nil, jerrors.Errorf("options.Service is nil")
 	}
 	s := gxregistry.Service{
 		Attr: &gxregistry.ServiceAttr{Name: options.Service},
@@ -56,7 +56,7 @@ func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) gxregistr
 		cancel: cancel,
 		w:      w,
 		client: client,
-	}
+	}, nil
 }
 
 func (w *Watcher) Next() (*gxregistry.EventResult, error) {
