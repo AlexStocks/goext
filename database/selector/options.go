@@ -1,16 +1,20 @@
-package selector
+// Copyright 2016 ~ 2018 AlexStocks(https://github.com/AlexStocks).
+// All rights reserved.  Use of this source code is
+// governed by Apache License 2.0.
+
+// Package gxregistry provides a interface for service selector
+package gxselector
 
 import (
-	// "golang.org/x/net/context"
 	"context"
 )
 
 import (
-	"github.com/AlexStocks/dubbogo/registry"
+	"github.com/AlexStocks/goext/database/registry"
 )
 
 type Options struct {
-	Registry registry.Registry
+	Registry gxregistry.Registry
 	Mode     SelectorMode // selector mode
 
 	// Other options for implementations of the interface
@@ -21,21 +25,21 @@ type Options struct {
 // Option used to initialise the selector
 type Option func(*Options)
 
-// Registry sets the registry used by the selector
-func Registry(r registry.Registry) Option {
+// WithRegistry sets the registry used by the selector
+func WithRegistry(r gxregistry.Registry) Option {
 	return func(o *Options) {
 		o.Registry = r
 	}
 }
 
-// SetStrategy sets the default strategy for the selector
-func SelectMode(mode SelectorMode) Option {
+// WithSetStrategy sets the default strategy for the selector
+func WithSelectMode(mode SelectorMode) Option {
 	return func(o *Options) {
 		o.Mode = mode
 	}
 }
 
-func Context(ctx context.Context) Option {
+func WithContext(ctx context.Context) Option {
 	return func(o *Options) {
 		o.Context = ctx
 	}
