@@ -400,7 +400,7 @@ func NewSelector(opts ...gxselector.Option) gxselector.Selector {
 	ttl := DefaultTTL
 
 	if sopts.Context != nil {
-		if t, ok := sopts.Context.Value(common.DUBBOGO_CTX_KEY).(time.Duration); ok {
+		if t, ok := sopts.Context.Value(GxselectorDefaultKey).(time.Duration); ok {
 			ttl = t
 		}
 	}

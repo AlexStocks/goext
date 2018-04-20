@@ -9,6 +9,8 @@
   > feature
   * add timespan from github.com/senseyeio/spaniel/
 
+    ​
+
 - 2018/04/19
   > feature
   * add handle etcd restart
