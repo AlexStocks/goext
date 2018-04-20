@@ -5,13 +5,14 @@
 ## dev list ##
 ---
 
+- 2018/04/20   
+  > feature
+  * add timespan from github.com/senseyeio/spaniel/
+
 - 2018/04/19
   > feature
   * add handle etcd restart
-
   * add cache selector
-
-    ​
 
 - 2018/04/18
   > improvement
