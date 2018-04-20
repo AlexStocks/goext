@@ -22,13 +22,14 @@ option (gogoproto.goproto_getters_all) = false;
 // service role
 //////////////////////////////////////////
 enum ServiceRoleType {
-	Provider = 0;
-	Cosumer = 1;
+	SRT_UNKOWN = 0;
+	SRT_Provider = 1;
+	SRT_Cosumer = 2;
 }
 
 message ServiceAttr {
 	string Group = 1;
-	string Name = 2;
+	string Service = 2;
 	string Protocol = 3;
 	string Version = 4;
 	ServiceRoleType Role = 5;
@@ -51,7 +52,8 @@ message Service {
 // service url event type
 //////////////////////////////////////////
 enum ServiceEventType {
-    ServiceAdd = 0;
+    SET_UNKNOWN = 0;
+    ServiceAdd = 1;
 	ServiceDel = 2;
 	ServiceUpdate = 3;
 }

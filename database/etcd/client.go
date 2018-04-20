@@ -2,13 +2,13 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 //
-// ref: https://github.com/coreos/etcd/blob/master/clientv3/concurrency/session.go
+// gxetcd encapsulate a etcd lease client
 package gxetcd
 
 import (
 	"context"
+	"fmt"
 	"sync"
-	"time"
 )
 
 import (
@@ -16,53 +16,6 @@ import (
 	ecv3 "github.com/coreos/etcd/clientv3"
 	jerrors "github.com/juju/errors"
 )
-
-const (
-	defaultClientTTL = 60e9
-)
-
-type clientOptions struct {
-	ttl     time.Duration
-	leaseID ecv3.LeaseID
-	ctx     context.Context
-}
-
-//////////////////////////////////////////
-// Lease Client Option
-//////////////////////////////////////////
-
-// ClientOption configures Client.
-type ClientOption func(*clientOptions)
-
-// WithTTL configures the session's TTL in seconds.
-// If TTL is <= 0, the default 60 seconds TTL will be used.
-func WithTTL(ttl time.Duration) ClientOption {
-	return func(so *clientOptions) {
-		if ttl > 0 {
-			so.ttl = ttl
-		}
-	}
-}
-
-// WithLease specifies the existing leaseID to be used for the session.
-// This is useful in process restart scenario, for example, to reclaim
-// leadership from an election prior to restart.
-func WithLease(leaseID ecv3.LeaseID) ClientOption {
-	return func(so *clientOptions) {
-		so.leaseID = leaseID
-	}
-}
-
-// WithContext assigns a context to the session instead of defaulting to
-// using the client context. This is useful for canceling NewClient and
-// Close operations immediately without having to close the client. If the
-// context is canceled before Close() completes, the session's lease will be
-// abandoned and left to expire instead of being revoked.
-func WithContext(ctx context.Context) ClientOption {
-	return func(so *clientOptions) {
-		so.ctx = ctx
-	}
-}
 
 //////////////////////////////////////////
 // Lease Client
@@ -102,11 +55,12 @@ func (c *Client) KeepAlive() (<-chan *ecv3.LeaseKeepAliveResponse, error) {
 	c.Unlock()
 
 	if id == ecv3.NoLease {
-		resp, err := c.client.Grant(c.opts.ctx, int64(c.opts.ttl.Seconds()))
+		rsp, err := c.client.Grant(c.opts.ctx, int64(c.opts.ttl.Seconds()))
+		fmt.Printf("rsp:%+v, ttl:%d\n", rsp, c.opts.ttl.Seconds())
 		if err != nil {
 			return nil, jerrors.Annotatef(err, "etcdv3.Grant()")
 		}
-		id = ecv3.LeaseID(resp.ID)
+		id = ecv3.LeaseID(rsp.ID)
 	}
 	c.Lock()
 	c.id = id
@@ -140,9 +94,11 @@ func (c *Client) Lease() ecv3.LeaseID { return c.id }
 // TTL return the ttl of Client's lease
 func (c *Client) TTL() int64 {
 	rsp, err := c.client.TimeToLive(context.TODO(), c.id)
+	fmt.Printf("client lease id:%+v, rsp:%+v\n", c.id, rsp)
 	if err != nil {
 		return 0
 	}
+	fmt.Printf("rsp.ttl:%+v\n", rsp.TTL)
 
 	return rsp.TTL
 }

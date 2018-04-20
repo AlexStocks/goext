@@ -25,7 +25,10 @@ type WatchOptions struct {
 	Root string
 	// Specify a service to watch
 	// If blank, the watch is for all services
-	Service string
+	Filter ServiceAttr
+	// Specify a service role to watch
+	// If blank, the watch is for all roles
+	Role ServiceRoleType
 	// Other options for implementations of the interface
 	// can be stored in a context
 	Context context.Context
@@ -62,8 +65,8 @@ func WithWatchRoot(root string) WatchOption {
 }
 
 // Watch a service
-func WithWatchService(name string) WatchOption {
+func WithWatchFilter(attr ServiceAttr) WatchOption {
 	return func(o *WatchOptions) {
-		o.Service = name
+		o.Filter = attr
 	}
 }

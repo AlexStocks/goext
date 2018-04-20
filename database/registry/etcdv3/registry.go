@@ -36,7 +36,7 @@ type Registry struct {
 	serviceRegistry map[gxregistry.ServiceAttr]gxregistry.Service
 }
 
-func NewRegistry(opts ...gxregistry.Option) gxregistry.Registry {
+func NewRegistry(opts ...gxregistry.Option) (gxregistry.Registry, error) {
 	config := etcdv3.Config{
 		Endpoints: []string{"127.0.0.1:2379"},
 	}
@@ -64,11 +64,11 @@ func NewRegistry(opts ...gxregistry.Option) gxregistry.Registry {
 
 	client, err := etcdv3.New(config)
 	if err != nil {
-		panic(jerrors.Errorf("etcdv3.New(config:%+v) = error:%s", config, err))
+		return nil, jerrors.Errorf("etcdv3.New(config:%+v) = error:%s", config, err)
 	}
 	gxClient, err := gxetcd.NewClient(client, gxetcd.WithTTL(options.Timeout))
 	if err != nil {
-		panic(jerrors.Errorf("gxetcd.NewClient() = error:%s", err))
+		return nil, jerrors.Errorf("gxetcd.NewClient() = error:%s", err)
 	}
 
 	if options.Root == "" {
@@ -86,7 +86,7 @@ func NewRegistry(opts ...gxregistry.Option) gxregistry.Registry {
 	r.wg.Add(1)
 	go r.handleEtcdRestart()
 
-	return r
+	return r, nil
 }
 
 func (r *Registry) handleEtcdRestart() {

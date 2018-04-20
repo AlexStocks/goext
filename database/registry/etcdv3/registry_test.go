@@ -1,12 +1,12 @@
 package gxetcd
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
 
 import (
-	"fmt"
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/log"
 	"github.com/stretchr/testify/suite"
@@ -20,13 +20,12 @@ type RegisterTestSuite struct {
 }
 
 func (suite *RegisterTestSuite) SetupSuite() {
-
 	suite.sa = gxregistry.ServiceAttr{
 		Group:    "bjtelecom",
-		Name:     "shopping",
+		Service:  "shopping",
 		Protocol: "pb",
 		Version:  "1.0.1",
-		Role:     gxregistry.Provider,
+		Role:     gxregistry.SRT_Provider,
 	}
 
 	suite.node = gxregistry.Node{ID: "node0", Address: "127.0.0.1", Port: 12345}
@@ -36,12 +35,14 @@ func (suite *RegisterTestSuite) TearDownSuite() {
 }
 
 func (suite *RegisterTestSuite) SetupTest() {
-	suite.reg = NewRegistry(
+	var err error
+	suite.reg, err = NewRegistry(
 		// gxregistry.WithAddrs([]string{"127.0.0.1:2379", "127.0.0.1:12379", "127.0.0.1:22379"}...),
 		gxregistry.WithAddrs([]string{"127.0.0.1:2379"}...),
 		gxregistry.WithTimeout(3e9),
 		gxregistry.WithRoot("/etcd_test"),
 	)
+	suite.Equal(nil, err, "NewRegistry()")
 }
 
 func (suite *RegisterTestSuite) TearDownTest() {

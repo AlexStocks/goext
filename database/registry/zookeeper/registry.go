@@ -101,7 +101,7 @@ func (r *Registry) Register(sv interface{}) error {
 
 	// get existing hash
 	r.Lock()
-	v, ok := r.register[s.Attr.Name]
+	v, ok := r.register[s.Attr.Service]
 	r.Unlock()
 
 	// the service is unchanged, skip registering
@@ -136,7 +136,7 @@ func (r *Registry) Register(sv interface{}) error {
 
 	r.Lock()
 	// save our hash of the service
-	r.register[s.Attr.Name] = h
+	r.register[s.Attr.Service] = h
 	r.Unlock()
 
 	return nil
@@ -154,7 +154,7 @@ func (r *Registry) Unregister(svc interface{}) error {
 
 	r.Lock()
 	// delete our hash of the service
-	delete(r.register, s.Attr.Name)
+	delete(r.register, s.Attr.Service)
 	r.Unlock()
 
 	for _, node := range s.Nodes {

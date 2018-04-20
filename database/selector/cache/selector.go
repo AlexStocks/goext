@@ -346,9 +346,9 @@ func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Next, erro
 		// return nil, err
 		return nil, gxselector.ErrNotFound
 	}
-	for i, s := range services {
-		log.Debug("services[%d] = serviceURL{%#v}", i, s)
-	}
+	//for i, s := range services {
+	//	log.Debug("services[%d] = serviceURL{%#v}", i, s)
+	//}
 	// if there's nothing left, return
 	if len(services) == 0 {
 		return nil, gxselector.ErrNoneAvailable

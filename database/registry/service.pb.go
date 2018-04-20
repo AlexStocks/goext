@@ -22,6 +22,7 @@ import (
 	"math"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -55,17 +56,29 @@ const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 type ServiceRoleType int32
 
 const (
-	Provider ServiceRoleType = 0
-	Cosumer  ServiceRoleType = 1
+	SRT_UNKOWN   ServiceRoleType = 0
+	SRT_Provider ServiceRoleType = 1
+	SRT_Cosumer  ServiceRoleType = 2
 )
 
 var ServiceRoleType_name = map[int32]string{
-	0: "Provider",
-	1: "Cosumer",
+	0: "SRT_UNKOWN",
+	1: "SRT_Provider",
+	2: "SRT_Cosumer",
 }
 var ServiceRoleType_value = map[string]int32{
-	"Provider": 0,
-	"Cosumer":  1,
+	"SRT_UNKOWN":   0,
+	"SRT_Provider": 1,
+	"SRT_Cosumer":  2,
+}
+
+func String2ServiceRoleType(role string) ServiceRoleType {
+	r, ok := ServiceRoleType_value[role]
+	if !ok {
+		return SRT_UNKOWN
+	}
+
+	return ServiceRoleType(r)
 }
 
 func (ServiceRoleType) EnumDescriptor() ([]byte, []int) { return fileDescriptorService, []int{0} }
@@ -76,18 +89,21 @@ func (ServiceRoleType) EnumDescriptor() ([]byte, []int) { return fileDescriptorS
 type ServiceEventType int32
 
 const (
-	ServiceAdd    ServiceEventType = 0
+	SET_UNKNOWN   ServiceEventType = 0
+	ServiceAdd    ServiceEventType = 1
 	ServiceDel    ServiceEventType = 2
 	ServiceUpdate ServiceEventType = 3
 )
 
 var ServiceEventType_name = map[int32]string{
-	0: "ServiceAdd",
+	0: "SET_UNKNOWN",
+	1: "ServiceAdd",
 	2: "ServiceDel",
 	3: "ServiceUpdate",
 }
 var ServiceEventType_value = map[string]int32{
-	"ServiceAdd":    0,
+	"SET_UNKNOWN":   0,
+	"ServiceAdd":    1,
 	"ServiceDel":    2,
 	"ServiceUpdate": 3,
 }
@@ -96,7 +112,7 @@ func (ServiceEventType) EnumDescriptor() ([]byte, []int) { return fileDescriptor
 
 type ServiceAttr struct {
 	Group    string          `protobuf:"bytes,1,opt,name=Group,proto3" json:"Group,omitempty"`
-	Name     string          `protobuf:"bytes,2,opt,name=Name,proto3" json:"Name,omitempty"`
+	Service  string          `protobuf:"bytes,2,opt,name=Service,proto3" json:"Service,omitempty"`
 	Protocol string          `protobuf:"bytes,3,opt,name=Protocol,proto3" json:"Protocol,omitempty"`
 	Version  string          `protobuf:"bytes,4,opt,name=Version,proto3" json:"Version,omitempty"`
 	Role     ServiceRoleType `protobuf:"varint,5,opt,name=Role,proto3,enum=gxregistry.ServiceRoleType" json:"Role,omitempty"`
@@ -105,6 +121,27 @@ type ServiceAttr struct {
 func (m *ServiceAttr) Reset()                    { *m = ServiceAttr{} }
 func (*ServiceAttr) ProtoMessage()               {}
 func (*ServiceAttr) Descriptor() ([]byte, []int) { return fileDescriptorService, []int{0} }
+func (m *ServiceAttr) Filter(service ServiceAttr) bool {
+	switch {
+	case "" != m.Protocol && service.Protocol != m.Protocol:
+		return false
+
+	case "" != m.Service && service.Service != m.Service:
+		return false
+
+	case "" != m.Group && service.Group != m.Group:
+		return false
+
+	case "" != m.Version && service.Version != m.Version:
+		return false
+
+	case SRT_UNKOWN != m.Role && service.Role != m.Role:
+		return false
+
+	default:
+		return true
+	}
+}
 
 type Node struct {
 	ID       string            `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
@@ -187,8 +224,8 @@ func (this *ServiceAttr) VerboseEqual(that interface{}) error {
 	if this.Group != that1.Group {
 		return fmt.Errorf("Group this(%v) Not Equal that(%v)", this.Group, that1.Group)
 	}
-	if this.Name != that1.Name {
-		return fmt.Errorf("Name this(%v) Not Equal that(%v)", this.Name, that1.Name)
+	if this.Service != that1.Service {
+		return fmt.Errorf("Service this(%v) Not Equal that(%v)", this.Service, that1.Service)
 	}
 	if this.Protocol != that1.Protocol {
 		return fmt.Errorf("Protocol this(%v) Not Equal that(%v)", this.Protocol, that1.Protocol)
@@ -229,7 +266,7 @@ func (this *ServiceAttr) Equal(that interface{}) bool {
 	if this.Group != that1.Group {
 		return false
 	}
-	if this.Name != that1.Name {
+	if this.Service != that1.Service {
 		return false
 	}
 	if this.Protocol != that1.Protocol {
@@ -496,7 +533,7 @@ func (this *ServiceAttr) GoString() string {
 	s := make([]string, 0, 9)
 	s = append(s, "&gxregistry.ServiceAttr{")
 	s = append(s, "Group: "+fmt.Sprintf("%#v", this.Group)+",\n")
-	s = append(s, "Name: "+fmt.Sprintf("%#v", this.Name)+",\n")
+	s = append(s, "Service: "+fmt.Sprintf("%#v", this.Service)+",\n")
 	s = append(s, "Protocol: "+fmt.Sprintf("%#v", this.Protocol)+",\n")
 	s = append(s, "Version: "+fmt.Sprintf("%#v", this.Version)+",\n")
 	s = append(s, "Role: "+fmt.Sprintf("%#v", this.Role)+",\n")
@@ -598,11 +635,11 @@ func (m *ServiceAttr) MarshalTo(dAtA []byte) (int, error) {
 		i = encodeVarintService(dAtA, i, uint64(len(m.Group)))
 		i += copy(dAtA[i:], m.Group)
 	}
-	if len(m.Name) > 0 {
+	if len(m.Service) > 0 {
 		dAtA[i] = 0x12
 		i++
-		i = encodeVarintService(dAtA, i, uint64(len(m.Name)))
-		i += copy(dAtA[i:], m.Name)
+		i = encodeVarintService(dAtA, i, uint64(len(m.Service)))
+		i += copy(dAtA[i:], m.Service)
 	}
 	if len(m.Protocol) > 0 {
 		dAtA[i] = 0x1a
@@ -800,7 +837,7 @@ func (m *ServiceAttr) Size() (n int) {
 	if l > 0 {
 		n += 1 + l + sovService(uint64(l))
 	}
-	l = len(m.Name)
+	l = len(m.Service)
 	if l > 0 {
 		n += 1 + l + sovService(uint64(l))
 	}
@@ -899,7 +936,7 @@ func (this *ServiceAttr) String() string {
 	}
 	s := strings.Join([]string{`&ServiceAttr{`,
 		`Group:` + fmt.Sprintf("%v", this.Group) + `,`,
-		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`Service:` + fmt.Sprintf("%v", this.Service) + `,`,
 		`Protocol:` + fmt.Sprintf("%v", this.Protocol) + `,`,
 		`Version:` + fmt.Sprintf("%v", this.Version) + `,`,
 		`Role:` + fmt.Sprintf("%v", this.Role) + `,`,
@@ -1031,7 +1068,7 @@ func (m *ServiceAttr) Unmarshal(dAtA []byte) error {
 			iNdEx = postIndex
 		case 2:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field Service", wireType)
 			}
 			var stringLen uint64
 			for shift := uint(0); ; shift += 7 {
@@ -1056,7 +1093,7 @@ func (m *ServiceAttr) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.Name = string(dAtA[iNdEx:postIndex])
+			m.Service = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 3:
 			if wireType != 2 {
@@ -1877,7 +1914,7 @@ var fileDescriptorService = []byte{
 func (a *ServiceAttr) MarshalPath() ([]byte, error) {
 	params := url.Values{}
 	params.Add("group", a.Group)
-	params.Add("service", a.Name)
+	params.Add("service", a.Service)
 	params.Add("protocol", a.Protocol)
 	params.Add("version", a.Version)
 	params.Add("role", a.Role.String())
@@ -1899,10 +1936,10 @@ func (a *ServiceAttr) UnmarshalPath(data []byte) error {
 	}
 
 	a.Group = query.Get("group")
-	a.Name = query.Get("service")
+	a.Service = query.Get("service")
 	a.Protocol = query.Get("protocol")
 	a.Version = query.Get("version")
-	(&a.Role).Get(query.Get("role"))
+	a.Role = String2ServiceRoleType(query.Get("role"))
 
 	return nil
 }

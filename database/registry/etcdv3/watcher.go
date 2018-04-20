@@ -16,6 +16,7 @@ import (
 )
 
 import (
+	"fmt"
 	"github.com/AlexStocks/goext/database/etcd"
 	"github.com/AlexStocks/goext/database/registry"
 	log "github.com/AlexStocks/log4go"
@@ -26,6 +27,7 @@ type Watcher struct {
 	done   chan struct{}
 	cancel context.CancelFunc
 	w      clientv3.WatchChan
+	opts   gxregistry.WatchOptions
 	client *gxetcd.Client
 }
 
@@ -41,11 +43,11 @@ func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) (gxregist
 	if options.Root == "" {
 		options.Root = gxregistry.DefaultServiceRoot
 	}
-	if len(options.Service) == 0 {
+	if options.Filter.Service == "" {
 		return nil, jerrors.Errorf("options.Service is nil")
 	}
 	s := gxregistry.Service{
-		Attr: &gxregistry.ServiceAttr{Name: options.Service},
+		Attr: &gxregistry.ServiceAttr{Service: options.Filter.Service},
 	}
 	watchPath := s.Path(options.Root)
 
@@ -60,6 +62,7 @@ func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) (gxregist
 }
 
 func (w *Watcher) Next() (*gxregistry.EventResult, error) {
+	var action gxregistry.ServiceEventType
 	for msg := range w.w {
 		if w.IsClosed() {
 			return nil, gxregistry.ErrWatcherClosed
@@ -75,7 +78,10 @@ func (w *Watcher) Next() (*gxregistry.EventResult, error) {
 				log.Warn("gxregistry.DecodeService() = error:%s", err)
 				continue
 			}
-			var action gxregistry.ServiceEventType
+
+			if !w.opts.Filter.Filter(*service.Attr) {
+				continue
+			}
 
 			switch ev.Type {
 			case clientv3.EventTypePut:
@@ -109,6 +115,7 @@ func (w *Watcher) Next() (*gxregistry.EventResult, error) {
 
 func (w *Watcher) Valid() bool {
 	if w.IsClosed() {
+		fmt.Println("fuck0")
 		return false
 	}
 
