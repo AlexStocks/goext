@@ -5,11 +5,13 @@
 ## dev list ##
 ---
 
-- 2018/04/20   
+- 2018/04/21
+  > feature
+  * add reuseport from github.com/kavu/go_reuseport
+
+- 2018/04/20
   > feature
   * add timespan from github.com/senseyeio/spaniel/
-
-    ​
 
 - 2018/04/19
   > feature

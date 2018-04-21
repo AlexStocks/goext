@@ -4,7 +4,7 @@
 
 // Package gxtime encapsulates some golang.time functions
 // refer from https://github.com/senseyeio/spaniel/blob/master/timespan.go
-package gxtime
+package gxtimespan
 
 import (
 	"time"

@@ -4,7 +4,7 @@
 
 // Package gxtime encapsulates some golang.time functions
 // refers from https://github.com/senseyeio/spaniel/blob/master/interval.go
-package gxtime
+package gxtimespan
 
 import (
 	"sort"
