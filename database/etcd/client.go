@@ -7,7 +7,6 @@ package gxetcd
 
 import (
 	"context"
-	"fmt"
 	"sync"
 )
 
@@ -56,7 +55,6 @@ func (c *Client) KeepAlive() (<-chan *ecv3.LeaseKeepAliveResponse, error) {
 
 	if id == ecv3.NoLease {
 		rsp, err := c.client.Grant(c.opts.ctx, int64(c.opts.ttl.Seconds()))
-		fmt.Printf("rsp:%+v, ttl:%d\n", rsp, c.opts.ttl.Seconds())
 		if err != nil {
 			return nil, jerrors.Annotatef(err, "etcdv3.Grant()")
 		}
@@ -94,11 +92,9 @@ func (c *Client) Lease() ecv3.LeaseID { return c.id }
 // TTL return the ttl of Client's lease
 func (c *Client) TTL() int64 {
 	rsp, err := c.client.TimeToLive(context.TODO(), c.id)
-	fmt.Printf("client lease id:%+v, rsp:%+v\n", c.id, rsp)
 	if err != nil {
 		return 0
 	}
-	fmt.Printf("rsp.ttl:%+v\n", rsp.TTL)
 
 	return rsp.TTL
 }

@@ -83,70 +83,77 @@ func NewRegistry(opts ...gxregistry.Option) (gxregistry.Registry, error) {
 		serviceRegistry: make(map[gxregistry.ServiceAttr]gxregistry.Service),
 	}
 
-	r.wg.Add(1)
-	go r.handleEtcdRestart()
+	err = r.handleEtcdRestart()
+	if err != nil {
+		return nil, jerrors.Annotate(err, "registry.handleEtcdRestart()")
+	}
 
 	return r, nil
 }
 
-func (r *Registry) handleEtcdRestart() {
-	var (
-		failTime     int
-		registerFlag bool
-	)
-	defer r.wg.Done()
-
+func (r *Registry) handleEtcdRestart() error {
 	keepAlive, err := r.client.KeepAlive()
 	if err != nil {
-		log.Warn("gxetcd.KeepAlive() = error:%+v", err)
+		return jerrors.Annotate(err, "gxetcd.KeepAlive()")
 	}
 
-LOOP:
-	for {
-		select {
-		case <-r.done:
-			log.Warn("Registry.done closed. Registry.handleEtcdRestart exit now ...")
-			break LOOP
-		case msg, ok := <-keepAlive:
-			// eat messages until keep alive channel closes
-			if !ok {
-				registerFlag = true
-				log.Warn("etcd keep alive channel closed")
-				keepAlive, err = r.client.KeepAlive()
-				if err != nil {
-					log.Warn("gxetcd.KeepAlive() = error:%+v", err)
-				}
-				failTime <<= 1
-				if failTime == 0 {
-					failTime = 1e8
-				} else if gxregistry.MaxFailTime < failTime {
-					failTime = gxregistry.MaxFailTime
-				}
-				time.Sleep(time.Duration(failTime)) // to avoid connecting the registry tool frequently
-			} else {
-				failTime = 0
-				// the etcd has restarted. now we need to register all services
-				if registerFlag {
-					services := []gxregistry.Service{}
-					r.Lock()
-					for _, s := range r.serviceRegistry {
-						services = append(services, s)
+	r.wg.Add(1)
+	go func() {
+		var (
+			failTime     int
+			registerFlag bool
+		)
+		defer r.wg.Done()
+
+	LOOP:
+		for {
+			select {
+			case <-r.done:
+				log.Warn("Registry.done closed. Registry.handleEtcdRestart exit now ...")
+				break LOOP
+			case msg, ok := <-keepAlive:
+				// eat messages until keep alive channel closes
+				if !ok {
+					registerFlag = true
+					log.Warn("etcd keep alive channel closed")
+					keepAlive, err = r.client.KeepAlive()
+					if err != nil {
+						log.Warn("gxetcd.KeepAlive() = error:%+v", err)
 					}
-					r.Unlock()
-					failure := false
-					for idx := range services {
-						if err = r.register(services[idx]); err != nil {
-							failure = true
-							log.Warn("Registry.register(service:{%#v}) = err:%+v", services[idx], err)
-							break
+					failTime <<= 1
+					if failTime == 0 {
+						failTime = 1e8
+					} else if gxregistry.MaxFailTime < failTime {
+						failTime = gxregistry.MaxFailTime
+					}
+					time.Sleep(time.Duration(failTime)) // to avoid connecting the registry tool frequently
+				} else {
+					failTime = 0
+					// the etcd has restarted. now we need to register all services
+					if registerFlag {
+						services := []gxregistry.Service{}
+						r.Lock()
+						for _, s := range r.serviceRegistry {
+							services = append(services, s)
 						}
+						r.Unlock()
+						failure := false
+						for idx := range services {
+							if err = r.register(services[idx]); err != nil {
+								failure = true
+								log.Warn("Registry.register(service:{%#v}) = err:%+v", services[idx], err)
+								break
+							}
+						}
+						registerFlag = failure // when fails to register all services,  just register again.
 					}
-					registerFlag = failure // when fails to register all services,  just register again.
+					log.Debug("Recv msg from etcd KeepAlive: %s\n", msg.String())
 				}
-				log.Debug("Recv msg from etcd KeepAlive: %s\n", msg.String())
 			}
 		}
-	}
+	}()
+
+	return nil
 }
 
 func (r *Registry) Options() gxregistry.Options {

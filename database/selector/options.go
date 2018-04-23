@@ -32,7 +32,7 @@ func WithRegistry(r gxregistry.Registry) Option {
 	}
 }
 
-// WithSetStrategy sets the default strategy for the selector
+// WithSelectMode sets the default strategy for the selector
 func WithSelectMode(mode SelectorMode) Option {
 	return func(o *Options) {
 		o.Mode = mode

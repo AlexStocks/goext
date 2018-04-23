@@ -9,13 +9,10 @@ import (
 	jerrors "github.com/juju/errors"
 )
 
-// Watcher is an interface that returns updates
-// about services within the registry.
 type Watcher interface {
-	// Next is a blocking call
-	Next() (*EventResult, error)
+	Notify() (*EventResult, error)
 	Valid() bool // 检查watcher与registry连接是否正常
-	Stop()
+	Close()
 	IsClosed() bool
 }
 

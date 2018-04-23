@@ -20,15 +20,17 @@ type Options struct {
 	Context context.Context
 }
 
+type WatchFilter func(ServiceAttr) bool
+
 type WatchOptions struct {
 	// the root registry path, suck as "/dubbo/"
 	Root string
 	// Specify a service to watch
-	// If blank, the watch is for all services
-	Filter ServiceAttr
-	// Specify a service role to watch
-	// If blank, the watch is for all roles
-	Role ServiceRoleType
+	// Its Service should not be nil.
+	Attr ServiceAttr
+	// Specify a filter to service role to watch
+	// If blank, the watch will filter by @Attr
+	Filter WatchFilter
 	// Other options for implementations of the interface
 	// can be stored in a context
 	Context context.Context
@@ -64,9 +66,25 @@ func WithWatchRoot(root string) WatchOption {
 	}
 }
 
+//// WithLease specifies the existing leaseID to be used for the session.
+//// This is useful in process restart scenario, for example, to reclaim
+//// leadership from an election prior to restart.
+//func WithWatchLease(leaseID ecv3.LeaseID) WatchOption {
+//	return func(so *WatchOptions) {
+//		so.LeaseID = leaseID
+//	}
+//}
+
 // Watch a service
-func WithWatchFilter(attr ServiceAttr) WatchOption {
+func WithWatchServiceAttr(attr ServiceAttr) WatchOption {
 	return func(o *WatchOptions) {
-		o.Filter = attr
+		o.Attr = attr
+	}
+}
+
+// Watch a service
+func WithWatchFilter(f WatchFilter) WatchOption {
+	return func(o *WatchOptions) {
+		o.Filter = f
 	}
 }

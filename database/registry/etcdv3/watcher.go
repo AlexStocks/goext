@@ -8,6 +8,7 @@ package gxetcd
 
 import (
 	"context"
+	"strings"
 )
 
 import (
@@ -16,7 +17,6 @@ import (
 )
 
 import (
-	"fmt"
 	"github.com/AlexStocks/goext/database/etcd"
 	"github.com/AlexStocks/goext/database/registry"
 	log "github.com/AlexStocks/log4go"
@@ -37,32 +37,55 @@ func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) (gxregist
 		o(&options)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{}, 1)
-
 	if options.Root == "" {
 		options.Root = gxregistry.DefaultServiceRoot
 	}
-	if options.Filter.Service == "" {
+	if options.Attr.Service == "" {
 		return nil, jerrors.Errorf("options.Service is nil")
 	}
-	s := gxregistry.Service{
-		Attr: &gxregistry.ServiceAttr{Service: options.Filter.Service},
-	}
-	watchPath := s.Path(options.Root)
 
+	if client.TTL() < 0 {
+		// there is no lease
+		// fix bug of TestValid, 20180421
+		_, err := client.KeepAlive()
+		if err != nil {
+			return nil, jerrors.Annotate(err, "client.KeepAlive")
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{}, 1)
+
+	watchPath := options.Root
+	if !strings.HasSuffix(watchPath, "/") {
+		watchPath += "/"
+	}
 	w := client.EtcdClient().Watch(ctx, watchPath, clientv3.WithPrefix(), clientv3.WithPrevKV())
 
-	return &Watcher{
+	wc := &Watcher{
 		done:   done,
 		cancel: cancel,
 		w:      w,
+		opts:   options,
 		client: client,
-	}, nil
+	}
+
+	if wc.opts.Filter == nil {
+		wc.opts.Filter = func(attr gxregistry.ServiceAttr) bool {
+			return wc.opts.Attr.Filter(attr)
+		}
+	}
+
+	return wc, nil
 }
 
-func (w *Watcher) Next() (*gxregistry.EventResult, error) {
-	var action gxregistry.ServiceEventType
+func (w *Watcher) Notify() (*gxregistry.EventResult, error) {
+	var (
+		err     error
+		service *gxregistry.Service
+		action  gxregistry.ServiceEventType
+	)
+
 	for msg := range w.w {
 		if w.IsClosed() {
 			return nil, gxregistry.ErrWatcherClosed
@@ -73,16 +96,6 @@ func (w *Watcher) Next() (*gxregistry.EventResult, error) {
 		}
 
 		for _, ev := range msg.Events {
-			service, err := gxregistry.DecodeService(ev.Kv.Value)
-			if err != nil {
-				log.Warn("gxregistry.DecodeService() = error:%s", err)
-				continue
-			}
-
-			if !w.opts.Filter.Filter(*service.Attr) {
-				continue
-			}
-
 			switch ev.Type {
 			case clientv3.EventTypePut:
 				if ev.IsCreate() {
@@ -90,39 +103,51 @@ func (w *Watcher) Next() (*gxregistry.EventResult, error) {
 				} else if ev.IsModify() {
 					action = gxregistry.ServiceUpdate
 				}
+
+				service, err = gxregistry.DecodeService(ev.Kv.Value)
+				if err != nil || service == nil {
+					log.Warn("gxregistry.DecodeService() = {service:%p, error:%+v}", service, err)
+					continue
+				}
+
+				if !w.opts.Filter(*service.Attr) {
+					continue
+				}
+
 			case clientv3.EventTypeDelete:
 				action = gxregistry.ServiceDel
 
 				// get service from prevKv
 				service, err = gxregistry.DecodeService(ev.PrevKv.Value)
-				if err != nil {
-					log.Warn("gxregistry.DecodeService() = error:%s", err)
+				if err != nil || service == nil {
+					log.Warn("gxregistry.DecodeService() = {service:%p, error:%+v}", service, err)
+					continue
+				}
+
+				if !w.opts.Filter(*service.Attr) {
 					continue
 				}
 			}
 
-			if service == nil {
-				continue
-			}
 			return &gxregistry.EventResult{
 				Action:  action,
 				Service: service,
 			}, nil
 		}
 	}
+
 	return nil, jerrors.Errorf("could not get next")
 }
 
 func (w *Watcher) Valid() bool {
 	if w.IsClosed() {
-		fmt.Println("fuck0")
 		return false
 	}
 
 	return w.client.TTL() > 0
 }
 
-func (w *Watcher) Stop() {
+func (w *Watcher) Close() {
 	select {
 	case <-w.done:
 		return

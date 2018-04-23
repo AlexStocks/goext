@@ -77,7 +77,7 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, erro
 	s.Lock()
 	defer s.Unlock()
 
-	serviceString := attr.Name
+	serviceString := attr.Service
 	// check the cache first
 	services, ok := s.cache[serviceString]
 	ttl, kk := s.ttls[serviceString]
@@ -155,7 +155,7 @@ func (s *Selector) update(res *gxregistry.EventResult) {
 	)
 
 	log.Debug("update @registry result{%s}", res)
-	sname = res.Service.Attr.Name
+	sname = res.Service.Attr.Service
 	s.Lock()
 	services, ok = s.cache[sname]
 	log.Debug("service name:%s, get service{%#v} event, its current member lists:", sname, services)
@@ -291,8 +291,8 @@ func (s *Selector) watch(w gxregistry.Watcher) error {
 	}()
 
 	for {
-		res, err = w.Next()
-		log.Debug("watch.Next() = result{%s}, error{%#v}", res, err)
+		res, err = w.Notify()
+		log.Debug("watch.Notify() = result{%s}, error{%#v}", res, err)
 		if err != nil {
 			return err
 		}

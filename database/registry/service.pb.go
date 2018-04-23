@@ -1954,12 +1954,12 @@ func EncodeService(s *Service) (string, error) {
 }
 
 func DecodeService(ds []byte) (*Service, error) {
-	var s *Service
+	var s Service
 	err := json.Unmarshal(ds, &s)
 	if err != nil {
-		return nil, jerrors.Annotatef(err, "json.Unmarshal()")
+		return nil, jerrors.Annotatef(err, "json.Unmarshal(data:%s)", gxstrings.String(ds))
 	}
-	return s, nil
+	return &s, nil
 }
 
 func registryPath(paths ...string) string {
