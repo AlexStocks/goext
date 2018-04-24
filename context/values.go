@@ -17,8 +17,9 @@ type Values struct {
 	m map[interface{}]interface{}
 }
 
-func (v Values) Get(key interface{}) interface{} {
-	return v.m[key]
+func (v Values) Get(key interface{}) (interface{}, bool) {
+	i, b := v.m[key]
+	return i, b
 }
 
 func (c Values) Set(key interface{}, value interface{}) {
@@ -47,7 +48,7 @@ func NewValuesContext(ctx context.Context) *ValuesContext {
 	}
 }
 
-func (c *ValuesContext) Get(key interface{}) interface{} {
+func (c *ValuesContext) Get(key interface{}) (interface{}, bool) {
 	return c.Context.Value(defaultCtxKey).(Values).Get(key)
 }
 

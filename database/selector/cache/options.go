@@ -6,11 +6,11 @@
 package gxcache
 
 import (
-	"context"
 	"time"
 )
 
 import (
+	"github.com/AlexStocks/goext/context"
 	"github.com/AlexStocks/goext/database/selector"
 )
 
@@ -21,8 +21,8 @@ const (
 func WithTTL(t time.Duration) gxselector.Option {
 	return func(o *gxselector.Options) {
 		if o.Context == nil {
-			o.Context = context.Background()
+			o.Context = gxcontext.NewValuesContext(nil)
 		}
-		o.Context = context.WithValue(o.Context, GxselectorDefaultKey, t)
+		o.Context.Set(GxselectorDefaultKey, t)
 	}
 }

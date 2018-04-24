@@ -9,12 +9,10 @@ import (
 	jerrors "github.com/juju/errors"
 )
 
-// The registry provides an interface for service discovery
-// and an abstraction over varying implementations
-// {etcd, zookeeper, ...}
+// Registry provides an interface for service register
 type Registry interface {
 	Register(service Service) error
-	Unregister(service Service) error
+	Deregister(service Service) error
 	GetService(attr ServiceAttr) (*Service, error)
 	Watch(opts ...WatchOption) (Watcher, error)
 	Close() error

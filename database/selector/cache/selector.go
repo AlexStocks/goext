@@ -261,7 +261,7 @@ func (s *Selector) tick() {
 
 // watch loops the next event and calls update
 // it returns if there's an error
-// 如果收到了退出信号或者Next调用返回错误，就调用watcher的stop函数
+// 如果收到了退出信号或者Filter调用返回错误，就调用watcher的stop函数
 func (s *Selector) watch(w gxregistry.Watcher) error {
 	var (
 		err  error
@@ -273,7 +273,7 @@ func (s *Selector) watch(w gxregistry.Watcher) error {
 
 	defer func() {
 		close(done)
-		w.Stop()
+		w.Close()
 	}()
 	s.wg.Add(1)
 	go func() {
@@ -281,10 +281,10 @@ func (s *Selector) watch(w gxregistry.Watcher) error {
 		// 上面的意思是这个goroutine会一直卡在这个select段上，直到收到done或者reload signal
 		select {
 		case <-s.done:
-			w.Stop() // stop之后下面的Next函数就会返回error
+			w.Close() // close之后下面的Filter函数就会返回error
 		case <-s.reload: // 除非Init函数被调用，否则reload不会收到任何信号
 			// stop the watcher
-			w.Stop()
+			w.Close()
 		case <-done:
 		}
 		s.wg.Done()
@@ -330,7 +330,7 @@ func (s *Selector) Options() gxselector.Options {
 	return s.so
 }
 
-func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Next, error) {
+func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Filter, error) {
 	var (
 		err      error
 		services []*gxregistry.Service
@@ -354,7 +354,7 @@ func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Next, erro
 		return nil, gxselector.ErrNoneAvailable
 	}
 
-	return gxselector.SelectorNext(s.so.Mode)(services), nil
+	return gxselector.SelectorFilter(s.so.Mode)(services), nil
 }
 
 // Close stops the watcher and destroys the cache
@@ -400,7 +400,7 @@ func NewSelector(opts ...gxselector.Option) gxselector.Selector {
 	ttl := DefaultTTL
 
 	if sopts.Context != nil {
-		if t, ok := sopts.Context.Value(GxselectorDefaultKey).(time.Duration); ok {
+		if t, ok := sopts.Context.Get(GxselectorDefaultKey).(time.Duration); ok {
 			ttl = t
 		}
 	}

@@ -85,8 +85,8 @@ func (suite *RegisterTestSuite) TestRegistry_Register() {
 
 	// unregister node1
 	service = gxregistry.Service{Attr: &suite.sa, Nodes: []*gxregistry.Node{&node1}}
-	err = suite.reg.Unregister(service)
-	suite.Equalf(nil, err, "Unregister(service:%+v)", service)
+	err = suite.reg.Deregister(service)
+	suite.Equalf(nil, err, "Deregister(service:%+v)", service)
 	_, flag = suite.reg.(*Registry).exist(service)
 	suite.Equalf(false, flag, "Registry.exist(service:%s)", gxlog.PrettyString(service))
 
@@ -97,8 +97,8 @@ func (suite *RegisterTestSuite) TestRegistry_Register() {
 
 	// unregister node0
 	service = gxregistry.Service{Attr: &suite.sa, Nodes: []*gxregistry.Node{&suite.node}}
-	err = suite.reg.Unregister(service)
-	suite.Equalf(nil, err, "Unregister(service:%+v)", service)
+	err = suite.reg.Deregister(service)
+	suite.Equalf(nil, err, "Deregister(service:%+v)", service)
 	_, flag = suite.reg.(*Registry).exist(service)
 	suite.Equalf(false, flag, "Registry.exist(service:%s)", gxlog.PrettyString(service))
 

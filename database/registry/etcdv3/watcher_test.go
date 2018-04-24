@@ -175,7 +175,7 @@ func (suite *WatcherTestSuite) TestNotify() {
 		Attr:  &suite.sa,
 		Nodes: []*gxregistry.Node{&suite.node},
 	}
-	err = suite.reg.Unregister(service)
+	err = suite.reg.Deregister(service)
 	suite.Equalf(nil, err, "Register(service:%+v)", service)
 	wg.Wait()
 	suite.Equal(nil, err)

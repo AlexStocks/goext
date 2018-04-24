@@ -2,7 +2,7 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-// Package gxregistry provides a interface for service selector
+// Package gxselector provides a interface for service selector
 package gxselector
 
 import (
@@ -10,23 +10,17 @@ import (
 	jerrors "github.com/juju/errors"
 )
 
-// Selector builds on the registry as a mechanism to pick nodes
-// and mark their status. This allows host pools and other things
-// to be built using various algorithms.
+// Filter returns a available node based on its load balance algorithm.
+type Filter func(ID uint64) (*gxregistry.Service, error)
+
+// Selector used to get service nodes from registry.
 type Selector interface {
 	Init(opts ...Option) error
 	Options() Options
-	// Select returns a function which should return the next node
-	Select(attr gxregistry.ServiceAttr) (Next, error)
-	// Close renders the selector unusable
+	Select(attr gxregistry.ServiceAttr) (Filter, error)
 	Close() error
-	// Name of the selector
 	String() string
 }
-
-// Next is a function that returns the next node
-// based on the selector's strategy
-type Next func(ID uint64) (*gxregistry.Service, error)
 
 var (
 	ErrNotFound              = jerrors.Errorf("not found")

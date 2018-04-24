@@ -6,7 +6,6 @@
 package gxregistry
 
 import (
-	"context"
 	"time"
 )
 
@@ -14,10 +13,6 @@ type Options struct {
 	Addrs   []string
 	Timeout time.Duration
 	Root    string
-
-	// Other options for implementations of the interface
-	// can be stored in a context
-	Context context.Context
 }
 
 type WatchFilter func(ServiceAttr) bool
@@ -31,9 +26,6 @@ type WatchOptions struct {
 	// Specify a filter to service role to watch
 	// If blank, the watch will filter by @Attr
 	Filter WatchFilter
-	// Other options for implementations of the interface
-	// can be stored in a context
-	Context context.Context
 }
 
 type Option func(*Options)
@@ -65,15 +57,6 @@ func WithWatchRoot(root string) WatchOption {
 		o.Root = root
 	}
 }
-
-//// WithLease specifies the existing leaseID to be used for the session.
-//// This is useful in process restart scenario, for example, to reclaim
-//// leadership from an election prior to restart.
-//func WithWatchLease(leaseID ecv3.LeaseID) WatchOption {
-//	return func(so *WatchOptions) {
-//		so.LeaseID = leaseID
-//	}
-//}
 
 // Watch a service
 func WithWatchServiceAttr(attr ServiceAttr) WatchOption {

@@ -9,6 +9,7 @@ import (
 	jerrors "github.com/juju/errors"
 )
 
+// Watcher provides an interface for service discovery
 type Watcher interface {
 	Notify() (*EventResult, error)
 	Valid() bool // 检查watcher与registry连接是否正常

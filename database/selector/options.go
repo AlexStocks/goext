@@ -6,20 +6,14 @@
 package gxselector
 
 import (
-	"context"
-)
-
-import (
+	"github.com/AlexStocks/goext/context"
 	"github.com/AlexStocks/goext/database/registry"
 )
 
 type Options struct {
 	Registry gxregistry.Registry
 	Mode     SelectorMode // selector mode
-
-	// Other options for implementations of the interface
-	// can be stored in a context
-	Context context.Context
+	Context  *gxcontext.ValuesContext
 }
 
 // Option used to initialise the selector
@@ -39,7 +33,7 @@ func WithSelectMode(mode SelectorMode) Option {
 	}
 }
 
-func WithContext(ctx context.Context) Option {
+func WithContext(ctx *gxcontext.ValuesContext) Option {
 	return func(o *Options) {
 		o.Context = ctx
 	}

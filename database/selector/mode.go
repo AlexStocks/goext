@@ -19,10 +19,10 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-type SelectorModeFunc func([]*gxregistry.Service) Next
+type SelectorModeFunc func([]*gxregistry.Service) Filter
 
 // Random is a random strategy algorithm for node selection
-func random(services []*gxregistry.Service) Next {
+func random(services []*gxregistry.Service) Filter {
 	return func(ID uint64) (*gxregistry.Service, error) {
 		if len(services) == 0 {
 			return nil, ErrNoneAvailable
@@ -34,7 +34,7 @@ func random(services []*gxregistry.Service) Next {
 }
 
 // hash is hash strategy algorithm for node selection
-func hash(services []*gxregistry.Service) Next {
+func hash(services []*gxregistry.Service) Filter {
 	return func(ID uint64) (*gxregistry.Service, error) {
 		if len(services) == 0 {
 			return nil, ErrNoneAvailable
@@ -46,7 +46,7 @@ func hash(services []*gxregistry.Service) Next {
 }
 
 // RoundRobin is a roundrobin strategy algorithm for node selection
-func roundRobin(services []*gxregistry.Service) Next {
+func roundRobin(services []*gxregistry.Service) Filter {
 	var i uint64
 	var mtx sync.Mutex
 
@@ -105,7 +105,7 @@ var (
 	}
 )
 
-func SelectorNext(mode SelectorMode) SelectorModeFunc {
+func SelectorFilter(mode SelectorMode) SelectorModeFunc {
 	if mode < SM_BEGIN || SM_END < mode {
 		mode = SM_Random
 	}

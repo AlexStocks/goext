@@ -3,7 +3,6 @@
 // governed by Apache License 2.0.
 
 // Package gxetcd provides an etcd version 3 gxregistry
-// ref: https://github.com/micro/go-plugins/blob/master/registry/etcdv3/etcdv3.go
 package gxetcd
 
 import (
@@ -316,7 +315,7 @@ func (r *Registry) unregister(s gxregistry.Service) error {
 	return nil
 }
 
-func (r *Registry) Unregister(s gxregistry.Service) error {
+func (r *Registry) Deregister(s gxregistry.Service) error {
 	r.deleteService(s)
 	return r.unregister(s)
 }
