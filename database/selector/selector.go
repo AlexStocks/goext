@@ -19,7 +19,6 @@ type Selector interface {
 	Options() Options
 	Select(attr gxregistry.ServiceAttr) (Filter, error)
 	Close() error
-	String() string
 }
 
 var (

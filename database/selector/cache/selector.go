@@ -2,7 +2,7 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-// Package gxregistry provides a interface for service selector
+// Package gxcache provides a cache selector
 package gxcache
 
 import (
@@ -21,26 +21,20 @@ import (
 )
 
 var (
-	// selector每DefaultTTL分钟通过tick函数清空cache或者get函数去清空某个service的cache，
-	// 以全量获取某个service的所有providers
 	DefaultTTL = 5 * time.Minute
 )
 
-/*
-	Cache selector is a selector which uses the registry.Watcher to Cache service entries.
-	It defaults to a TTL for DefaultTTL and causes a cache miss on the next request.
-*/
+// the cached selector
 type Selector struct {
-	so  gxselector.Options // registry & strategy
-	ttl time.Duration
+	opts gxselector.Options // registry & strategy
+	ttl  time.Duration
 
-	// registry cache
 	wg sync.WaitGroup
 	sync.Mutex
 	cache map[string][]*gxregistry.Service
-	ttls  map[string]time.Time // 每个数组的创建时间
+	// the creation time for every []*gxregistry.Service.
+	ttls map[string]time.Time
 
-	// used to close or reload watcher
 	reload chan struct{}
 	done   chan struct{}
 }
@@ -54,9 +48,7 @@ func (s *Selector) quit() bool {
 	}
 }
 
-// cp copies a service. Because we're caching handing back pointers would
-// create a race condition, so we do this instead its fast enough
-// 这个函数会被下面的get函数调用，get调用期间会启用lock
+// cp is invoked by function get.
 func (s *Selector) cp(current []*gxregistry.Service) []*gxregistry.Service {
 	var services []*gxregistry.Service
 
@@ -67,7 +59,6 @@ func (s *Selector) cp(current []*gxregistry.Service) []*gxregistry.Service {
 	return services
 }
 
-// 此接口无用
 func (s *Selector) del(service string) {
 	delete(s.cache, service)
 	delete(s.ttls, service)
@@ -83,10 +74,9 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, erro
 	ttl, kk := s.ttls[serviceString]
 	log.Debug("s.cache[serviceString{%v}] = services{%v}", serviceString, services)
 
-	// got results, copy and return
 	if ok && len(services) > 0 {
 		// only return if its less than the ttl
-		// 拷贝services的内容，防止发生add/del event时影响results内容
+		// and copy the service array in case of its results is affected by function add/del
 		if kk && time.Since(ttl) < s.ttl {
 			return s.cp(services), nil
 		}
@@ -94,15 +84,15 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, erro
 			serviceString, services, ttl, s.ttl)
 	}
 
-	// cache miss or ttl expired
-	// now ask the registry
-	svc, err := s.so.Registry.GetService(attr)
+	svc, err := s.opts.Registry.GetService(attr)
 	if err != nil {
 		log.Error("registry.GetService(serviceString{%v}) = err{%T, %v}", serviceString, err, err)
 		if ok && len(services) > 0 {
 			log.Error("serviceString{%v} timeout. can not get new serviceString array, use old instead", serviceString)
-			return services, nil // 超时后，如果获取不到新的，就先暂用旧的
+			// all local services expired and can not get new services from registry, just use che cached instead
+			return services, nil
 		}
+
 		return nil, err
 	}
 
@@ -111,14 +101,13 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, erro
 		serviceArray = append(serviceArray, &gxregistry.Service{Attr: svc.Attr, Nodes: []*gxregistry.Node{node}})
 	}
 
-	// we didn't have any results so cache
 	s.cache[serviceString] = s.cp(serviceArray)
 	s.ttls[serviceString] = time.Now().Add(s.ttl)
 
 	return serviceArray, nil
 }
 
-// update函数调用set函数，update函数调用期间会启用lock
+// update will invoke set
 func (s *Selector) set(service string, services []*gxregistry.Service) {
 	if 0 < len(services) {
 		s.cache[service] = services
@@ -186,31 +175,16 @@ func (s *Selector) update(res *gxregistry.EventResult) {
 	s.Unlock()
 }
 
-// run starts the cache watcher loop
-// it creates a new watcher if there's a problem
-// reloads the watcher if Init is called
-// and returns when Close is called
 func (s *Selector) run() {
 	defer s.wg.Done()
-	// 这个函数会周期性地清空cache，从函数注释来看作者对这个函数设计也存疑，而如此频繁的刷新会导致register不断地在zk上创建大量临时节点，
-	// 故而我觉得不用它比较好 // AlexStocks 2016/07/09
-	//
-	// 其实，Select调用get函数获取service的service url array的时候，也会进行超时检查
-	//
-	// 将来进行负载均衡开发的时候，可以重新打开这个函数，进行权重更新计算
-	// go s.tick() // 这个tick是周期性执行函数，周期性的清空cache
-
-	// 除非收到quit信号，否则一直卡在watch上，watch内部也是一个loop
 	for {
-		// done early if already dead
+		// quit asap
 		if s.quit() {
 			log.Warn("(Selector)run() quit now")
 			return
 		}
 
-		// create new watcher
-		// 创建新watch，走到这一步要么第一次for循环进来，要么是watch函数出错。watch出错说明registry.watch的zk client与zk连接出现了问题
-		w, err := s.so.Registry.Watch()
+		w, err := s.opts.Registry.Watch()
 		log.Debug("cache.Registry.Watch() = watch{%#v}, error{%#v}", w)
 		if err != nil {
 			if s.quit() {
@@ -221,13 +195,9 @@ func (s *Selector) run() {
 			continue
 		}
 
-		// watch for events
-		// 除非watch遇到错误，否则watch函数内部的for循环一直运行下午，run函数的for循环也会一直卡在watch函数上
-		// watch一旦退出，就会执行registry.Watch().Stop, 相应的client就会无效
 		err = s.watch(w)
 		log.Debug("cache.watch(w) = err{%#v}", err)
 		if err != nil {
-			// log.Println(err)
 			log.Warn("Selector.watch() = error{%v}", err)
 			time.Sleep(common.TimeSecondDuration(gxregistry.REGISTRY_CONN_DELAY))
 			continue
@@ -235,33 +205,6 @@ func (s *Selector) run() {
 	}
 }
 
-// check cache and expire on each tick
-// tick函数每隔一分钟把Selector.cache中所有内容clear一次，这样做貌似不好
-func (s *Selector) tick() {
-	t := time.NewTicker(time.Minute)
-	defer t.Stop()
-
-	for {
-		select {
-		case <-t.C:
-			s.Lock()
-			for service, expiry := range s.ttls {
-				if d := time.Since(expiry); d > s.ttl {
-					// TODO: maybe refresh the cache rather than blowing it away
-					log.Warn("tick delete service{%s}", service)
-					s.del(service)
-				}
-			}
-			s.Unlock()
-		case <-s.done:
-			return
-		}
-	}
-}
-
-// watch loops the next event and calls update
-// it returns if there's an error
-// 如果收到了退出信号或者Filter调用返回错误，就调用watcher的stop函数
 func (s *Selector) watch(w gxregistry.Watcher) error {
 	var (
 		err  error
@@ -277,12 +220,10 @@ func (s *Selector) watch(w gxregistry.Watcher) error {
 	}()
 	s.wg.Add(1)
 	go func() {
-		// wait for done or reload signal
-		// 上面的意思是这个goroutine会一直卡在这个select段上，直到收到done或者reload signal
 		select {
 		case <-s.done:
-			w.Close() // close之后下面的Filter函数就会返回error
-		case <-s.reload: // 除非Init函数被调用，否则reload不会收到任何信号
+			w.Close()
+		case <-s.reload:
 			// stop the watcher
 			w.Close()
 		case <-done:
@@ -297,7 +238,7 @@ func (s *Selector) watch(w gxregistry.Watcher) error {
 			return err
 		}
 		if res.Action == gxregistry.ServiceDel && !w.Valid() {
-			// consumer与registry连接中断的情况下，为了服务的稳定不删除任何provider
+			// do not delete any provider when consumer failed to connect the registry.
 			log.Warn("update @result{%s}. But its connection to registry is invalid", res)
 			continue
 		}
@@ -308,7 +249,7 @@ func (s *Selector) watch(w gxregistry.Watcher) error {
 
 func (s *Selector) Init(opts ...gxselector.Option) error {
 	for _, o := range opts {
-		o(&s.so)
+		o(&s.opts)
 	}
 
 	// reload the watcher
@@ -327,7 +268,7 @@ func (s *Selector) Init(opts ...gxselector.Option) error {
 }
 
 func (s *Selector) Options() gxselector.Options {
-	return s.so
+	return s.opts
 }
 
 func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Filter, error) {
@@ -336,36 +277,26 @@ func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Filter, er
 		services []*gxregistry.Service
 	)
 
-	// get the service
-	// try the cache first
-	// if that fails go directly to the registry
 	services, err = s.get(service)
 	log.Debug("get(service{%+v} = serviceURL array{%+v})", service, services)
 	if err != nil {
 		log.Error("cache.get(service{%s}) = error{%T-%v}", service, err, err)
-		// return nil, err
 		return nil, gxselector.ErrNotFound
 	}
-	//for i, s := range services {
-	//	log.Debug("services[%d] = serviceURL{%#v}", i, s)
-	//}
-	// if there's nothing left, return
 	if len(services) == 0 {
 		return nil, gxselector.ErrNoneAvailable
 	}
 
-	return gxselector.SelectorFilter(s.so.Mode)(services), nil
+	return gxselector.SelectorFilter(s.opts.Mode)(services), nil
 }
 
-// Close stops the watcher and destroys the cache
-// Close函数清空service url cache，且发出done signal以停止watch的运行
 func (s *Selector) Close() error {
 	s.Lock()
 	s.cache = make(map[string][]*gxregistry.Service)
 	s.Unlock()
 
 	select {
-	case <-s.done: // 这里这个技巧非常好，检测是否已经close了c.done
+	case <-s.done:
 		return nil
 	default:
 		close(s.done)
@@ -374,16 +305,6 @@ func (s *Selector) Close() error {
 	return nil
 }
 
-func (s *Selector) String() string {
-	return "cache selector"
-}
-
-// selector主要有两个接口，对外接口Select用于获取地址，select调用get，get调用cp;
-// 对内接口run调用watch,watch则调用update，update调用set，以用于接收add/del service url.
-//
-// 还有两个接口Init和Close,Init用于发出reload信号，重新初始化selector，而Close则是发出stop信号，停掉watch，清算破产
-//
-// registor自身主要向selector暴露了watch功能
 func NewSelector(opts ...gxselector.Option) gxselector.Selector {
 	sopts := gxselector.Options{
 		Mode: gxselector.SM_Random,
@@ -400,13 +321,13 @@ func NewSelector(opts ...gxselector.Option) gxselector.Selector {
 	ttl := DefaultTTL
 
 	if sopts.Context != nil {
-		if t, ok := sopts.Context.Get(GxselectorDefaultKey).(time.Duration); ok {
-			ttl = t
+		if t, ok := sopts.Context.Get(GxselectorDefaultKey); ok {
+			ttl = t.(time.Duration)
 		}
 	}
 
 	s := &Selector{
-		so:     sopts,
+		opts:   sopts,
 		ttl:    ttl,
 		cache:  make(map[string][]*gxregistry.Service),
 		ttls:   make(map[string]time.Time),
