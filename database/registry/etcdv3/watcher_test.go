@@ -2,8 +2,6 @@ package gxetcd
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os/exec"
 	"sync"
 	"testing"
 	"time"
@@ -66,24 +64,6 @@ func (suite *WatcherTestSuite) TestValid() {
 	suite.Equal(false, flag, "after watcher.Close()")
 	flag = suite.wt.IsClosed()
 	suite.Equal(true, flag, "after watcher.Close()")
-}
-
-func (suite *WatcherTestSuite) execBashCommand(bashCmd string) {
-	cmd := exec.Command("/bin/bash", "-c", bashCmd)
-	stdout, err := cmd.StdoutPipe()
-	suite.Equalf(nil, err, "Error:can not obtain stdout pipe for command:%s", bashCmd)
-
-	// execute command
-	err = cmd.Start()
-	suite.Equalf(nil, err, "Error:The command %s is err,", bashCmd)
-
-	bytes, err := ioutil.ReadAll(stdout)
-	suite.Equal(nil, err, "ReadAll Stdout")
-
-	err = cmd.Wait()
-	suite.Equal(nil, err, "cmd.Wait()")
-	// suite.T().Logf("cmd %s result\n:%s", bashCmd, string(bytes))
-	fmt.Printf("cmd %s result\n:%s\n", bashCmd, string(bytes))
 }
 
 // 本单测测试步骤：
@@ -202,14 +182,6 @@ func (suite *WatcherTestSuite) TestNotify() {
 	suite.Equalf(gxregistry.ServiceDel, event.Action, "event:%+v", event)
 	suite.Equalf(service, *event.Service, "event:%+v", event)
 }
-
-//func (suite *WatcherTestSuite)TestNewWatcher() {
-//		_, err := suite.reg.Watch(
-//		gxregistry.WithWatchRoot("/etcd_test"),
-//		gxregistry.WithWatchFilter(gxregistry.ServiceAttr{Service: ""}),
-//	)
-//	suite.NotEqual(nil, err, "Registry.Watch()")
-//}
 
 func TestWatcherTestSuite(t *testing.T) {
 	suite.Run(t, new(WatcherTestSuite))

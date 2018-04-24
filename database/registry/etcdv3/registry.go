@@ -20,6 +20,7 @@ import (
 import (
 	"github.com/AlexStocks/goext/database/etcd"
 	"github.com/AlexStocks/goext/database/registry"
+	"github.com/AlexStocks/goext/runtime"
 	log "github.com/AlexStocks/log4go"
 )
 
@@ -109,7 +110,7 @@ func (r *Registry) handleEtcdRestart() error {
 		for {
 			select {
 			case <-r.done:
-				log.Warn("Registry.done closed. Registry.handleEtcdRestart exit now ...")
+				log.Warn("Registry.done closed. Registry.handleEtcdRestart goroutine %d exit now ...", gxruntime.GoID())
 				break LOOP
 			case msg, ok := <-keepAlive:
 				// eat messages until keep alive channel closes
