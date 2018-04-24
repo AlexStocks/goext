@@ -24,7 +24,6 @@ var (
 	DefaultTTL = 5 * time.Minute
 )
 
-// the cached selector
 type Selector struct {
 	opts gxselector.Options // registry & strategy
 	ttl  time.Duration
@@ -58,26 +57,21 @@ func (s *Selector) cp(current []*gxregistry.Service) []*gxregistry.Service {
 	return services
 }
 
-func (s *Selector) del(service string) {
-	delete(s.services, service)
-	delete(s.active, service)
-}
-
-func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, error) {
+func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxselector.ServiceToken, error) {
 	s.Lock()
 	defer s.Unlock()
 
 	serviceString := attr.Service
 	// check the services first
-	services, ok := s.services[serviceString]
-	ttl, kk := s.active[serviceString]
+	services, sok := s.services[serviceString]
+	ttl, tok := s.active[serviceString]
 	log.Debug("s.services[serviceString{%v}] = services{%v}", serviceString, services)
 
-	if ok && len(services) > 0 {
+	if sok && len(services) > 0 {
 		// only return if its less than the ttl
 		// and copy the service array in case of its results is affected by function add/del
-		if kk && time.Since(ttl) < s.ttl {
-			return s.cp(services), nil
+		if tok && time.Since(ttl) < s.ttl {
+			return s.cp(services), ttl.UnixNano(), nil
 		}
 		log.Warn("s.services[serviceString{%v}] = services{%v}, array ttl{%v} is less than services.ttl{%v}",
 			serviceString, services, ttl, s.ttl)
@@ -86,13 +80,13 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, erro
 	svc, err := s.opts.Registry.GetService(attr)
 	if err != nil {
 		log.Error("registry.GetService(serviceString{%v}) = err{%T, %v}", serviceString, err, err)
-		if ok && len(services) > 0 {
+		if sok && len(services) > 0 {
 			log.Error("serviceString{%v} timeout. can not get new serviceString array, use old instead", serviceString)
 			// all local services expired and can not get new services from registry, just use che cached instead
-			return services, nil
+			return services, ttl.UnixNano(), nil
 		}
 
-		return nil, err
+		return nil, 0, err
 	}
 
 	var serviceArray []*gxregistry.Service
@@ -101,9 +95,10 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, erro
 	}
 
 	s.services[serviceString] = s.cp(serviceArray)
-	s.active[serviceString] = time.Now().Add(s.ttl)
+	ttl = time.Now().Add(s.ttl)
+	s.active[serviceString] = ttl
 
-	return serviceArray, nil
+	return serviceArray, ttl.UnixNano(), nil
 }
 
 // update will invoke set
@@ -194,6 +189,7 @@ func (s *Selector) run() {
 			continue
 		}
 
+		// this function will block until got done signal
 		err = s.watch(w)
 		log.Debug("services.watch(w) = err{%#v}", err)
 		if err != nil {
@@ -247,23 +243,41 @@ func (s *Selector) Options() gxselector.Options {
 	return s.opts
 }
 
-func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Filter, error) {
+func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Filter, gxselector.ServiceToken, error) {
 	var (
 		err      error
+		token    gxselector.ServiceToken
 		services []*gxregistry.Service
 	)
 
-	services, err = s.get(service)
+	services, token, err = s.get(service)
 	log.Debug("get(service{%+v} = serviceURL array{%+v})", service, services)
 	if err != nil {
 		log.Error("services.get(service{%s}) = error{%T-%v}", service, err, err)
-		return nil, gxselector.ErrNotFound
+		return nil, 0, gxselector.ErrNotFound
 	}
 	if len(services) == 0 {
-		return nil, gxselector.ErrNoneAvailable
+		return nil, 0, gxselector.ErrNoneAvailable
 	}
 
-	return gxselector.SelectorFilter(s.opts.Mode)(services), nil
+	return gxselector.SelectorFilter(s.opts.Mode)(services), token, nil
+}
+
+func (s *Selector) CheckTokenAlive(attr gxregistry.ServiceAttr, token gxselector.ServiceToken) bool {
+	var (
+		ok     bool
+		active time.Time
+	)
+
+	s.Lock()
+	active, ok = s.active[attr.Service]
+	s.Unlock()
+
+	if ok {
+		return active.Unix() == token
+	}
+
+	return true
 }
 
 func (s *Selector) Close() error {
