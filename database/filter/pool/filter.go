@@ -2,8 +2,8 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-// Package gxcache provides a services selector
-package gxcache
+// Package gxpool provides a service pool filter
+package gxpool
 
 import (
 	"sync"
@@ -16,16 +16,17 @@ import (
 
 import (
 	"github.com/AlexStocks/dubbogo/common"
+	"github.com/AlexStocks/goext/database/filter"
 	"github.com/AlexStocks/goext/database/registry"
-	"github.com/AlexStocks/goext/database/selector"
 )
 
 var (
 	DefaultTTL = 5 * time.Minute
 )
 
-type Selector struct {
-	opts gxselector.Options // registry & strategy
+type Filter struct {
+	// registry & strategy
+	opts gxfilter.Options
 	ttl  time.Duration
 
 	wg sync.WaitGroup
@@ -37,7 +38,7 @@ type Selector struct {
 	done chan struct{}
 }
 
-func (s *Selector) quit() bool {
+func (s *Filter) quit() bool {
 	select {
 	case <-s.done:
 		return true
@@ -46,8 +47,8 @@ func (s *Selector) quit() bool {
 	}
 }
 
-// cp is invoked by function get.
-func (s *Selector) cp(current []*gxregistry.Service) []*gxregistry.Service {
+// copy is invoked by function get.
+func (s *Filter) copy(current []*gxregistry.Service) []*gxregistry.Service {
 	var services []*gxregistry.Service
 
 	for _, service := range current {
@@ -57,7 +58,7 @@ func (s *Selector) cp(current []*gxregistry.Service) []*gxregistry.Service {
 	return services
 }
 
-func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxselector.ServiceToken, error) {
+func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilter.ServiceToken, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -71,7 +72,7 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxse
 		// only return if its less than the ttl
 		// and copy the service array in case of its results is affected by function add/del
 		if tok && time.Since(ttl) < s.ttl {
-			return s.cp(services), ttl.UnixNano(), nil
+			return s.copy(services), ttl.UnixNano(), nil
 		}
 		log.Warn("s.services[serviceString{%v}] = services{%v}, array ttl{%v} is less than services.ttl{%v}",
 			serviceString, services, ttl, s.ttl)
@@ -94,7 +95,7 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxse
 		serviceArray = append(serviceArray, &gxregistry.Service{Attr: svc.Attr, Nodes: []*gxregistry.Node{node}})
 	}
 
-	s.services[serviceString] = s.cp(serviceArray)
+	s.services[serviceString] = s.copy(serviceArray)
 	ttl = time.Now().Add(s.ttl)
 	s.active[serviceString] = ttl
 
@@ -102,7 +103,7 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxse
 }
 
 // update will invoke set
-func (s *Selector) set(service string, services []*gxregistry.Service) {
+func (s *Filter) set(service string, services []*gxregistry.Service) {
 	if 0 < len(services) {
 		s.services[service] = services
 		s.active[service] = time.Now().Add(s.ttl)
@@ -127,7 +128,7 @@ func filterServices(array *[]*gxregistry.Service, i int) {
 	*array = s
 }
 
-func (s *Selector) update(res *gxregistry.EventResult) {
+func (s *Filter) update(res *gxregistry.EventResult) {
 	if res == nil || res.Service == nil {
 		return
 	}
@@ -169,12 +170,12 @@ func (s *Selector) update(res *gxregistry.EventResult) {
 	s.Unlock()
 }
 
-func (s *Selector) run() {
+func (s *Filter) run() {
 	defer s.wg.Done()
 	for {
 		// quit asap
 		if s.quit() {
-			log.Warn("(Selector)run() quit now")
+			log.Warn("(Filter)run() quit now")
 			return
 		}
 
@@ -182,7 +183,7 @@ func (s *Selector) run() {
 		log.Debug("services.Registry.Watch() = watch{%#v}, error{%#v}", w)
 		if err != nil {
 			if s.quit() {
-				log.Warn("(Selector)run() quit now")
+				log.Warn("(Filter)run() quit now")
 				return
 			}
 			log.Warn("Registry.Watch() = error:%+v", err)
@@ -193,14 +194,14 @@ func (s *Selector) run() {
 		err = s.watch(w)
 		log.Debug("services.watch(w) = err{%#v}", err)
 		if err != nil {
-			log.Warn("Selector.watch() = error{%v}", err)
+			log.Warn("Filter.watch() = error{%v}", err)
 			time.Sleep(common.TimeSecondDuration(gxregistry.REGISTRY_CONN_DELAY))
 			continue
 		}
 	}
 }
 
-func (s *Selector) watch(w gxregistry.Watcher) error {
+func (s *Filter) watch(w gxregistry.Watcher) error {
 	var (
 		err  error
 		res  *gxregistry.EventResult
@@ -239,14 +240,14 @@ func (s *Selector) watch(w gxregistry.Watcher) error {
 	}
 }
 
-func (s *Selector) Options() gxselector.Options {
+func (s *Filter) Options() gxfilter.Options {
 	return s.opts
 }
 
-func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Filter, gxselector.ServiceToken, error) {
+func (s *Filter) Filter(service gxregistry.ServiceAttr) (gxfilter.Balancer, gxfilter.ServiceToken, error) {
 	var (
 		err      error
-		token    gxselector.ServiceToken
+		token    gxfilter.ServiceToken
 		services []*gxregistry.Service
 	)
 
@@ -254,16 +255,16 @@ func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Filter, gx
 	log.Debug("get(service{%+v} = serviceURL array{%+v})", service, services)
 	if err != nil {
 		log.Error("services.get(service{%s}) = error{%T-%v}", service, err, err)
-		return nil, 0, gxselector.ErrNotFound
+		return nil, 0, gxfilter.ErrNotFound
 	}
 	if len(services) == 0 {
-		return nil, 0, gxselector.ErrNoneAvailable
+		return nil, 0, gxfilter.ErrNoneAvailable
 	}
 
-	return gxselector.SelectorFilter(s.opts.Mode)(services), token, nil
+	return gxfilter.BalancerModeFunc(s.opts.Mode)(services), token, nil
 }
 
-func (s *Selector) CheckTokenAlive(attr gxregistry.ServiceAttr, token gxselector.ServiceToken) bool {
+func (s *Filter) CheckTokenAlive(attr gxregistry.ServiceAttr, token gxfilter.ServiceToken) bool {
 	var (
 		ok     bool
 		active time.Time
@@ -280,7 +281,7 @@ func (s *Selector) CheckTokenAlive(attr gxregistry.ServiceAttr, token gxselector
 	return true
 }
 
-func (s *Selector) Close() error {
+func (s *Filter) Close() error {
 	s.Lock()
 	s.services = make(map[string][]*gxregistry.Service)
 	s.Unlock()
@@ -295,9 +296,9 @@ func (s *Selector) Close() error {
 	return nil
 }
 
-func NewSelector(opts ...gxselector.Option) gxselector.Selector {
-	sopts := gxselector.Options{
-		Mode: gxselector.SM_Random,
+func NewSelector(opts ...gxfilter.Option) gxfilter.Filter {
+	sopts := gxfilter.Options{
+		Mode: gxfilter.SM_Random,
 	}
 
 	for _, opt := range opts {
@@ -310,12 +311,12 @@ func NewSelector(opts ...gxselector.Option) gxselector.Selector {
 
 	ttl := DefaultTTL
 	if sopts.Context != nil {
-		if t, ok := sopts.Context.Get(GxselectorDefaultKey); ok {
+		if t, ok := sopts.Context.Get(GxfilterDefaultKey); ok {
 			ttl = t.(time.Duration)
 		}
 	}
 
-	s := &Selector{
+	s := &Filter{
 		opts:     sopts,
 		ttl:      ttl,
 		services: make(map[string][]*gxregistry.Service),

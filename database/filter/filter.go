@@ -2,8 +2,8 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-// Package gxselector provides a interface for service selector
-package gxselector
+// Package gxfilter provides a interface for service filter
+package gxfilter
 
 import (
 	"github.com/AlexStocks/goext/database/registry"
@@ -12,13 +12,13 @@ import (
 
 type ServiceToken = int64
 
-// Filter returns a available node based on its load balance algorithm.
-type Filter func(ID uint64) (*gxregistry.Service, error)
+// Balancer returns a available node based on its load balance algorithm.
+type Balancer func(ID uint64) (*gxregistry.Service, error)
 
-// Selector used to get service nodes from registry.
-type Selector interface {
+// Filter used to get service nodes from registry.
+type Filter interface {
 	Options() Options
-	Select(attr gxregistry.ServiceAttr) (Filter, ServiceToken, error)
+	Filter(attr gxregistry.ServiceAttr) (Balancer, ServiceToken, error)
 	CheckTokenAlive(attr gxregistry.ServiceAttr, token ServiceToken) bool
 	Close() error
 }

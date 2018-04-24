@@ -2,8 +2,8 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-// Package gxselector provides a interface for service selector
-package gxselector
+// Package gxfilter provides a interface for service filter
+package gxfilter
 
 import (
 	"math/rand"
@@ -19,10 +19,10 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-type SelectorModeFunc func([]*gxregistry.Service) Filter
+type BalancerFunc func([]*gxregistry.Service) Balancer
 
 // Random is a random strategy algorithm for node selection
-func random(services []*gxregistry.Service) Filter {
+func random(services []*gxregistry.Service) Balancer {
 	return func(ID uint64) (*gxregistry.Service, error) {
 		if len(services) == 0 {
 			return nil, ErrNoneAvailable
@@ -34,7 +34,7 @@ func random(services []*gxregistry.Service) Filter {
 }
 
 // hash is hash strategy algorithm for node selection
-func hash(services []*gxregistry.Service) Filter {
+func hash(services []*gxregistry.Service) Balancer {
 	return func(ID uint64) (*gxregistry.Service, error) {
 		if len(services) == 0 {
 			return nil, ErrNoneAvailable
@@ -46,7 +46,7 @@ func hash(services []*gxregistry.Service) Filter {
 }
 
 // RoundRobin is a roundrobin strategy algorithm for node selection
-func roundRobin(services []*gxregistry.Service) Filter {
+func roundRobin(services []*gxregistry.Service) Balancer {
 	var i uint64
 	var mtx sync.Mutex
 
@@ -68,11 +68,11 @@ func roundRobin(services []*gxregistry.Service) Filter {
 // selector mode
 //////////////////////////////////////////
 
-// SelectorMode defines the algorithm of selecting a provider from cluster
-type SelectorMode int
+// BalancerMode defines the algorithm of selecting a provider from cluster
+type BalancerMode int
 
 const (
-	SM_BEGIN SelectorMode = iota
+	SM_BEGIN BalancerMode = iota
 	SM_Random
 	SM_RoundRobin
 	SM_Hash
@@ -87,7 +87,7 @@ var selectorModeStrings = [...]string{
 	"End",
 }
 
-func (s SelectorMode) String() string {
+func (s BalancerMode) String() string {
 	if SM_BEGIN < s && s < SM_END {
 		return selectorModeStrings[s]
 	}
@@ -96,7 +96,7 @@ func (s SelectorMode) String() string {
 }
 
 var (
-	selectorModeFuncs = []SelectorModeFunc{
+	selectorModeFuncs = []BalancerFunc{
 		SM_BEGIN:      random,
 		SM_Random:     random,
 		SM_RoundRobin: roundRobin,
@@ -105,7 +105,7 @@ var (
 	}
 )
 
-func SelectorFilter(mode SelectorMode) SelectorModeFunc {
+func BalancerModeFunc(mode BalancerMode) BalancerFunc {
 	if mode < SM_BEGIN || SM_END < mode {
 		mode = SM_Random
 	}

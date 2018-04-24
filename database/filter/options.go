@@ -2,8 +2,8 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-// Package gxregistry provides a interface for service selector
-package gxselector
+// Package gxfilter provides a interface for service filter
+package gxfilter
 
 import (
 	"github.com/AlexStocks/goext/context"
@@ -12,7 +12,7 @@ import (
 
 type Options struct {
 	Registry gxregistry.Registry
-	Mode     SelectorMode // selector mode
+	Mode     BalancerMode // selector mode
 	Context  *gxcontext.ValuesContext
 }
 
@@ -27,7 +27,7 @@ func WithRegistry(r gxregistry.Registry) Option {
 }
 
 // WithSelectMode sets the default strategy for the selector
-func WithSelectMode(mode SelectorMode) Option {
+func WithSelectMode(mode BalancerMode) Option {
 	return func(o *Options) {
 		o.Mode = mode
 	}

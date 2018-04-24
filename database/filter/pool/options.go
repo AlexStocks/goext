@@ -2,8 +2,8 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-// Package gxregistry provides a interface for service selector
-package gxcache
+// Package gxpool provides a interface for service pool filter
+package gxpool
 
 import (
 	"time"
@@ -11,18 +11,18 @@ import (
 
 import (
 	"github.com/AlexStocks/goext/context"
-	"github.com/AlexStocks/goext/database/selector"
+	"github.com/AlexStocks/goext/database/filter"
 )
 
 const (
-	GxselectorDefaultKey = 0X201804201515
+	GxfilterDefaultKey = 0X201804201515
 )
 
-func WithTTL(t time.Duration) gxselector.Option {
-	return func(o *gxselector.Options) {
+func WithTTL(t time.Duration) gxfilter.Option {
+	return func(o *gxfilter.Options) {
 		if o.Context == nil {
 			o.Context = gxcontext.NewValuesContext(nil)
 		}
-		o.Context.Set(GxselectorDefaultKey, t)
+		o.Context.Set(GxfilterDefaultKey, t)
 	}
 }
