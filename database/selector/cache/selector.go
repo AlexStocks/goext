@@ -2,7 +2,7 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-// Package gxcache provides a cache selector
+// Package gxcache provides a services selector
 package gxcache
 
 import (
@@ -31,12 +31,11 @@ type Selector struct {
 
 	wg sync.WaitGroup
 	sync.Mutex
-	cache map[string][]*gxregistry.Service
+	services map[string][]*gxregistry.Service
 	// the creation time for every []*gxregistry.Service.
-	ttls map[string]time.Time
+	active map[string]time.Time
 
-	reload chan struct{}
-	done   chan struct{}
+	done chan struct{}
 }
 
 func (s *Selector) quit() bool {
@@ -60,8 +59,8 @@ func (s *Selector) cp(current []*gxregistry.Service) []*gxregistry.Service {
 }
 
 func (s *Selector) del(service string) {
-	delete(s.cache, service)
-	delete(s.ttls, service)
+	delete(s.services, service)
+	delete(s.active, service)
 }
 
 func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, error) {
@@ -69,10 +68,10 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, erro
 	defer s.Unlock()
 
 	serviceString := attr.Service
-	// check the cache first
-	services, ok := s.cache[serviceString]
-	ttl, kk := s.ttls[serviceString]
-	log.Debug("s.cache[serviceString{%v}] = services{%v}", serviceString, services)
+	// check the services first
+	services, ok := s.services[serviceString]
+	ttl, kk := s.active[serviceString]
+	log.Debug("s.services[serviceString{%v}] = services{%v}", serviceString, services)
 
 	if ok && len(services) > 0 {
 		// only return if its less than the ttl
@@ -80,7 +79,7 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, erro
 		if kk && time.Since(ttl) < s.ttl {
 			return s.cp(services), nil
 		}
-		log.Warn("s.cache[serviceString{%v}] = services{%v}, array ttl{%v} is less than cache.ttl{%v}",
+		log.Warn("s.services[serviceString{%v}] = services{%v}, array ttl{%v} is less than services.ttl{%v}",
 			serviceString, services, ttl, s.ttl)
 	}
 
@@ -101,8 +100,8 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, erro
 		serviceArray = append(serviceArray, &gxregistry.Service{Attr: svc.Attr, Nodes: []*gxregistry.Node{node}})
 	}
 
-	s.cache[serviceString] = s.cp(serviceArray)
-	s.ttls[serviceString] = time.Now().Add(s.ttl)
+	s.services[serviceString] = s.cp(serviceArray)
+	s.active[serviceString] = time.Now().Add(s.ttl)
 
 	return serviceArray, nil
 }
@@ -110,14 +109,14 @@ func (s *Selector) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, erro
 // update will invoke set
 func (s *Selector) set(service string, services []*gxregistry.Service) {
 	if 0 < len(services) {
-		s.cache[service] = services
-		s.ttls[service] = time.Now().Add(s.ttl)
+		s.services[service] = services
+		s.active[service] = time.Now().Add(s.ttl)
 
 		return
 	}
 
-	delete(s.cache, service)
-	delete(s.ttls, service)
+	delete(s.services, service)
+	delete(s.active, service)
 }
 
 func filterServices(array *[]*gxregistry.Service, i int) {
@@ -146,11 +145,11 @@ func (s *Selector) update(res *gxregistry.EventResult) {
 	log.Debug("update @registry result{%s}", res)
 	sname = res.Service.Attr.Service
 	s.Lock()
-	services, ok = s.cache[sname]
+	services, ok = s.services[sname]
 	log.Debug("service name:%s, get service{%#v} event, its current member lists:", sname, services)
 	if ok { // existing service found
 		for i, s := range services {
-			log.Debug("cache.services[%s][%d] = service{%#v}", sname, i, s)
+			log.Debug("services.services[%s][%d] = service{%#v}", sname, i, s)
 			if s.Equal(res.Service) {
 				filterServices(&(services), i)
 			}
@@ -165,11 +164,11 @@ func (s *Selector) update(res *gxregistry.EventResult) {
 		log.Error("selector delete serviceURL{%#v}", *res.Service)
 	}
 	s.set(sname, services)
-	services, ok = s.cache[sname]
-	log.Debug("after update, cache.services[%s] member list size{%d}", sname, len(services))
+	services, ok = s.services[sname]
+	log.Debug("after update, services.services[%s] member list size{%d}", sname, len(services))
 	// if ok { // debug
 	// 	for i, s := range services {
-	// 		log.Debug("cache.services[%s][%d] = service{%#v}", sname, i, s)
+	// 		log.Debug("services.services[%s][%d] = service{%#v}", sname, i, s)
 	// 	}
 	// }
 	s.Unlock()
@@ -185,7 +184,7 @@ func (s *Selector) run() {
 		}
 
 		w, err := s.opts.Registry.Watch()
-		log.Debug("cache.Registry.Watch() = watch{%#v}, error{%#v}", w)
+		log.Debug("services.Registry.Watch() = watch{%#v}, error{%#v}", w)
 		if err != nil {
 			if s.quit() {
 				log.Warn("(Selector)run() quit now")
@@ -196,7 +195,7 @@ func (s *Selector) run() {
 		}
 
 		err = s.watch(w)
-		log.Debug("cache.watch(w) = err{%#v}", err)
+		log.Debug("services.watch(w) = err{%#v}", err)
 		if err != nil {
 			log.Warn("Selector.watch() = error{%v}", err)
 			time.Sleep(common.TimeSecondDuration(gxregistry.REGISTRY_CONN_DELAY))
@@ -223,9 +222,6 @@ func (s *Selector) watch(w gxregistry.Watcher) error {
 		select {
 		case <-s.done:
 			w.Close()
-		case <-s.reload:
-			// stop the watcher
-			w.Close()
 		case <-done:
 		}
 		s.wg.Done()
@@ -247,26 +243,6 @@ func (s *Selector) watch(w gxregistry.Watcher) error {
 	}
 }
 
-func (s *Selector) Init(opts ...gxselector.Option) error {
-	for _, o := range opts {
-		o(&s.opts)
-	}
-
-	// reload the watcher
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		select {
-		case <-s.done:
-			return
-		default:
-			s.reload <- struct{}{}
-		}
-	}()
-
-	return nil
-}
-
 func (s *Selector) Options() gxselector.Options {
 	return s.opts
 }
@@ -280,7 +256,7 @@ func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Filter, er
 	services, err = s.get(service)
 	log.Debug("get(service{%+v} = serviceURL array{%+v})", service, services)
 	if err != nil {
-		log.Error("cache.get(service{%s}) = error{%T-%v}", service, err, err)
+		log.Error("services.get(service{%s}) = error{%T-%v}", service, err, err)
 		return nil, gxselector.ErrNotFound
 	}
 	if len(services) == 0 {
@@ -292,7 +268,7 @@ func (s *Selector) Select(service gxregistry.ServiceAttr) (gxselector.Filter, er
 
 func (s *Selector) Close() error {
 	s.Lock()
-	s.cache = make(map[string][]*gxregistry.Service)
+	s.services = make(map[string][]*gxregistry.Service)
 	s.Unlock()
 
 	select {
@@ -319,7 +295,6 @@ func NewSelector(opts ...gxselector.Option) gxselector.Selector {
 	}
 
 	ttl := DefaultTTL
-
 	if sopts.Context != nil {
 		if t, ok := sopts.Context.Get(GxselectorDefaultKey); ok {
 			ttl = t.(time.Duration)
@@ -327,12 +302,11 @@ func NewSelector(opts ...gxselector.Option) gxselector.Selector {
 	}
 
 	s := &Selector{
-		opts:   sopts,
-		ttl:    ttl,
-		cache:  make(map[string][]*gxregistry.Service),
-		ttls:   make(map[string]time.Time),
-		reload: make(chan struct{}, 1),
-		done:   make(chan struct{}),
+		opts:     sopts,
+		ttl:      ttl,
+		services: make(map[string][]*gxregistry.Service),
+		active:   make(map[string]time.Time),
+		done:     make(chan struct{}),
 	}
 
 	s.wg.Add(1)

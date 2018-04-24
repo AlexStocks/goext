@@ -15,7 +15,6 @@ type Filter func(ID uint64) (*gxregistry.Service, error)
 
 // Selector used to get service nodes from registry.
 type Selector interface {
-	Init(opts ...Option) error
 	Options() Options
 	Select(attr gxregistry.ServiceAttr) (Filter, error)
 	Close() error
