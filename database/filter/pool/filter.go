@@ -18,10 +18,13 @@ import (
 	"github.com/AlexStocks/dubbogo/common"
 	"github.com/AlexStocks/goext/database/filter"
 	"github.com/AlexStocks/goext/database/registry"
+	"github.com/AlexStocks/goext/time"
+	jerrors "github.com/juju/errors"
 )
 
 var (
-	DefaultTTL = 5 * time.Minute
+	defaultTTL    = 5 * time.Minute
+	activeTimeout = 2 * time.Hour
 )
 
 type Filter struct {
@@ -38,7 +41,7 @@ type Filter struct {
 	done chan struct{}
 }
 
-func (s *Filter) quit() bool {
+func (s *Filter) isClosed() bool {
 	select {
 	case <-s.done:
 		return true
@@ -48,11 +51,13 @@ func (s *Filter) quit() bool {
 }
 
 // copy is invoked by function get.
-func (s *Filter) copy(current []*gxregistry.Service) []*gxregistry.Service {
+func (s *Filter) copy(current []*gxregistry.Service, by gxregistry.ServiceAttr) []*gxregistry.Service {
 	var services []*gxregistry.Service
 
 	for _, service := range current {
-		services = append(services, service)
+		if by.Filter(*service.Attr) {
+			services = append(services, service)
+		}
 	}
 
 	return services
@@ -72,7 +77,7 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilt
 		// only return if its less than the ttl
 		// and copy the service array in case of its results is affected by function add/del
 		if tok && time.Since(ttl) < s.ttl {
-			return s.copy(services), ttl.UnixNano(), nil
+			return s.copy(services, attr), ttl.UnixNano(), nil
 		}
 		log.Warn("s.services[serviceString{%v}] = services{%v}, array ttl{%v} is less than services.ttl{%v}",
 			serviceString, services, ttl, s.ttl)
@@ -95,11 +100,12 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilt
 		serviceArray = append(serviceArray, &gxregistry.Service{Attr: svc.Attr, Nodes: []*gxregistry.Node{node}})
 	}
 
-	s.services[serviceString] = s.copy(serviceArray)
+	filterServiceArray := s.copy(serviceArray, attr)
+	s.services[serviceString] = serviceArray
 	ttl = time.Now().Add(s.ttl)
 	s.active[serviceString] = ttl
 
-	return serviceArray, ttl.UnixNano(), nil
+	return filterServiceArray, ttl.UnixNano(), nil
 }
 
 // update will invoke set
@@ -155,9 +161,9 @@ func (s *Filter) update(res *gxregistry.EventResult) {
 	switch res.Action {
 	case gxregistry.ServiceAdd, gxregistry.ServiceUpdate:
 		services = append(services, res.Service)
-		log.Info("selector add serviceURL{%#v}", *res.Service)
+		log.Info("filter add serviceURL{%#v}", *res.Service)
 	case gxregistry.ServiceDel:
-		log.Error("selector delete serviceURL{%#v}", *res.Service)
+		log.Warn("filter delete serviceURL{%#v}", *res.Service)
 	}
 	s.set(sname, services)
 	services, ok = s.services[sname]
@@ -174,16 +180,18 @@ func (s *Filter) run() {
 	defer s.wg.Done()
 	for {
 		// quit asap
-		if s.quit() {
-			log.Warn("(Filter)run() quit now")
+		if s.isClosed() {
+			log.Warn("(Filter)run() isClosed now")
 			return
 		}
 
-		w, err := s.opts.Registry.Watch()
-		log.Debug("services.Registry.Watch() = watch{%#v}, error{%#v}", w)
+		w, err := s.opts.Registry.Watch(
+			gxregistry.WithWatchRoot(s.opts.Registry.Options().Root),
+		)
+		log.Debug("services.Registry.Watch() = watch:%+v, error:%+v", w, err)
 		if err != nil {
-			if s.quit() {
-				log.Warn("(Filter)run() quit now")
+			if s.isClosed() {
+				log.Warn("(Filter)run() isClosed now")
 				return
 			}
 			log.Warn("Registry.Watch() = error:%+v", err)
@@ -268,6 +276,7 @@ func (s *Filter) CheckTokenAlive(attr gxregistry.ServiceAttr, token gxfilter.Ser
 	var (
 		ok     bool
 		active time.Time
+		t      time.Time
 	)
 
 	s.Lock()
@@ -275,10 +284,15 @@ func (s *Filter) CheckTokenAlive(attr gxregistry.ServiceAttr, token gxfilter.Ser
 	s.Unlock()
 
 	if ok {
-		return active.Unix() == token
+		t = gxtime.UnixNano2Time(token)
+		if activeTimeout < active.Sub(t) {
+			// active expire, the user should update its service array
+			return false
+		}
+		return active.UnixNano() == token
 	}
 
-	return true
+	return false
 }
 
 func (s *Filter) Close() error {
@@ -296,7 +310,7 @@ func (s *Filter) Close() error {
 	return nil
 }
 
-func NewSelector(opts ...gxfilter.Option) gxfilter.Filter {
+func NewFilter(opts ...gxfilter.Option) (gxfilter.Filter, error) {
 	sopts := gxfilter.Options{
 		Mode: gxfilter.SM_Random,
 	}
@@ -306,10 +320,10 @@ func NewSelector(opts ...gxfilter.Option) gxfilter.Filter {
 	}
 
 	if sopts.Registry == nil {
-		panic("@opts.Registry is nil")
+		return nil, jerrors.Errorf("@opts.Registry is nil")
 	}
 
-	ttl := DefaultTTL
+	ttl := defaultTTL
 	if sopts.Context != nil {
 		if t, ok := sopts.Context.Get(GxfilterDefaultKey); ok {
 			ttl = t.(time.Duration)
@@ -326,5 +340,5 @@ func NewSelector(opts ...gxfilter.Option) gxfilter.Filter {
 
 	s.wg.Add(1)
 	go s.run()
-	return s
+	return s, nil
 }

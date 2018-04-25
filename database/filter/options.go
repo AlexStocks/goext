@@ -12,22 +12,22 @@ import (
 
 type Options struct {
 	Registry gxregistry.Registry
-	Mode     BalancerMode // selector mode
+	Mode     BalancerMode // filter mode
 	Context  *gxcontext.ValuesContext
 }
 
-// Option used to initialise the selector
+// Option used to initialise the filter
 type Option func(*Options)
 
-// WithRegistry sets the registry used by the selector
+// WithRegistry sets the registry used by the filter
 func WithRegistry(r gxregistry.Registry) Option {
 	return func(o *Options) {
 		o.Registry = r
 	}
 }
 
-// WithSelectMode sets the default strategy for the selector
-func WithSelectMode(mode BalancerMode) Option {
+// WithBalancerMode sets the default strategy for the filter
+func WithBalancerMode(mode BalancerMode) Option {
 	return func(o *Options) {
 		o.Mode = mode
 	}

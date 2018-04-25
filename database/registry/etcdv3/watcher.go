@@ -40,9 +40,6 @@ func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) (gxregist
 	if options.Root == "" {
 		options.Root = gxregistry.DefaultServiceRoot
 	}
-	if options.Attr.Service == "" {
-		return nil, jerrors.Errorf("options.Service is nil")
-	}
 
 	if client.TTL() < 0 {
 		// there is no lease
@@ -68,12 +65,6 @@ func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) (gxregist
 		w:      w,
 		opts:   options,
 		client: client,
-	}
-
-	if wc.opts.Filter == nil {
-		wc.opts.Filter = func(attr gxregistry.ServiceAttr) bool {
-			return wc.opts.Attr.Filter(attr)
-		}
 	}
 
 	return wc, nil
@@ -110,9 +101,9 @@ func (w *Watcher) Notify() (*gxregistry.EventResult, error) {
 					continue
 				}
 
-				if !w.opts.Filter(*service.Attr) {
-					continue
-				}
+				//if !w.opts.Filter(*service.Attr) {
+				//	continue
+				//}
 
 			case clientv3.EventTypeDelete:
 				action = gxregistry.ServiceDel
@@ -124,9 +115,9 @@ func (w *Watcher) Notify() (*gxregistry.EventResult, error) {
 					continue
 				}
 
-				if !w.opts.Filter(*service.Attr) {
-					continue
-				}
+				//if !w.opts.Filter(*service.Attr) {
+				//	continue
+				//}
 			}
 
 			return &gxregistry.EventResult{

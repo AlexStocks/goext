@@ -15,17 +15,9 @@ type Options struct {
 	Root    string
 }
 
-type WatchFilter func(ServiceAttr) bool
-
 type WatchOptions struct {
 	// the root registry path, suck as "/dubbo/"
 	Root string
-	// Specify a service to watch
-	// Its Service should not be nil.
-	Attr ServiceAttr
-	// Specify a filter to service role to watch
-	// If blank, the watch will filter by @Attr
-	Filter WatchFilter
 }
 
 type Option func(*Options)
@@ -55,19 +47,5 @@ type WatchOption func(*WatchOptions)
 func WithWatchRoot(root string) WatchOption {
 	return func(o *WatchOptions) {
 		o.Root = root
-	}
-}
-
-// Watch a service
-func WithWatchServiceAttr(attr ServiceAttr) WatchOption {
-	return func(o *WatchOptions) {
-		o.Attr = attr
-	}
-}
-
-// Watch a service
-func WithWatchFilter(f WatchFilter) WatchOption {
-	return func(o *WatchOptions) {
-		o.Filter = f
 	}
 }

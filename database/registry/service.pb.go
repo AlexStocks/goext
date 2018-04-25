@@ -58,18 +58,18 @@ type ServiceRoleType int32
 const (
 	SRT_UNKOWN   ServiceRoleType = 0
 	SRT_Provider ServiceRoleType = 1
-	SRT_Cosumer  ServiceRoleType = 2
+	SRT_Consumer ServiceRoleType = 2
 )
 
 var ServiceRoleType_name = map[int32]string{
 	0: "SRT_UNKOWN",
 	1: "SRT_Provider",
-	2: "SRT_Cosumer",
+	2: "SRT_Consumer",
 }
 var ServiceRoleType_value = map[string]int32{
 	"SRT_UNKOWN":   0,
 	"SRT_Provider": 1,
-	"SRT_Cosumer":  2,
+	"SRT_Consumer": 2,
 }
 
 func String2ServiceRoleType(role string) ServiceRoleType {

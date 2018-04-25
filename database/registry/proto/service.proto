@@ -24,7 +24,7 @@ option (gogoproto.goproto_getters_all) = false;
 enum ServiceRoleType {
 	SRT_UNKOWN = 0;
 	SRT_Provider = 1;
-	SRT_Cosumer = 2;
+	SRT_Consumer = 2;
 }
 
 message ServiceAttr {
