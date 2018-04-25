@@ -1,6 +1,7 @@
 package gxpool
 
 import (
+	"testing"
 	"time"
 )
 
@@ -10,7 +11,6 @@ import (
 	"github.com/AlexStocks/goext/database/registry/etcdv3"
 	"github.com/AlexStocks/goext/log"
 	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 type FilterTestSuite struct {
