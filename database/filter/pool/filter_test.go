@@ -64,6 +64,7 @@ func (suite *FilterTestSuite) SetupTest() {
 		gxregistry.WithAddrs(suite.etcdAddrs...),
 		gxregistry.WithTimeout(3e9),
 		gxregistry.WithRoot(suite.root),
+		gxregistry.WithTimeout(5e9),
 	)
 	suite.Equal(nil, err, "NewRegistry()")
 
