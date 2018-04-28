@@ -28,7 +28,7 @@ import (
 
 import (
 	_ "github.com/gogo/protobuf/gogoproto"
-	proto "github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/proto"
 	github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 	jerrors "github.com/juju/errors"
 )
@@ -1913,11 +1913,25 @@ var fileDescriptorService = []byte{
 
 func (a *ServiceAttr) MarshalPath() ([]byte, error) {
 	params := url.Values{}
-	params.Add("group", a.Group)
-	params.Add("service", a.Service)
-	params.Add("protocol", a.Protocol)
-	params.Add("version", a.Version)
-	params.Add("role", a.Role.String())
+	if len(a.Group) != 0 {
+		params.Add("group", a.Group)
+	}
+	if len(a.Service) != 0 {
+		params.Add("service", a.Service)
+	}
+	if len(a.Protocol) != 0 {
+		params.Add("protocol", a.Protocol)
+	}
+	if len(a.Version) != 0 {
+		params.Add("version", a.Version)
+	}
+	if a.Role != SRT_UNKOWN {
+		params.Add("role", a.Role.String())
+	}
+
+	if len(params) == 0 {
+		return gxstrings.Slice(""), nil
+	}
 
 	// encode result: group=bjtelecom&protocol=pb&service=shopping&type=add+service&version=1.0.1
 	// query escape: group%3Dbjtelecom%26protocol%3Dpb%26service%3Dshopping%26type%3Dadd%2Bservice%26version%3D1.0.1
@@ -1942,6 +1956,50 @@ func (a *ServiceAttr) UnmarshalPath(data []byte) error {
 	a.Role = String2ServiceRoleType(query.Get("role"))
 
 	return nil
+}
+
+func (a *ServiceAttr) GeneralEqual(that interface{}) bool {
+	if that == nil {
+		if a == nil {
+			return true
+		}
+		return false
+	}
+
+	that1, ok := that.(*ServiceAttr)
+	if !ok {
+		that2, ok := that.(ServiceAttr)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		if a == nil {
+			return true
+		}
+		return false
+	} else if a == nil {
+		return false
+	}
+	if len(a.Group) != 0 && a.Group != that1.Group {
+		return false
+	}
+	if len(a.Service) != 0 && a.Service != that1.Service {
+		return false
+	}
+	if len(a.Protocol) != 0 && a.Protocol != that1.Protocol {
+		return false
+	}
+	if len(a.Version) != 0 && a.Version != that1.Version {
+		return false
+	}
+	if a.Role != SRT_UNKOWN && a.Role != that1.Role {
+		return false
+	}
+
+	return true
 }
 
 func EncodeService(s *Service) (string, error) {

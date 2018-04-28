@@ -5,6 +5,10 @@
 ## dev list ##
 ---
 
+- 2018/04/28
+  > bug fix
+  * add ServiceAttr GeneralEqual to filter service
+
 - 2018/04/21
   > feature
   * add reuseport from github.com/kavu/go_reuseport

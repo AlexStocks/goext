@@ -85,7 +85,7 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilt
 
 	svc, err := s.opts.Registry.GetService(attr)
 	if err != nil {
-		log.Error("registry.GetService(serviceString{%v}) = err{%T, %v}", serviceString, err, err)
+		log.Error("registry.GetService(serviceString{%v}) = err:%+v}", serviceString, err)
 		if sok && len(services) > 0 {
 			log.Error("serviceString{%v} timeout. can not get new serviceString array, use old instead", serviceString)
 			// all local services expired and can not get new services from registry, just use che cached instead
@@ -250,6 +250,25 @@ func (s *Filter) watch(w gxregistry.Watcher) error {
 
 func (s *Filter) Options() gxfilter.Options {
 	return s.opts
+}
+
+func (s *Filter) GetService(service gxregistry.ServiceAttr) ([]*gxregistry.Service, error) {
+	var (
+		err      error
+		services []*gxregistry.Service
+	)
+
+	services, _, err = s.get(service)
+	log.Debug("get(service{%+v} = serviceURL array{%+v})", service, services)
+	if err != nil {
+		log.Error("services.get(service{%s}) = error{%T-%v}", service, err, err)
+		return nil, gxfilter.ErrNotFound
+	}
+	if len(services) == 0 {
+		return nil, gxfilter.ErrNoneAvailable
+	}
+
+	return services, nil
 }
 
 func (s *Filter) Filter(service gxregistry.ServiceAttr) (gxfilter.Balancer, gxfilter.ServiceToken, error) {

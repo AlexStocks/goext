@@ -18,6 +18,7 @@ type Balancer func(ID uint64) (*gxregistry.Service, error)
 // Filter used to get service nodes from registry.
 type Filter interface {
 	Options() Options
+	GetService(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, error)
 	Filter(attr gxregistry.ServiceAttr) (Balancer, ServiceToken, error)
 	CheckTokenAlive(attr gxregistry.ServiceAttr, token ServiceToken) bool
 	Close() error

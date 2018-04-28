@@ -343,7 +343,7 @@ func (r *Registry) GetService(attr gxregistry.ServiceAttr) (*gxregistry.Service,
 	service := &gxregistry.Service{Attr: &attr}
 	for _, n := range rsp.Kvs {
 		if sn, err := gxregistry.DecodeService(n.Value); err == nil && sn != nil {
-			if sn.Attr.Equal(service.Attr) {
+			if service.Attr.GeneralEqual(sn.Attr) {
 				for _, node := range sn.Nodes {
 					service.Nodes = append(service.Nodes, node)
 				}
