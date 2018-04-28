@@ -21,6 +21,7 @@ import (
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/runtime"
 	log "github.com/AlexStocks/log4go"
+	"strings"
 )
 
 type Registry struct {
@@ -324,8 +325,11 @@ func (r *Registry) GetService(attr gxregistry.ServiceAttr) (*gxregistry.Service,
 	ctx, cancel := context.WithTimeout(context.Background(), r.options.Timeout)
 	defer cancel()
 
-	svc := gxregistry.Service{Attr: &attr}
-	path := svc.Path(r.options.Root)
+	// svc := gxregistry.Service{Attr: &attr}
+	path := r.options.Root
+	if !strings.HasPrefix(path, "/") {
+		path += "/"
+	}
 	rsp, err := r.client.EtcdClient().Get(
 		ctx,
 		path,
