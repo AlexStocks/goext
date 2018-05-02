@@ -77,10 +77,10 @@ func (suite *RegisterTestSuite) TestRegistry_Register() {
 	_, flag = suite.reg.(*Registry).exist(service)
 	suite.Equalf(true, flag, "Registry.exist(service:%s)", gxlog.PrettyString(service))
 
-	service1, err := suite.reg.GetService(suite.sa)
+	service1, err := suite.reg.GetServices(suite.sa)
 	suite.Equalf(nil, err, "GetService(ServiceAttr:%#v)", suite.sa)
-	suite.Equalf(2, len(service1.Nodes), "GetService(ServiceAttr:%+v)", suite.sa)
-	_, flag = suite.reg.(*Registry).exist(*service1)
+	suite.Equalf(2, len(service1), "GetService(ServiceAttr:%+v)", suite.sa)
+	_, flag = suite.reg.(*Registry).exist(service1[0])
 	suite.Equalf(true, flag, "Registry.exist(service:%s)", gxlog.PrettyString(service1))
 
 	// unregister node1
@@ -90,10 +90,10 @@ func (suite *RegisterTestSuite) TestRegistry_Register() {
 	_, flag = suite.reg.(*Registry).exist(service)
 	suite.Equalf(false, flag, "Registry.exist(service:%s)", gxlog.PrettyString(service))
 
-	service1, err = suite.reg.GetService(suite.sa)
+	service1, err = suite.reg.GetServices(suite.sa)
 	suite.T().Log("services:", gxlog.ColorSprintln(service1))
 	suite.Equalf(nil, err, "GetService(ServiceAttr:%#v)", suite.sa)
-	suite.Equalf(1, len(service1.Nodes), "GetService(ServiceAttr:%+v)", suite.sa)
+	suite.Equalf(1, len(service1), "GetService(ServiceAttr:%+v)", suite.sa)
 
 	// unregister node0
 	service = gxregistry.Service{Attr: &suite.sa, Nodes: []*gxregistry.Node{&suite.node}}
@@ -102,7 +102,7 @@ func (suite *RegisterTestSuite) TestRegistry_Register() {
 	_, flag = suite.reg.(*Registry).exist(service)
 	suite.Equalf(false, flag, "Registry.exist(service:%s)", gxlog.PrettyString(service))
 
-	service1, err = suite.reg.GetService(suite.sa)
+	service1, err = suite.reg.GetServices(suite.sa)
 	suite.T().Log("services:", gxlog.ColorSprintln(service1))
 	suite.Equalf(gxregistry.ErrorRegistryNotFound, err, "GetService(ServiceAttr:%#v)", suite.sa)
 }

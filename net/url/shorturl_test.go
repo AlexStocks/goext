@@ -4,6 +4,15 @@ import (
 	"testing"
 )
 
+func TestGenSo985ShortURL(t *testing.T) {
+	shortURL, err := GenSo985ShortURL("https://github.com/alexstocks/goext")
+	if err != nil {
+		t.Errorf("error:%#v", err)
+	}
+
+	t.Logf("short url:%s", shortURL)
+}
+
 func TestGenGitioShortURL(t *testing.T) {
 	shortURL, err := GenGitioShortURL("https://github.com/alexstocks/goext")
 	if err != nil {

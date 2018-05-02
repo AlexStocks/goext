@@ -33,6 +33,7 @@ const (
 	// SinaShortURL  = "http://api.t.sina.com.cn/short_url/shorten.json?source=3271760578&url_long="
 	SinaShortURL  = "http://api.t.sina.com.cn/short_url/shorten.json?source=1681459862&url_long="
 	GoogdShortURL = "http://www.goo.gd/action/json.php?source=1681459862&url_long="
+	So985ShortURL = "http://api.c7.gg/api.php?format=json&url="
 )
 
 var (
@@ -48,6 +49,40 @@ var (
 		return c, nil
 	}
 )
+
+type So985Result struct {
+	UrlShort string `json:"url"`
+	Err      string `json:"err"`
+}
+
+// GenSo985ShortURL generates short url by git.io.
+func GenSo985ShortURL(uri string) (string, error) {
+	if !strings.HasPrefix(uri, "http://") && !strings.HasPrefix(uri, "https://") {
+		return "", ErrorHTTPPrefix
+	}
+
+	c := http.Client{Transport: &http.Transport{Dial: httpDial}}
+	rsp, err := c.Get(So985ShortURL + uri)
+	if err != nil {
+		return "", errors.Annotatef(err, "http.Get(%s)", SinaShortURL+uri)
+	}
+
+	defer rsp.Body.Close()
+	body, err := ioutil.ReadAll(rsp.Body)
+	if err != nil {
+		return "", errors.Annotatef(err, "ioutil.ReadAll")
+	}
+
+	res := &So985Result{}
+	fmt.Printf("body:%s\n", string(body))
+	return "", nil
+	err = json.Unmarshal([]byte(body), &res)
+	if err != nil {
+		return "", errors.Annotatef(err, "json.Unmarshal")
+	}
+
+	return res.UrlShort, nil
+}
 
 // refers: https://github.com/osamingo/gitio/blob/master/shortener/gitio.go
 

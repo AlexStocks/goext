@@ -13,7 +13,7 @@ import (
 type Registry interface {
 	Register(service Service) error
 	Deregister(service Service) error
-	GetService(attr ServiceAttr) (*Service, error)
+	GetServices(attr ServiceAttr) ([]Service, error)
 	Watch(opts ...WatchOption) (Watcher, error)
 	Close() error
 	String() string

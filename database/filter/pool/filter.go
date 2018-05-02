@@ -55,8 +55,16 @@ func (s *Filter) copy(current []*gxregistry.Service, by gxregistry.ServiceAttr) 
 	var services []*gxregistry.Service
 
 	for _, service := range current {
+		service := service
 		if by.Filter(*service.Attr) {
-			services = append(services, service)
+			s := *service
+			s.Nodes = make([]*gxregistry.Node, 0, len(service.Nodes))
+			for _, node := range service.Nodes {
+				n := *node
+				s.Nodes = append(s.Nodes, &n)
+			}
+
+			services = append(services, &s)
 		}
 	}
 
@@ -83,7 +91,8 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilt
 			serviceString, services, ttl, s.ttl)
 	}
 
-	svc, err := s.opts.Registry.GetService(attr)
+	svcs, err := s.opts.Registry.GetServices(attr)
+	log.Debug("Registry.GetServices(attr:%+v) = {err:%s, svcs:%+v}", attr, err, svcs)
 	if err != nil {
 		log.Error("registry.GetService(serviceString{%v}) = err:%+v}", serviceString, err)
 		if sok && len(services) > 0 {
@@ -96,8 +105,10 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilt
 	}
 
 	var serviceArray []*gxregistry.Service
-	for _, node := range svc.Nodes {
-		serviceArray = append(serviceArray, &gxregistry.Service{Attr: svc.Attr, Nodes: []*gxregistry.Node{node}})
+	for i, svc := range svcs {
+		svc := svc
+		serviceArray = append(serviceArray, &svc)
+		log.Debug("i:%d, svc:%+v, serviceArray:%+v", i, svc, serviceArray)
 	}
 
 	filterServiceArray := s.copy(serviceArray, attr)
@@ -148,12 +159,13 @@ func (s *Filter) update(res *gxregistry.EventResult) {
 	sname = res.Service.Attr.Service
 	s.Lock()
 	services, ok = s.services[sname]
-	log.Debug("service name:%s, get service{%#v} event, its current member lists:", sname, services)
+	log.Debug("service name:%s, its current member lists:%+v", sname, services)
 	if ok { // existing service found
 		for i, s := range services {
 			log.Debug("services.services[%s][%d] = service{%#v}", sname, i, s)
 			if s.Equal(res.Service) {
 				filterServices(&(services), i)
+				log.Debug("i:%d, new services:%+v", i, services)
 			}
 		}
 	}

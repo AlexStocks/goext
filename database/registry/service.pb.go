@@ -1958,50 +1958,6 @@ func (a *ServiceAttr) UnmarshalPath(data []byte) error {
 	return nil
 }
 
-func (a *ServiceAttr) GeneralEqual(that interface{}) bool {
-	if that == nil {
-		if a == nil {
-			return true
-		}
-		return false
-	}
-
-	that1, ok := that.(*ServiceAttr)
-	if !ok {
-		that2, ok := that.(ServiceAttr)
-		if ok {
-			that1 = &that2
-		} else {
-			return false
-		}
-	}
-	if that1 == nil {
-		if a == nil {
-			return true
-		}
-		return false
-	} else if a == nil {
-		return false
-	}
-	if len(a.Group) != 0 && a.Group != that1.Group {
-		return false
-	}
-	if len(a.Service) != 0 && a.Service != that1.Service {
-		return false
-	}
-	if len(a.Protocol) != 0 && a.Protocol != that1.Protocol {
-		return false
-	}
-	if len(a.Version) != 0 && a.Version != that1.Version {
-		return false
-	}
-	if a.Role != SRT_UNKOWN && a.Role != that1.Role {
-		return false
-	}
-
-	return true
-}
-
 func EncodeService(s *Service) (string, error) {
 	b, err := json.Marshal(s)
 	if err != nil {

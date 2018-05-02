@@ -5,6 +5,11 @@
 ## dev list ##
 ---
 
+
+- 2018/05/02
+  > bug fix
+  * use value copy in for-loop 
+  
 - 2018/04/28
   > bug fix
   * add ServiceAttr GeneralEqual to filter service

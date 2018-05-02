@@ -321,7 +321,7 @@ func (r *Registry) Deregister(s gxregistry.Service) error {
 	return r.unregister(s)
 }
 
-func (r *Registry) GetService(attr gxregistry.ServiceAttr) (*gxregistry.Service, error) {
+func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]gxregistry.Service, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), r.options.Timeout)
 	defer cancel()
 
@@ -344,18 +344,21 @@ func (r *Registry) GetService(attr gxregistry.ServiceAttr) (*gxregistry.Service,
 		return nil, gxregistry.ErrorRegistryNotFound
 	}
 
-	service := &gxregistry.Service{Attr: &attr}
+	services := make([]gxregistry.Service, 0, 32)
 	for _, n := range rsp.Kvs {
 		if sn, err := gxregistry.DecodeService(n.Value); err == nil && sn != nil {
-			if service.Attr.GeneralEqual(sn.Attr) {
+			if attr.Filter(*sn.Attr) {
 				for _, node := range sn.Nodes {
+					var service gxregistry.Service
+					service.Attr = sn.Attr // bug fix: @attr 仅仅用于过滤，其属性值比较少，etcd 返回的service.ServiceAttr 值比 @attr 精确
 					service.Nodes = append(service.Nodes, node)
+					services = append(services, service)
 				}
 			}
 		}
 	}
 
-	return service, nil
+	return services, nil
 }
 
 func (r *Registry) Watch(opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
