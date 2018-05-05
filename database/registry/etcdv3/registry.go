@@ -62,6 +62,8 @@ func NewRegistry(opts ...gxregistry.Option) (gxregistry.Registry, error) {
 	if len(addrs) > 0 {
 		config.Endpoints = addrs
 	}
+	config.DialTimeout = options.Timeout
+	config.DialKeepAliveTimeout = options.Timeout
 
 	client, err := etcdv3.New(config)
 	if err != nil {
@@ -307,7 +309,7 @@ func (r *Registry) unregister(s gxregistry.Service) error {
 	defer cancel()
 
 	for _, node := range s.Nodes {
-		_, err := r.client.EtcdClient().Delete(ctx, s.NodePath(r.options.Root, *node))
+		_, err := r.client.EtcdClient().Delete(ctx, s.NodePath(r.options.Root, *node), etcdv3.WithIgnoreLease())
 		if err != nil {
 			return err
 		}

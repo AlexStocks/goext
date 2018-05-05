@@ -207,6 +207,7 @@ func (s *Filter) run() {
 				return
 			}
 			log.Warn("Registry.Watch() = error:%+v", err)
+			time.Sleep(common.TimeSecondDuration(gxregistry.REGISTRY_CONN_DELAY))
 			continue
 		}
 

@@ -23,8 +23,9 @@ type ClientTestSuite struct {
 
 func (suite *ClientTestSuite) SetupSuite() {
 	suite.config = etcdv3.Config{
-		Endpoints:   []string{"127.0.0.1:2379"},
-		DialTimeout: 8e9,
+		Endpoints:            []string{"127.0.0.1:2379"},
+		DialTimeout:          8e9,
+		DialKeepAliveTimeout: 3e9,
 	}
 }
 
