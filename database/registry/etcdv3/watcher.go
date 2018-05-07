@@ -46,7 +46,7 @@ func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) (gxregist
 		// fix bug of TestValid, 20180421
 		_, err := client.KeepAlive()
 		if err != nil {
-			return nil, jerrors.Annotate(err, "client.KeepAlive")
+			return nil, jerrors.Trace(err)
 		}
 	}
 
@@ -97,13 +97,9 @@ func (w *Watcher) Notify() (*gxregistry.EventResult, error) {
 
 				service, err = gxregistry.DecodeService(ev.Kv.Value)
 				if err != nil || service == nil {
-					log.Warn("gxregistry.DecodeService() = {service:%p, error:%+v}", service, err)
+					log.Warn("gxregistry.DecodeService() = {service:%p, error:%+v}", service, jerrors.ErrorStack(err))
 					continue
 				}
-
-				//if !w.opts.Filter(*service.Attr) {
-				//	continue
-				//}
 
 			case clientv3.EventTypeDelete:
 				action = gxregistry.ServiceDel
@@ -111,13 +107,9 @@ func (w *Watcher) Notify() (*gxregistry.EventResult, error) {
 				// get service from prevKv
 				service, err = gxregistry.DecodeService(ev.PrevKv.Value)
 				if err != nil || service == nil {
-					log.Warn("gxregistry.DecodeService() = {service:%p, error:%+v}", service, err)
+					log.Warn("gxregistry.DecodeService() = {service:%p, error:%+v}", service, jerrors.ErrorStack(err))
 					continue
 				}
-
-				//if !w.opts.Filter(*service.Attr) {
-				//	continue
-				//}
 			}
 
 			return &gxregistry.EventResult{

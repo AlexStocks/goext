@@ -97,7 +97,7 @@ func NewRegistry(opts ...gxregistry.Option) (gxregistry.Registry, error) {
 func (r *Registry) handleEtcdRestart() error {
 	keepAlive, err := r.client.KeepAlive()
 	if err != nil {
-		return jerrors.Annotate(err, "gxetcd.KeepAlive()")
+		return jerrors.Trace(err)
 	}
 
 	r.wg.Add(1)

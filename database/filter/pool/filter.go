@@ -12,18 +12,17 @@ import (
 
 import (
 	log "github.com/AlexStocks/log4go"
-)
-
-import (
-	"github.com/AlexStocks/dubbogo/common"
-	"github.com/AlexStocks/goext/database/filter"
-	"github.com/AlexStocks/goext/database/registry"
-	"github.com/AlexStocks/goext/time"
 	jerrors "github.com/juju/errors"
 )
 
+import (
+	"github.com/AlexStocks/goext/database/filter"
+	"github.com/AlexStocks/goext/database/registry"
+	"github.com/AlexStocks/goext/time"
+)
+
 var (
-	defaultTTL    = 5 * time.Minute
+	defaultTTL    = 10 * time.Minute
 	activeTimeout = 2 * time.Hour
 )
 
@@ -92,7 +91,7 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilt
 	}
 
 	svcs, err := s.opts.Registry.GetServices(attr)
-	log.Debug("Registry.GetServices(attr:%+v) = {err:%s, svcs:%+v}", attr, err, svcs)
+	log.Debug("Registry.GetServices(attr:%+v) = {err:%s, svcs:%+v}", attr, jerrors.ErrorStack(err), svcs)
 	if err != nil {
 		log.Error("registry.GetService(serviceString{%v}) = err:%+v}", serviceString, err)
 		if sok && len(services) > 0 {
@@ -101,7 +100,7 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilt
 			return services, ttl.UnixNano(), nil
 		}
 
-		return nil, 0, err
+		return nil, 0, jerrors.Annotatef(err, "cacheSelect.get(ServiceAttr:%+v)", attr)
 	}
 
 	var serviceArray []*gxregistry.Service
@@ -178,8 +177,8 @@ func (s *Filter) update(res *gxregistry.EventResult) {
 		log.Warn("filter delete serviceURL{%#v}", *res.Service)
 	}
 	s.set(sname, services)
-	services, ok = s.services[sname]
-	log.Debug("after update, services.services[%s] member list size{%d}", sname, len(services))
+	// services, ok = s.services[sname]
+	log.Debug("after update, services.services[%s] member list size{%d}", sname, len(s.services[sname]))
 	// if ok { // debug
 	// 	for i, s := range services {
 	// 		log.Debug("services.services[%s][%d] = service{%#v}", sname, i, s)
@@ -200,23 +199,23 @@ func (s *Filter) run() {
 		w, err := s.opts.Registry.Watch(
 			gxregistry.WithWatchRoot(s.opts.Registry.Options().Root),
 		)
-		log.Debug("services.Registry.Watch() = watch:%+v, error:%+v", w, err)
+		log.Debug("services.Registry.Watch() = watch:%+v, error:%+v", w, jerrors.ErrorStack(err))
 		if err != nil {
 			if s.isClosed() {
 				log.Warn("(Filter)run() isClosed now")
 				return
 			}
-			log.Warn("Registry.Watch() = error:%+v", err)
-			time.Sleep(common.TimeSecondDuration(gxregistry.REGISTRY_CONN_DELAY))
+			log.Warn("Registry.Watch() = error:%+v", jerrors.ErrorStack(err))
+			time.Sleep(gxtime.TimeSecondDuration(gxregistry.REGISTRY_CONN_DELAY))
 			continue
 		}
 
 		// this function will block until got done signal
 		err = s.watch(w)
-		log.Debug("services.watch(w) = err{%#v}", err)
+		log.Debug("services.watch(w) = err{%#+v}", jerrors.ErrorStack(err))
 		if err != nil {
-			log.Warn("Filter.watch() = error{%v}", err)
-			time.Sleep(common.TimeSecondDuration(gxregistry.REGISTRY_CONN_DELAY))
+			log.Warn("Filter.watch() = error{%v}", jerrors.ErrorStack(err))
+			time.Sleep(gxtime.TimeSecondDuration(gxregistry.REGISTRY_CONN_DELAY))
 			continue
 		}
 	}
@@ -274,7 +273,7 @@ func (s *Filter) GetService(service gxregistry.ServiceAttr) ([]*gxregistry.Servi
 	services, _, err = s.get(service)
 	log.Debug("get(service{%+v} = serviceURL array{%+v})", service, services)
 	if err != nil {
-		log.Error("services.get(service{%s}) = error{%T-%v}", service, err, err)
+		log.Error("services.get(service{%s}) = error{%+v}", service, jerrors.ErrorStack(err))
 		return nil, gxfilter.ErrNotFound
 	}
 	if len(services) == 0 {

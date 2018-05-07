@@ -56,13 +56,12 @@ func (c *Client) KeepAlive() (<-chan *ecv3.LeaseKeepAliveResponse, error) {
 	if id == ecv3.NoLease {
 		rsp, err := c.client.Grant(c.opts.ctx, int64(c.opts.ttl.Seconds()))
 		if err != nil {
-			return nil, jerrors.Annotatef(err, "etcdv3.Grant()")
+			return nil, jerrors.Trace(err)
 		}
 		id = ecv3.LeaseID(rsp.ID)
 	}
 	c.Lock()
 	c.id = id
-	// fmt.Printf("lease id:%#x\n", id)
 	c.Unlock()
 
 	ctx, cancel := context.WithCancel(c.opts.ctx)

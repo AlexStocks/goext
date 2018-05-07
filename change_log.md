@@ -5,6 +5,9 @@
 ## dev list ##
 ---
 
+- 2018/05/07
+  > feature
+  * add container/hashtable
 
 - 2018/05/02
   > bug fix
