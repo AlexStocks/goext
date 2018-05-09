@@ -7,11 +7,13 @@ package gxetcd
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 )
 
 import (
+	log "github.com/AlexStocks/log4go"
 	etcdv3 "github.com/coreos/etcd/clientv3"
 	jerrors "github.com/juju/errors"
 )
@@ -20,8 +22,6 @@ import (
 	"github.com/AlexStocks/goext/database/etcd"
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/runtime"
-	log "github.com/AlexStocks/log4go"
-	"strings"
 )
 
 type Registry struct {
