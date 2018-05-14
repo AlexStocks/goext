@@ -82,13 +82,13 @@ func CInfo(format string, args ...interface{}) {
 }
 
 func CWarn(format string, args ...interface{}) {
-	CPrintfln(BMagenta, format, args...)
+	CEPrintfln(BMagenta, format, args...)
 }
 
 func CError(format string, args ...interface{}) {
-	CPrintfln(NRed, format, args...)
+	CEPrintfln(NRed, format, args...)
 }
 
 func CFatal(format string, args ...interface{}) {
-	CPrintfln(BRed, format, args...)
+	CEPrintfln(BRed, format, args...)
 }
