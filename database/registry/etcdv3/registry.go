@@ -19,14 +19,14 @@ import (
 )
 
 import (
-	"github.com/AlexStocks/goext/database/etcd"
+	etcd "github.com/AlexStocks/goext/database/etcd"
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/runtime"
 )
 
 type Registry struct {
 	etcdClient *etcdv3.Client
-	client     *gxetcd.Client
+	client     *etcd.Client
 	options    gxregistry.Options
 
 	done chan struct{}
@@ -69,7 +69,7 @@ func NewRegistry(opts ...gxregistry.Option) (gxregistry.Registry, error) {
 	if err != nil {
 		return nil, jerrors.Errorf("etcdv3.New(config:%+v) = error:%s", config, err)
 	}
-	gxClient, err := gxetcd.NewClient(client, gxetcd.WithTTL(options.Timeout))
+	gxClient, err := etcd.NewClient(client, etcd.WithTTL(options.Timeout))
 	if err != nil {
 		return nil, jerrors.Errorf("gxetcd.NewClient() = error:%s", err)
 	}

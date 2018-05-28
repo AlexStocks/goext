@@ -18,7 +18,7 @@ import (
 )
 
 import (
-	"github.com/AlexStocks/goext/database/etcd"
+	etcd "github.com/AlexStocks/goext/database/etcd"
 	"github.com/AlexStocks/goext/database/registry"
 )
 
@@ -28,10 +28,10 @@ type Watcher struct {
 	cancel context.CancelFunc
 	w      clientv3.WatchChan
 	opts   gxregistry.WatchOptions
-	client *gxetcd.Client
+	client *etcd.Client
 }
 
-func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
+func NewWatcher(client *etcd.Client, opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
 	var options gxregistry.WatchOptions
 	for _, o := range opts {
 		o(&options)
