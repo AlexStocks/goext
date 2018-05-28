@@ -6,8 +6,6 @@ import (
 	"os"
 	"sync"
 	"syscall"
-
-	"github.com/ashishgandhi/buffer/binary"
 )
 
 // buffer file format related sizes

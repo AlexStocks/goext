@@ -23,7 +23,6 @@ var (
 )
 
 type Client struct {
-	name          string
 	zkAddrs       []string
 	sync.Mutex             // for conn
 	conn          *zk.Conn // 这个conn不能被close两次，否则会收到 “panic: close of closed channel”
@@ -63,15 +62,14 @@ func StateToString(state zk.State) string {
 	return "zookeeper unknown state"
 }
 
-func NewClient(name string, zkAddrs []string, connTimeout time.Duration) (*Client, error) {
+func NewClient(zkAddrs []string, connTimeout time.Duration) (*Client, error) {
 	var (
 		err   error
-		event <-chan zk.Event
 		c     *Client
+		event <-chan zk.Event
 	)
 
 	c = &Client{
-		name:          name,
 		zkAddrs:       zkAddrs,
 		done:          make(chan struct{}),
 		eventRegistry: make(map[string][]*chan struct{}),
@@ -79,7 +77,7 @@ func NewClient(name string, zkAddrs []string, connTimeout time.Duration) (*Clien
 	// connect to zookeeper
 	c.conn, event, err = zk.Connect(zkAddrs, connTimeout)
 	if err != nil {
-		return nil, err
+		return nil, jerrors.Annotatef(err, "zk.Connect(zk addr:%#v, timeout:%d)", zkAddrs, connTimeout)
 	}
 
 	c.wait.Add(1)
@@ -96,7 +94,7 @@ func (c *Client) handleZkEvent(session <-chan zk.Event) {
 
 	defer func() {
 		c.wait.Done()
-		log.Info("zk{path:%v, name:%s} connection goroutine game over.", c.zkAddrs, c.name)
+		log.Info("zk{path:%v} connection goroutine game over.", c.zkAddrs)
 	}()
 
 LOOP:
@@ -106,11 +104,11 @@ LOOP:
 			break LOOP
 
 		case event = <-session:
-			log.Warn("client{%s} get a zookeeper event{type:%s, server:%s, path:%s, state:%d-%s, err:%s}",
-				c.name, event.Type.String(), event.Server, event.Path, event.State, StateToString(event.State), event.Err)
+			log.Warn("client get a zookeeper event{type:%s, server:%s, path:%s, state:%d-%s, err:%s}",
+				event.Type.String(), event.Server, event.Path, event.State, StateToString(event.State), event.Err)
 			switch (int)(event.State) {
 			case (int)(zk.StateDisconnected):
-				log.Warn("zk{addr:%s} state is StateDisconnected, so close the zk client{name:%s}.", c.zkAddrs, c.name)
+				log.Warn("zk{addr:%#v} state is StateDisconnected, so close the zk client.", c.zkAddrs)
 				c.Stop()
 				c.Lock()
 				if c.conn != nil {
@@ -121,11 +119,11 @@ LOOP:
 				break LOOP
 
 			case (int)(zk.EventNodeDataChanged), (int)(zk.EventNodeChildrenChanged):
-				log.Info("zkClient{%s} get zk node changed event{path:%s}", c.name, event.Path)
+				log.Info("zkClient get zk node changed event{path:%s}", event.Path)
 				c.Lock()
 				for p, a := range c.eventRegistry {
 					if strings.HasPrefix(p, event.Path) {
-						log.Info("send event{state:zk.EventNodeDataChange, Path:%s} notify event to path{%s} related watcher", event.Path, p)
+						log.Info("send event{zk.EventNodeDataChange, zk.Path:%s} to path{%s} related watcher", event.Path, p)
 						for _, e := range a {
 							*e <- struct{}{}
 						}
@@ -158,7 +156,7 @@ func (c *Client) RegisterEvent(path string, event *chan struct{}) {
 	a = append(a, event)
 	c.eventRegistry[path] = a
 	c.Unlock()
-	log.Debug("zkClient{%s} register event{path:%s, ptr:%p}", c.name, path, event)
+	log.Debug("zkClient register event{path:%s, ptr:%p}", path, event)
 }
 
 func (c *Client) UnregisterEvent(path string, event *chan struct{}) {
@@ -176,10 +174,10 @@ func (c *Client) UnregisterEvent(path string, event *chan struct{}) {
 			if e == event {
 				arr := a
 				a = append(arr[:i], arr[i+1:]...)
-				log.Debug("zkClient{%s} unregister event{path:%s, event:%p}", c.name, path, event)
+				log.Debug("zkClient unregister event{path:%s, event:%p}", path, event)
 			}
 		}
-		log.Debug("after zkClient{%s} unregister event{path:%s, event:%p}, array length %d", c.name, path, event, len(a))
+		log.Debug("after zkClient unregister event{path:%s, event:%p}, array length %d", path, event, len(a))
 		if len(a) == 0 {
 			delete(c.eventRegistry, path)
 		} else {
@@ -212,7 +210,7 @@ func (c *Client) ValidateConnection() bool {
 	default:
 	}
 
-	var valid bool = true
+	var valid = true
 	c.Lock()
 	if c.conn == nil {
 		valid = false
@@ -231,7 +229,7 @@ func (c *Client) Close() {
 		c.conn = nil
 	}
 	c.Unlock()
-	log.Warn("zkClient{name:%s, zk addr:%s} done now.", c.name, c.zkAddrs)
+	log.Warn("zkClient{zk addr:%s} done now.", c.zkAddrs)
 }
 
 // 节点须逐级创建
@@ -423,7 +421,7 @@ func (c *Client) ExistW(path string) (<-chan zk.Event, error) {
 		return nil, jerrors.Annotatef(err, "zk.ExistsW(path:%s)", path)
 	}
 	if !exist {
-		return nil, jerrors.Errorf("zkClient{%s} App zk path{%s} does not exist.", c.name, path)
+		return nil, jerrors.Errorf("zkClient App zk path{%s} does not exist.", path)
 	}
 
 	return watch, nil
