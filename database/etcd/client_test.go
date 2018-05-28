@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 )
 
 import (
@@ -11,7 +12,6 @@ import (
 	etcdv3 "github.com/coreos/etcd/clientv3"
 	jerrors "github.com/juju/errors"
 	"github.com/stretchr/testify/suite"
-	"time"
 )
 
 type ClientTestSuite struct {

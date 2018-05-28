@@ -11,11 +11,8 @@ import (
 
 import (
 	log "github.com/AlexStocks/log4go"
-)
-
-import (
 	jerrors "github.com/juju/errors"
-	hash "github.com/mitchellh/hashstructure"
+	"github.com/samuel/go-zookeeper/zk"
 )
 
 import (
@@ -27,26 +24,29 @@ import (
 // Registry
 //////////////////////////////////////////////
 
-const (
-	kRegistryZkClient = "zk registry"
-)
-
 type Registry struct {
-	client     *gxzookeeper.Client
-	options    gxregistry.Options
-	sync.Mutex                   // lock for client + register
-	register   map[string]uint64 // service name -> hash(gxregistry.Service)
+	client          *gxzookeeper.Client
+	options         gxregistry.Options
+	sync.Mutex      // lock for client + register
+	done            chan struct{}
+	wg              sync.WaitGroup
+	serviceRegistry map[gxregistry.ServiceAttr]gxregistry.Service
 }
 
 func NewRegistry(opts ...gxregistry.Option) (*Registry, error) {
 	var (
 		err     error
 		r       *Registry
+		conn    *zk.Conn
+		event   <-chan zk.Event
 		options gxregistry.Options
 	)
 
 	for _, o := range opts {
 		o(&options)
+	}
+	if options.Addrs == nil {
+		return nil, jerrors.Errorf("@options.Addrs is nil")
 	}
 	if options.Timeout == 0 {
 		options.Timeout = gxregistry.DefaultTimeout
@@ -54,119 +54,184 @@ func NewRegistry(opts ...gxregistry.Option) (*Registry, error) {
 	if options.Root == "" {
 		options.Root = gxregistry.DefaultServiceRoot
 	}
-
-	r = &Registry{options: options}
-	err = r.validateZookeeperClient()
+	// connect to zookeeper
+	conn, event, err = zk.Connect(options.Addrs, options.Timeout)
 	if err != nil {
-		return nil, err
+		return nil, jerrors.Annotatef(err, "zk.Connect(zk addr:%#v, timeout:%d)", options.Addrs, options.Timeout)
 	}
-	r.register = make(map[string]uint64)
+	r = &Registry{
+		options:         options,
+		client:          gxzookeeper.NewClient(conn),
+		done:            make(chan struct{}),
+		serviceRegistry: make(map[gxregistry.ServiceAttr]gxregistry.Service),
+	}
+	go r.handleZkEvent(event)
 
 	return r, nil
+}
+
+func (r *Registry) handleZkEvent(session <-chan zk.Event) {
 }
 
 func (r *Registry) Options() gxregistry.Options {
 	return r.options
 }
 
-func (r *Registry) validateZookeeperClient() error {
-	var err error
+// 如果s.nodes为空，则返回当前registry中的service
+// 若非空，则检查其中的每个node是否存在
+func (r *Registry) exist(s gxregistry.Service) (gxregistry.Service, bool) {
+	// get existing hash
 	r.Lock()
-	if r.client == nil {
-		r.client, err = gxzookeeper.NewClient(kRegistryZkClient, r.options.Addrs, r.options.Timeout)
-		if err != nil {
-			log.Warn("newZookeeperClient(name{%s}, zk addresss{%v}, timeout{%d}) = error{%v}",
-				kRegistryZkClient, r.options.Addrs, r.options.Timeout, err)
+	defer r.Unlock()
+	v, ok := r.serviceRegistry[*(s.Attr)]
+	if len(s.Nodes) == 0 {
+		return v, ok
+	}
+
+	for i := range s.Nodes {
+		flag := false
+		for j := range v.Nodes {
+			if s.Nodes[i].Equal(v.Nodes[j]) {
+				flag = true
+				continue
+			}
+		}
+		if !flag {
+			// log.Error("s.node:%s, v.nodes:%s", gxlog.PrettyString(s.Nodes[i]), gxlog.PrettyString(v.Nodes))
+			return v, false
 		}
 	}
-	r.Unlock()
 
-	return err
+	return v, true
 }
 
-func (r *Registry) Register(sv interface{}) error {
-	s, ok := sv.(*gxregistry.Service)
-	if !ok {
-		return jerrors.Errorf("@service:%+v type is not gxregistry.Service", sv)
-	}
+func (r *Registry) addService(s gxregistry.Service) {
 	if len(s.Nodes) == 0 {
-		return jerrors.Errorf("Require at least one node")
-	}
-
-	// create hash of service; uint64
-	h, err := hash.Hash(s, nil)
-	if err != nil {
-		return err
+		return
 	}
 
 	// get existing hash
 	r.Lock()
-	v, ok := r.register[s.Attr.Service]
-	r.Unlock()
-
-	// the service is unchanged, skip registering
-	if ok && v == h {
-		return nil
+	defer r.Unlock()
+	v, ok := r.serviceRegistry[*s.Attr]
+	if !ok {
+		r.serviceRegistry[*s.Attr] = s
+		return
 	}
 
-	service := &gxregistry.Service{Metadata: s.Metadata}
+	for i := range s.Nodes {
+		flag := false
+		for j := range v.Nodes {
+			if s.Nodes[i].Equal(v.Nodes[j]) {
+				flag = true
+			}
+		}
+		if !flag {
+			v.Nodes = append(v.Nodes, s.Nodes[i])
+		}
+	}
+	r.serviceRegistry[*s.Attr] = v
+
+	return
+}
+
+func (r *Registry) deleteService(s gxregistry.Service) {
+	if len(s.Nodes) == 0 {
+		return
+	}
+
+	// get existing hash
+	r.Lock()
+	defer r.Unlock()
+	v, ok := r.serviceRegistry[*s.Attr]
+	if !ok {
+		return
+	}
+
+	for i := range s.Nodes {
+		for j := range v.Nodes {
+			if s.Nodes[i].Equal(v.Nodes[j]) {
+				v.Nodes = append(v.Nodes[:j], v.Nodes[j+1:]...)
+				break
+			}
+		}
+	}
+	r.serviceRegistry[*s.Attr] = v
+
+	return
+}
+
+func (r *Registry) register(s gxregistry.Service) error {
+	service := gxregistry.Service{Metadata: s.Metadata}
 	service.Attr = s.Attr
 
-	// register every node
+	// serviceRegistry every node
 	var zkPath string
-	for _, node := range s.Nodes {
+	for i, node := range s.Nodes {
+		service.Nodes = []*gxregistry.Node{node}
+		data, err := gxregistry.EncodeService(&service)
+		if err != nil {
+			service.Nodes = s.Nodes[:i]
+			r.unregister(service)
+			return jerrors.Annotatef(err, "gxregistry.EncodeService(service:%+v) = error:%s", service, err)
+		}
+
 		r.Lock()
 		defer r.Unlock()
 		zkPath = service.NodePath(r.options.Root, *node)
 		err = r.client.CreateZkPath(zkPath)
 		if err != nil {
 			log.Error("zkClient.CreateZkPath(root{%s})", zkPath, err)
-			return err
+			return jerrors.Trace(err)
 		}
-		service.Nodes = []*gxregistry.Node{node}
-		sn, err := gxregistry.EncodeService(service)
-		if err != nil {
-			return jerrors.Annotatef(err, "gxregister.EncodeService(service:%+v)", service)
-		}
-		_, err = r.client.RegisterTempSeq(zkPath, []byte(sn))
+
+		_, err = r.client.RegisterTempSeq(zkPath, []byte(data))
 		if err != nil {
 			return jerrors.Annotatef(err, "gxregister.RegisterTempSeq(path:%s)", zkPath)
 		}
 	}
 
-	r.Lock()
-	// save our hash of the service
-	r.register[s.Attr.Service] = h
-	r.Unlock()
-
 	return nil
 }
 
-func (r *Registry) Unregister(svc interface{}) error {
-	s, ok := svc.(*gxregistry.Service)
-	if !ok {
-		return jerrors.Errorf("@service:%+v type is not gxregistry.Service", svc)
-	}
-
+func (r *Registry) Register(s gxregistry.Service) error {
 	if len(s.Nodes) == 0 {
 		return jerrors.Errorf("Require at least one node")
 	}
 
-	r.Lock()
-	// delete our hash of the service
-	delete(r.register, s.Attr.Service)
-	r.Unlock()
+	err := r.register(s)
+	if err != nil {
+		return jerrors.Annotate(err, "Registry.register")
+	}
 
+	// save the service
+	r.addService(s)
+
+	return nil
+}
+
+func (r *Registry) unregister(s gxregistry.Service) error {
+	if len(s.Nodes) == 0 {
+		return jerrors.Errorf("Require at least one node")
+	}
+
+	var err error
 	for _, node := range s.Nodes {
-		if err := r.client.DeleteZkPath(s.NodePath(r.options.Root, *node)); err != nil {
-			return jerrors.Annotatef(err, "zkClient.DeleteZkPath(%s)", s.NodePath(r.options.Root, *node))
+		err = r.client.DeleteZkPath(s.NodePath(r.options.Root, *node))
+		if err != nil {
+			return jerrors.Trace(err)
 		}
 	}
 
 	return nil
 }
 
-func (r *Registry) GetService(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, error) {
+func (r *Registry) Deregister(s gxregistry.Service) error {
+	r.deleteService(s)
+	return jerrors.Trace(r.unregister(s))
+}
+
+func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, error) {
 	svc := gxregistry.Service{Attr: &attr}
 	path := svc.Path(r.options.Root)
 	children, err := r.client.GetChildren(path)
@@ -209,6 +274,15 @@ func (r *Registry) String() string {
 	return "zookeeper registry"
 }
 
-func (r *Registry) Close() {
-	r.client.Close()
+func (r *Registry) Close() error {
+	r.Lock()
+	defer r.Unlock()
+	if r.client != nil {
+		close(r.done)
+		r.client.ZkConn().Close()
+		r.wg.Wait()
+		r.client = nil
+	}
+
+	return nil
 }
