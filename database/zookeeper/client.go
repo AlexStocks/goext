@@ -15,10 +15,6 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
-var (
-	ErrZkClientConnNil = jerrors.Errorf("client{conn} is nil")
-)
-
 type Client struct {
 	conn *zk.Conn // 这个conn不能被close两次，否则会收到 “panic: close of closed channel”
 }
@@ -69,9 +65,12 @@ func (c *Client) CreateZkPath(basePath string) error {
 		tmpPath string
 	)
 
+	if strings.HasSuffix(basePath, "/") {
+		basePath = strings.TrimSuffix(basePath, "/")
+	}
+
 	for _, str := range strings.Split(basePath, "/")[1:] {
 		tmpPath = path.Join(tmpPath, "/", str)
-		err = ErrZkClientConnNil
 		_, err = c.conn.Create(tmpPath, []byte(""), 0, zk.WorldACL(zk.PermAll))
 		if err != nil {
 			if err != zk.ErrNodeExists {
@@ -85,13 +84,14 @@ func (c *Client) CreateZkPath(basePath string) error {
 
 // 像创建一样，删除节点的时候也只能从叶子节点逐级回退删除
 // 当节点还有子节点的时候，删除是不会成功的
-func (c *Client) DeleteZkPath(basePath string) error {
-	err := ErrZkClientConnNil
-	if c.conn != nil {
-		err = c.conn.Delete(basePath, -1)
-		if err != nil {
-			return jerrors.Annotatef(err, "zk.Delete(path:%s)", basePath)
-		}
+func (c *Client) DeleteZkPath(path string) error {
+	if strings.HasSuffix(path, "/") {
+		path = strings.TrimSuffix(path, "/")
+	}
+
+	err := c.conn.Delete(path, -1)
+	if err != nil {
+		return jerrors.Annotatef(err, "zk.Delete(path:%s)", path)
 	}
 
 	return nil
@@ -102,6 +102,10 @@ func (c *Client) RegisterTemp(path string, data []byte) (string, error) {
 		err     error
 		tmpPath string
 	)
+
+	if strings.HasSuffix(path, "/") {
+		path = strings.TrimSuffix(path, "/")
+	}
 
 	tmpPath, err = c.conn.Create(path, data, zk.FlagEphemeral, zk.WorldACL(zk.PermAll))
 	if err != nil {
@@ -118,6 +122,10 @@ func (c *Client) RegisterTempSeq(path string, data []byte) (string, error) {
 		err     error
 		tmpPath string
 	)
+
+	if strings.HasSuffix(path, "/") {
+		path = strings.TrimSuffix(path, "/")
+	}
 
 	tmpPath, err = c.conn.Create(path, data, zk.FlagEphemeral|zk.FlagSequence, zk.WorldACL(zk.PermAll))
 	if err != nil {
@@ -136,6 +144,10 @@ func (c *Client) GetChildrenW(path string) ([]string, <-chan zk.Event, error) {
 		stat     *zk.Stat
 		watch    <-chan zk.Event
 	)
+
+	if strings.HasSuffix(path, "/") {
+		path = strings.TrimSuffix(path, "/")
+	}
 
 	children, stat, watch, err = c.conn.ChildrenW(path)
 	if err != nil {
@@ -161,6 +173,10 @@ func (c *Client) Get(path string) ([]byte, error) {
 		stat *zk.Stat
 	)
 
+	if strings.HasSuffix(path, "/") {
+		path = strings.TrimSuffix(path, "/")
+	}
+
 	data, stat, err = c.conn.Get(path)
 	if err != nil {
 		if err == zk.ErrNoNode {
@@ -185,6 +201,10 @@ func (c *Client) GetChildren(path string) ([]string, error) {
 		stat     *zk.Stat
 	)
 
+	if strings.HasSuffix(path, "/") {
+		path = strings.TrimSuffix(path, "/")
+	}
+
 	children, stat, err = c.conn.Children(path)
 	if err != nil {
 		if err == zk.ErrNoNode {
@@ -208,6 +228,10 @@ func (c *Client) ExistW(path string) (<-chan zk.Event, error) {
 		err   error
 		watch <-chan zk.Event
 	)
+
+	if strings.HasSuffix(path, "/") {
+		path = strings.TrimSuffix(path, "/")
+	}
 
 	exist, _, watch, err = c.conn.ExistsW(path)
 	if err != nil {

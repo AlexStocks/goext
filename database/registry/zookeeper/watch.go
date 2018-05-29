@@ -6,20 +6,10 @@
 package gxzookeeper
 
 import (
-	"errors"
-	"path"
 	"sync"
-	"time"
 )
 
 import (
-	log "github.com/AlexStocks/log4go"
-	"github.com/samuel/go-zookeeper/zk"
-)
-
-import (
-	"github.com/AlexStocks/dubbogo/common"
-	"github.com/AlexStocks/dubbogo/registry"
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/database/zookeeper"
 )
@@ -35,10 +25,11 @@ type Watcher struct {
 	opts   gxregistry.WatchOptions
 	once   sync.Once
 	client *gxzookeeper.Client
-	events chan event // 通过这个channel把registry与selector连接了起来
-	wait   sync.WaitGroup
+	//events chan event // 通过这个channel把registry与selector连接了起来
+	wait sync.WaitGroup
 }
 
+/*
 type event struct {
 	res *registry.Result
 	err error
@@ -318,3 +309,4 @@ func (this *Watcher) Stop() {
 		this.client.Close()
 	})
 }
+*/

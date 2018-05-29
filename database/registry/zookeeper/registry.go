@@ -16,6 +16,7 @@ import (
 )
 
 import (
+	"fmt"
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/database/zookeeper"
 )
@@ -33,7 +34,7 @@ type Registry struct {
 	serviceRegistry map[gxregistry.ServiceAttr]gxregistry.Service
 }
 
-func NewRegistry(opts ...gxregistry.Option) (*Registry, error) {
+func NewRegistry(opts ...gxregistry.Option) (gxregistry.Registry, error) {
 	var (
 		err     error
 		r       *Registry
@@ -97,7 +98,6 @@ func (r *Registry) exist(s gxregistry.Service) (gxregistry.Service, bool) {
 			}
 		}
 		if !flag {
-			// log.Error("s.node:%s, v.nodes:%s", gxlog.PrettyString(s.Nodes[i]), gxlog.PrettyString(v.Nodes))
 			return v, false
 		}
 	}
@@ -176,16 +176,17 @@ func (r *Registry) register(s gxregistry.Service) error {
 			return jerrors.Annotatef(err, "gxregistry.EncodeService(service:%+v) = error:%s", service, err)
 		}
 
+		zkPath = service.Path(r.options.Root)
 		r.Lock()
 		defer r.Unlock()
-		zkPath = service.NodePath(r.options.Root, *node)
 		err = r.client.CreateZkPath(zkPath)
 		if err != nil {
 			log.Error("zkClient.CreateZkPath(root{%s})", zkPath, err)
 			return jerrors.Trace(err)
 		}
 
-		_, err = r.client.RegisterTempSeq(zkPath, []byte(data))
+		zkPath = service.NodePath(r.options.Root, *node)
+		_, err = r.client.RegisterTemp(zkPath, []byte(data))
 		if err != nil {
 			return jerrors.Annotatef(err, "gxregister.RegisterTempSeq(path:%s)", zkPath)
 		}
@@ -197,6 +198,10 @@ func (r *Registry) register(s gxregistry.Service) error {
 func (r *Registry) Register(s gxregistry.Service) error {
 	if len(s.Nodes) == 0 {
 		return jerrors.Errorf("Require at least one node")
+	}
+
+	if _, exist := r.exist(s); exist {
+		return gxregistry.ErrorAlreadyRegister
 	}
 
 	err := r.register(s)
@@ -231,7 +236,7 @@ func (r *Registry) Deregister(s gxregistry.Service) error {
 	return jerrors.Trace(r.unregister(s))
 }
 
-func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, error) {
+func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]gxregistry.Service, error) {
 	svc := gxregistry.Service{Attr: &attr}
 	path := svc.Path(r.options.Root)
 	children, err := r.client.GetChildren(path)
@@ -242,32 +247,40 @@ func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]*gxregistry.Servi
 		return nil, gxregistry.ErrorRegistryNotFound
 	}
 
-	serviceArray := []*gxregistry.Service{}
+	serviceArray := []gxregistry.Service{}
 	var node gxregistry.Node
 	for _, name := range children {
 		node.ID = name
 		zkPath := svc.NodePath(r.options.Root, node)
-		grandchildren, err := r.client.GetChildren(zkPath)
+
+		childData, err := r.client.Get(zkPath)
+		fmt.Println("get zkpath:", zkPath, " children:", childData, ", error:", err)
 		if err != nil {
-			return nil, jerrors.Annotatef(err, "gxzookeeper.GetChildren(node:%+v)", node)
-		}
-		if len(grandchildren) > 0 {
+			log.Warn("gxzookeeper.Get(name:%s) = error:%s", zkPath, jerrors.ErrorStack(err))
 			continue
 		}
 
-		childData, err := r.client.Get(zkPath)
-		if err != nil {
-			return nil, jerrors.Annotatef(err, "gxzookeeper.Get(name:%s)", zkPath)
-		}
-
 		sn, err := gxregistry.DecodeService(childData)
+		fmt.Println("decode data, sn:", sn, ", err:", err)
 		if err != nil {
-			return nil, jerrors.Annotate(err, "gxregistry.DecodeService()")
+			log.Warn("gxregistry.DecodeService(data:%#v) = error:%s", childData, jerrors.ErrorStack(err))
+			continue
 		}
-		serviceArray = append(serviceArray, sn)
+		if attr.Filter(*sn.Attr) {
+			for _, node := range sn.Nodes {
+				var service gxregistry.Service
+				service.Attr = sn.Attr
+				service.Nodes = append(service.Nodes, node)
+				serviceArray = append(serviceArray, service)
+			}
+		}
 	}
 
 	return serviceArray, nil
+}
+
+func (r *Registry) Watch(opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
+	return nil, nil
 }
 
 func (r *Registry) String() string {
