@@ -6,6 +6,8 @@
 package gxzookeeper
 
 import (
+	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -16,7 +18,6 @@ import (
 )
 
 import (
-	"fmt"
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/database/zookeeper"
 )
@@ -31,6 +32,7 @@ type Registry struct {
 	sync.Mutex      // lock for client + register
 	done            chan struct{}
 	wg              sync.WaitGroup
+	eventRegistry   map[string][]*chan struct{}
 	serviceRegistry map[gxregistry.ServiceAttr]gxregistry.Service
 }
 
@@ -64,6 +66,7 @@ func NewRegistry(opts ...gxregistry.Option) (gxregistry.Registry, error) {
 		options:         options,
 		client:          gxzookeeper.NewClient(conn),
 		done:            make(chan struct{}),
+		eventRegistry:   make(map[string][]*chan struct{}),
 		serviceRegistry: make(map[gxregistry.ServiceAttr]gxregistry.Service),
 	}
 	go r.handleZkEvent(event)
@@ -71,7 +74,125 @@ func NewRegistry(opts ...gxregistry.Option) (gxregistry.Registry, error) {
 	return r, nil
 }
 
+func (r *Registry) registerEvent(path string, event *chan struct{}) {
+	if path == "" || event == nil {
+		return
+	}
+
+	r.Lock()
+	a := r.eventRegistry[path]
+	a = append(a, event)
+	r.eventRegistry[path] = a
+	r.Unlock()
+	log.Debug("zkClient register event{path:%s, ptr:%p}", path, event)
+}
+
+func (r *Registry) unregisterEvent(path string, event *chan struct{}) {
+	if path == "" {
+		return
+	}
+
+	r.Lock()
+	for {
+		a, ok := r.eventRegistry[path]
+		if !ok {
+			break
+		}
+		for i, e := range a {
+			if e == event {
+				arr := a
+				a = append(arr[:i], arr[i+1:]...)
+				log.Debug("zkClient unregister event{path:%s, event:%p}", path, event)
+			}
+		}
+		log.Debug("after zkClient unregister event{path:%s, event:%p}, array length %d", path, event, len(a))
+		if len(a) == 0 {
+			delete(r.eventRegistry, path)
+		} else {
+			r.eventRegistry[path] = a
+		}
+		break
+	}
+	r.Unlock()
+}
+
+func (r *Registry) handleZkRestart() {
+	var (
+		err      error
+		services []gxregistry.Service
+	)
+
+	// copy c.services
+	services = make([]gxregistry.Service, 0, len(r.serviceRegistry))
+	r.Lock()
+	for _, s := range r.serviceRegistry {
+		services = append(services, s)
+	}
+	r.Unlock()
+
+	for _, s := range services {
+		err = r.register(s)
+		if err != nil {
+			log.Error("(ZookeeperRegistry)register(service:%s) = error:%s", s, jerrors.ErrorStack(err))
+		}
+	}
+}
+
 func (r *Registry) handleZkEvent(session <-chan zk.Event) {
+	var (
+		state int
+		event zk.Event
+	)
+
+	r.wg.Add(1)
+	defer func() {
+		r.wg.Done()
+		log.Info("zk{addr:%#v, path:%v} connection goroutine game over.", r.options.Addrs, r.options.Root)
+	}()
+
+LOOP:
+	for {
+		select {
+		case <-r.done:
+			break LOOP
+
+		case event = <-session:
+			log.Warn("client get a zookeeper event{type:%s, server:%s, path:%s, state:%d-%s, err:%#v}",
+				event.Type.String(), event.Server, event.Path, event.State, r.client.StateToString(event.State), event.Err)
+			switch (int)(event.State) {
+			case (int)(zk.StateDisconnected):
+				log.Warn("zk{addr:%#v, path:%v} state is StateDisconnected.", r.options.Addrs, r.options.Root)
+
+			case (int)(zk.EventNodeDataChanged), (int)(zk.EventNodeChildrenChanged):
+				log.Info("zkClient get zk node changed event{path:%s}", event.Path)
+				r.Lock()
+				for p, a := range r.eventRegistry {
+					if strings.HasPrefix(p, event.Path) {
+						log.Info("send event{zk.EventNodeDataChange, zk.Path:%s} to path{%s} related watcher", event.Path, p)
+						for _, e := range a {
+							*e <- struct{}{}
+						}
+					}
+				}
+				r.Unlock()
+
+			case (int)(zk.StateConnecting), (int)(zk.StateConnected), (int)(zk.StateHasSession):
+				if state != (int)(zk.StateConnecting) || state != (int)(zk.StateDisconnected) {
+					continue
+				}
+				if a, ok := r.eventRegistry[event.Path]; ok && 0 < len(a) {
+					for _, e := range a {
+						*e <- struct{}{}
+					}
+				}
+				if state == (int)(zk.StateDisconnected) && (int)(event.State) == (int)(zk.StateConnected) {
+					log.Info("start to handle zookeeper restart event.")
+					r.handleZkRestart()
+				}
+			}
+			state = (int)(event.State)
+		}
+	}
 }
 
 func (r *Registry) Options() gxregistry.Options {
@@ -177,16 +298,18 @@ func (r *Registry) register(s gxregistry.Service) error {
 		}
 
 		zkPath = service.Path(r.options.Root)
-		r.Lock()
-		defer r.Unlock()
+		//r.Lock()
 		err = r.client.CreateZkPath(zkPath)
+		//r.Unlock()
 		if err != nil {
 			log.Error("zkClient.CreateZkPath(root{%s})", zkPath, err)
 			return jerrors.Trace(err)
 		}
 
 		zkPath = service.NodePath(r.options.Root, *node)
+		//r.Lock()
 		_, err = r.client.RegisterTemp(zkPath, []byte(data))
+		//r.Unlock()
 		if err != nil {
 			return jerrors.Annotatef(err, "gxregister.RegisterTempSeq(path:%s)", zkPath)
 		}
