@@ -16,8 +16,11 @@ type Options struct {
 }
 
 type WatchOptions struct {
-	// the root registry path, suck as "/dubbo/"
+	// the root registry path, such as "/dubbo/"
 	Root string
+	// filter the second path, such as
+	// "/test/group%3Dbjtelecom%26protocol%3Dpb%26role%3DSRT_Provider%26service%3Dshopping%26version%3D1.0.1"
+	Filter ServiceAttr
 }
 
 type Option func(*Options)
@@ -47,5 +50,12 @@ type WatchOption func(*WatchOptions)
 func WithWatchRoot(root string) WatchOption {
 	return func(o *WatchOptions) {
 		o.Root = root
+	}
+}
+
+// Watch ServiceAttr Filter
+func WithWatchFilter(filter ServiceAttr) WatchOption {
+	return func(o *WatchOptions) {
+		o.Filter = filter
 	}
 }

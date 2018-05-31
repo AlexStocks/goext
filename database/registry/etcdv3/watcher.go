@@ -51,7 +51,6 @@ func NewWatcher(client *etcd.Client, opts ...gxregistry.WatchOption) (gxregistry
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{}, 1)
 
 	watchPath := options.Root
 	if !strings.HasSuffix(watchPath, "/") {
@@ -60,7 +59,7 @@ func NewWatcher(client *etcd.Client, opts ...gxregistry.WatchOption) (gxregistry
 	w := client.EtcdClient().Watch(ctx, watchPath, clientv3.WithPrefix(), clientv3.WithPrevKV())
 
 	wc := &Watcher{
-		done:   done,
+		done:   make(chan struct{}, 1),
 		cancel: cancel,
 		w:      w,
 		opts:   options,

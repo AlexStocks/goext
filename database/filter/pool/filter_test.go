@@ -47,9 +47,9 @@ func (suite *FilterTestSuite) SetupSuite() {
 	}
 
 	suite.nodes = []gxregistry.Node{
-		gxregistry.Node{ID: "node0", Address: "127.0.0.1", Port: 12345},
-		gxregistry.Node{ID: "node1", Address: "127.0.0.2", Port: 12345},
-		gxregistry.Node{ID: "node2", Address: "127.0.0.3", Port: 12345},
+		{ID: "node0", Address: "127.0.0.1", Port: 12345},
+		{ID: "node1", Address: "127.0.0.2", Port: 12345},
+		{ID: "node2", Address: "127.0.0.3", Port: 12345},
 	}
 
 	suite.ttl = 15e9

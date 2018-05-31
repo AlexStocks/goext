@@ -150,18 +150,18 @@ func (s *Filter) update(res *gxregistry.EventResult) {
 	}
 	var (
 		ok       bool
+		name     string
 		services []*gxregistry.Service
-		sname    string
 	)
 
 	log.Debug("update @registry result{%s}", res)
-	sname = res.Service.Attr.Service
+	name = res.Service.Attr.Service
 	s.Lock()
-	services, ok = s.services[sname]
-	log.Debug("service name:%s, its current member lists:%+v", sname, services)
+	services, ok = s.services[name]
+	log.Debug("service name:%s, its current member lists:%+v", name, services)
 	if ok { // existing service found
 		for i, s := range services {
-			log.Debug("services.services[%s][%d] = service{%#v}", sname, i, s)
+			log.Debug("services.services[%s][%d] = service{%#v}", name, i, s)
 			if s.Equal(res.Service) {
 				filterServices(&(services), i)
 				log.Debug("i:%d, new services:%+v", i, services)
@@ -176,12 +176,12 @@ func (s *Filter) update(res *gxregistry.EventResult) {
 	case gxregistry.ServiceDel:
 		log.Warn("filter delete serviceURL{%#v}", *res.Service)
 	}
-	s.set(sname, services)
-	// services, ok = s.services[sname]
-	log.Debug("after update, services.services[%s] member list size{%d}", sname, len(s.services[sname]))
+	s.set(name, services)
+	// services, ok = s.services[name]
+	log.Debug("after update, services.services[%s] member list size{%d}", name, len(s.services[name]))
 	// if ok { // debug
 	// 	for i, s := range services {
-	// 		log.Debug("services.services[%s][%d] = service{%#v}", sname, i, s)
+	// 		log.Debug("services.services[%s][%d] = service{%#v}", name, i, s)
 	// 	}
 	// }
 	s.Unlock()

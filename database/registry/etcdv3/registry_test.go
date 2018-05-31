@@ -37,7 +37,6 @@ func (suite *RegisterTestSuite) TearDownSuite() {
 func (suite *RegisterTestSuite) SetupTest() {
 	var err error
 	suite.reg, err = NewRegistry(
-		// gxregistry.WithAddrs([]string{"127.0.0.1:2379", "127.0.0.1:12379", "127.0.0.1:22379"}...),
 		gxregistry.WithAddrs([]string{"127.0.0.1:2379"}...),
 		gxregistry.WithTimeout(3e9),
 		gxregistry.WithRoot("/etcd_test"),

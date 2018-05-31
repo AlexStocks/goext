@@ -1,11 +1,14 @@
 package gxzookeeper
 
 import (
+	"testing"
+	"time"
+)
+
+import (
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/log"
 	"github.com/stretchr/testify/suite"
-	"testing"
-	"time"
 )
 
 type RegisterTestSuite struct {

@@ -6,7 +6,6 @@
 package gxzookeeper
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 )
@@ -18,6 +17,7 @@ import (
 )
 
 import (
+	"fmt"
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/database/zookeeper"
 )
@@ -373,18 +373,17 @@ func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]gxregistry.Servic
 	serviceArray := []gxregistry.Service{}
 	var node gxregistry.Node
 	for _, name := range children {
+		fmt.Println("name:", name)
 		node.ID = name
 		zkPath := svc.NodePath(r.options.Root, node)
 
 		childData, err := r.client.Get(zkPath)
-		fmt.Println("get zkpath:", zkPath, " children:", childData, ", error:", err)
 		if err != nil {
 			log.Warn("gxzookeeper.Get(name:%s) = error:%s", zkPath, jerrors.ErrorStack(err))
 			continue
 		}
 
 		sn, err := gxregistry.DecodeService(childData)
-		fmt.Println("decode data, sn:", sn, ", err:", err)
 		if err != nil {
 			log.Warn("gxregistry.DecodeService(data:%#v) = error:%s", childData, jerrors.ErrorStack(err))
 			continue
@@ -403,11 +402,18 @@ func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]gxregistry.Servic
 }
 
 func (r *Registry) Watch(opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
-	return nil, nil
+	w, err := NewWatcher(r, opts...)
+
+	return w, jerrors.Trace(err)
 }
 
 func (r *Registry) String() string {
 	return "zookeeper registry"
+}
+
+// check whether the session has been closed.
+func (r *Registry) Done() <-chan struct{} {
+	return r.done
 }
 
 func (r *Registry) Close() error {
