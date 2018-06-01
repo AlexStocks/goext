@@ -201,7 +201,7 @@ func (r *Registry) addService(s gxregistry.Service) {
 	defer r.Unlock()
 	v, ok := r.serviceRegistry[*s.Attr]
 	if !ok {
-		r.serviceRegistry[*s.Attr] = s
+		r.serviceRegistry[*s.Attr] = *(s.Copy())
 		return
 	}
 
@@ -213,7 +213,7 @@ func (r *Registry) addService(s gxregistry.Service) {
 			}
 		}
 		if !flag {
-			v.Nodes = append(v.Nodes, s.Nodes[i])
+			v.Nodes = append(v.Nodes, s.Nodes[i].Copy())
 		}
 	}
 	r.serviceRegistry[*s.Attr] = v

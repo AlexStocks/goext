@@ -19,6 +19,7 @@ import (
 
 import (
 	"github.com/AlexStocks/dubbogo/registry"
+	"github.com/AlexStocks/goext/container/array"
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/strings"
 	"github.com/AlexStocks/goext/time"
@@ -162,11 +163,8 @@ func (w *Watcher) handleZkPathEvent(zkRoot string, children []string) {
 }
 
 func (w *Watcher) handleZkNodeEvent(zkPath string, children []string) {
-	var (
-		err         error
-		newChildren []string
-	)
-	newChildren, err = w.reg.client.GetChildren(zkPath)
+	newChildren, err := w.reg.client.GetChildren(zkPath)
+	log.Debug("zkPath:%s, newChildren:%#v, children:%#v", zkPath, newChildren, children)
 	if err != nil {
 		log.Error("path{%s} child nodes changed, zk.Children() = error{%v}", zkPath, err)
 		return
@@ -248,10 +246,11 @@ func (w *Watcher) watchDir(zkPath string) {
 		w.wg.Done()
 		close(event)
 		w.Lock()
+		w.pathSet, _ = gxarray.RemoveElem(w.pathSet, zkPath)
 		w.Unlock()
+		log.Warn("stop watching dir %s", zkPath)
 	}()
 
-	failTimes = 1
 	for {
 		// get current children for a zkPath
 		children, childEventCh, err = w.reg.client.GetChildrenW(zkPath)
@@ -290,6 +289,7 @@ func (w *Watcher) watchDir(zkPath string) {
 				continue
 			}
 		}
+		failTimes = 0
 
 		select {
 		case zkEvent = <-childEventCh:
@@ -303,15 +303,10 @@ func (w *Watcher) watchDir(zkPath string) {
 			if zkPath == w.opts.Root {
 				w.handleZkPathEvent(zkEvent.Path, children)
 			} else {
-				if failTimes == 0 {
-					// 重连成功或者是第一次连接，则 children 全部置空，以方便把现有节点都添加到 selector 中
-					children = children[:0]
-				}
-				failTimes = 0
-
 				w.handleZkNodeEvent(zkEvent.Path, children)
 			}
-		case <-w.reg.done:
+
+		case <-w.done:
 			// There is no way to stop GetW/ChildrenW so just quit
 			log.Warn("client.done(), watch(path{%s}, ServiceConfig{%#v}) goroutine exit now...",
 				zkPath, w.opts.Filter)

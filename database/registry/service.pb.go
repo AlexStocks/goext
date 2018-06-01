@@ -143,6 +143,16 @@ func (m *ServiceAttr) Filter(service ServiceAttr) bool {
 	}
 }
 
+func (m *ServiceAttr) Copy() *ServiceAttr {
+	return &ServiceAttr{
+		Group:    m.Group,
+		Service:  m.Service,
+		Protocol: m.Protocol,
+		Version:  m.Version,
+		Role:     m.Role,
+	}
+}
+
 type Node struct {
 	ID       string            `protobuf:"bytes,1,opt,name=ID,proto3" json:"ID,omitempty"`
 	Address  string            `protobuf:"bytes,2,opt,name=Address,proto3" json:"Address,omitempty"`
@@ -154,6 +164,20 @@ func (m *Node) Reset()                    { *m = Node{} }
 func (*Node) ProtoMessage()               {}
 func (*Node) Descriptor() ([]byte, []int) { return fileDescriptorService, []int{1} }
 
+func (m *Node) Copy() *Node {
+	n := Node{
+		ID:       m.ID,
+		Address:  m.Address,
+		Port:     m.Port,
+		Metadata: make(map[string]string, len(m.Metadata)),
+	}
+	for k, v := range m.Metadata {
+		n.Metadata[k] = v
+	}
+
+	return &n
+}
+
 type Service struct {
 	Attr     *ServiceAttr      `protobuf:"bytes,1,opt,name=Attr" json:"Attr,omitempty"`
 	Nodes    []*Node           `protobuf:"bytes,2,rep,name=Nodes" json:"Nodes,omitempty"`
@@ -163,6 +187,22 @@ type Service struct {
 func (m *Service) Reset()                    { *m = Service{} }
 func (*Service) ProtoMessage()               {}
 func (*Service) Descriptor() ([]byte, []int) { return fileDescriptorService, []int{2} }
+func (s *Service) Copy() *Service {
+	c := Service{
+		Nodes:    make([]*Node, 0, len(s.Nodes)),
+		Metadata: make(map[string]string, len(s.Metadata)),
+	}
+	c.Attr = s.Attr.Copy()
+
+	for i := range s.Nodes {
+		c.Nodes = append(c.Nodes, s.Nodes[i].Copy())
+	}
+	for k, v := range s.Metadata {
+		c.Metadata[k] = v
+	}
+
+	return &c
+}
 
 // Result is returned by a call to Next on
 // the watcher. Actions can be create, update, delete
