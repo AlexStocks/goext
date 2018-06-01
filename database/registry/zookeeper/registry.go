@@ -8,6 +8,7 @@ package gxzookeeper
 import (
 	"strings"
 	"sync"
+	//"io/ioutil"
 )
 
 import (
@@ -17,7 +18,6 @@ import (
 )
 
 import (
-	"fmt"
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/database/zookeeper"
 )
@@ -58,9 +58,11 @@ func NewRegistry(opts ...gxregistry.Option) (gxregistry.Registry, error) {
 		options.Root = gxregistry.DefaultServiceRoot
 	}
 	// connect to zookeeper
+	//zk.DefaultLogger = golog.New(ioutil.Discard, "[goext] ", golog.LstdFlags)
 	conn, event, err = zk.Connect(options.Addrs, options.Timeout)
 	if err != nil {
-		return nil, jerrors.Annotatef(err, "zk.Connect(zk addr:%#v, timeout:%d)", options.Addrs, options.Timeout)
+		return nil, jerrors.Annotatef(err, "zk.Connect(zk addr:%#v, timeout:%d)",
+			options.Addrs, options.Timeout)
 	}
 	r = &Registry{
 		options:         options,
@@ -158,7 +160,7 @@ LOOP:
 
 		case event = <-session:
 			log.Warn("client get a zookeeper event{type:%s, server:%s, path:%s, state:%d-%s, err:%#v}",
-				event.Type.String(), event.Server, event.Path, event.State, r.client.StateToString(event.State), event.Err)
+				event.Type, event.Server, event.Path, event.State, r.client.StateToString(event.State), event.Err)
 			switch (int)(event.State) {
 			case (int)(zk.StateDisconnected):
 				log.Warn("zk{addr:%#v, path:%v} state is StateDisconnected.", r.options.Addrs, r.options.Root)
@@ -373,7 +375,6 @@ func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]gxregistry.Servic
 	serviceArray := []gxregistry.Service{}
 	var node gxregistry.Node
 	for _, name := range children {
-		fmt.Println("name:", name)
 		node.ID = name
 		zkPath := svc.NodePath(r.options.Root, node)
 

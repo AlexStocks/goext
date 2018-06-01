@@ -3,6 +3,7 @@ package gxzookeeper
 import (
 	"fmt"
 	"github.com/AlexStocks/goext/database/registry"
+	"github.com/AlexStocks/goext/log"
 	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
@@ -55,7 +56,7 @@ func (suite *WatcherTestSuite) TearDownTest() {
 	suite.reg.Close()
 }
 
-func (suite *WatcherTestSuite) TestWatchService1() {
+func (suite *WatcherTestSuite) TestWatchService() {
 	sa := gxregistry.ServiceAttr{
 		Group:    "bjtelecom",
 		Service:  "shopping",
@@ -64,13 +65,19 @@ func (suite *WatcherTestSuite) TestWatchService1() {
 		Role:     gxregistry.SRT_Provider,
 	}
 
+	// test case 1: 先启动 watcher， 然后再注册 provider node0 & node1，结果只能收到 node1 的注册
+	// 原因： WatchDir()
+	//
 	node1 := gxregistry.Node{ID: "node1", Address: "127.0.0.1", Port: 12341}
 	consumerService := gxregistry.Service{
 		Attr:  &suite.sa,
 		Nodes: []*gxregistry.Node{&suite.node, &node1},
 	}
 	err := suite.reg.Register(consumerService)
+	fmt.Println("register consumer service ", gxlog.PrettyString(consumerService))
 	suite.Equalf(nil, err, "Register(service:%+v)", consumerService)
+
+	time.Sleep(4e9)
 
 	node0 := gxregistry.Node{ID: "node0", Address: "127.0.0.1", Port: 22341}
 	node1 = gxregistry.Node{ID: "node1", Address: "127.0.0.1", Port: 22342}
@@ -78,10 +85,13 @@ func (suite *WatcherTestSuite) TestWatchService1() {
 		Attr:  &sa,
 		Nodes: []*gxregistry.Node{&node0, &node1},
 	}
+	fmt.Println("register provider service ", gxlog.PrettyString(providerService))
 	err = suite.reg.Register(providerService)
 	suite.Equalf(nil, err, "Register(service:%+v)", providerService)
+	time.Sleep(5e9)
 }
 
+/*
 func (suite *WatcherTestSuite) TestValid() {
 	time.Sleep(3e9)
 	flag := suite.wt.Valid()
@@ -93,6 +103,7 @@ func (suite *WatcherTestSuite) TestValid() {
 	suite.Equal(true, flag, "after watcher.Close()")
 }
 
+/*
 // 在 sleep 语句中，重启 zookeeper 来测试注册数据可靠性
 func (suite *WatcherTestSuite) TestZookeeperRestart() {
 	var (
@@ -127,6 +138,7 @@ func (suite *WatcherTestSuite) TestZookeeperRestart() {
 	suite.Equalf(1, len(service1[0].Nodes), "registry.GetService(ServiceAttr:%+v)", suite.sa)
 	suite.Equalf(2, len(service1), "registry.GetService(ServiceAttr:%+v)", suite.sa)
 }
+*/
 
 /*
 func (suite *WatcherTestSuite) TestNotify() {

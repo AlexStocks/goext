@@ -6,9 +6,9 @@
 package gxzookeeper
 
 import (
-	"fmt"
 	"path"
 	"sync"
+	"time"
 )
 
 import (
@@ -22,7 +22,6 @@ import (
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/strings"
 	"github.com/AlexStocks/goext/time"
-	"time"
 )
 
 const (
@@ -33,11 +32,13 @@ const (
 
 // watcher的watch系列函数暴露给zk registry，而Next函数则暴露给selector
 type Watcher struct {
-	opts   gxregistry.WatchOptions
-	reg    *Registry
-	events chan event // 通过这个channel把registry与selector连接了起来
-	done   chan struct{}
-	wg     sync.WaitGroup
+	opts       gxregistry.WatchOptions
+	reg        *Registry
+	events     chan event // 通过这个channel把registry与selector连接了起来
+	done       chan struct{}
+	sync.Mutex // lock path set
+	pathSet    []string
+	wg         sync.WaitGroup
 }
 
 type event struct {
@@ -120,6 +121,46 @@ func contains(s []string, e string) bool {
 	return false
 }
 
+func (w *Watcher) handleZkPathEvent(zkRoot string, children []string) {
+	newChildren, err := w.reg.client.GetChildren(zkRoot)
+	if err != nil {
+		log.Error("path{%s} child nodes changed, zk.Children() = error{%v}", zkRoot, err)
+		return
+	}
+
+	// a node was added -- watch the new node
+	var (
+		newPath    string
+		zkData     []byte
+		conf, attr gxregistry.ServiceAttr
+	)
+
+	conf = w.opts.Filter
+	for _, n := range newChildren {
+		if contains(children, n) {
+			continue
+		}
+
+		err = attr.UnmarshalPath(gxstrings.Slice(n))
+		if err != nil {
+			log.Error("ServiceAttr.UnmarshalPath(zkData:%s) = error{%v}", string(zkData), err)
+			continue
+		}
+
+		if !conf.Filter(attr) {
+			log.Warn("path attr:{%#v} is not compatible with Config{%#v}", attr, conf)
+			continue
+		}
+		newPath = path.Join(zkRoot, n)
+		log.Debug("watch path{%#v}", newPath)
+		go func(path string) {
+			log.Info("start to watch path %s", path)
+			w.watchDir(path)
+			log.Info("watch path %s goroutine exit now.", path)
+		}(newPath)
+	}
+}
+
 func (w *Watcher) handleZkNodeEvent(zkPath string, children []string) {
 	var (
 		err         error
@@ -127,7 +168,7 @@ func (w *Watcher) handleZkNodeEvent(zkPath string, children []string) {
 	)
 	newChildren, err = w.reg.client.GetChildren(zkPath)
 	if err != nil {
-		log.Error("path{%s} child nodes changed, zk.Children(path{%s} = error{%v}", zkPath, zkPath, err)
+		log.Error("path{%s} child nodes changed, zk.Children() = error{%v}", zkPath, err)
 		return
 	}
 
@@ -145,7 +186,7 @@ func (w *Watcher) handleZkNodeEvent(zkPath string, children []string) {
 		}
 
 		newNode = path.Join(zkPath, n)
-		log.Info("add zkNode{%s}", newNode)
+		log.Debug("add zkNode{%s}", newNode)
 		zkData, err = w.reg.client.Get(newNode)
 		if err != nil {
 			log.Warn("can not get value of zk node %s", newNode)
@@ -161,11 +202,10 @@ func (w *Watcher) handleZkNodeEvent(zkPath string, children []string) {
 			log.Warn("service{%#v} is not compatible with Config{%#v}", service, conf)
 			continue
 		}
-		log.Info("add service{%#v}", service)
+		log.Debug("add service{%#v}", service)
 		w.events <- event{&gxregistry.EventResult{registry.ServiceURLAdd, service}, nil}
 		// watch w service node
 		go func(node string, service *gxregistry.Service) {
-			log.Info("delete zkNode{%s}", node)
 			// watch goroutine退出，原因可能是service node不存在或者是与registry连接断开了
 			// 为了selector服务的稳定，仅在收到delete event的情况下向selector发送delete service event
 			if w.watchServiceNode(node) {
@@ -181,18 +221,24 @@ func (w *Watcher) handleZkNodeEvent(zkPath string, children []string) {
 // 关注zk path下面node的添加或者删除
 func (w *Watcher) watchDir(zkPath string) {
 	var (
-		err error
-		//rootFlag     bool
-		failTimes int
-		event     chan struct{}
-		zkEvent   zk.Event
-		//children     []string
-		newChildren  []string
+		flag         bool
+		err          error
+		failTimes    int
+		event        chan struct{}
+		zkEvent      zk.Event
+		children     []string
 		childEventCh <-chan zk.Event
 	)
 
-	if zkPath == w.opts.Root {
-		//rootFlag = true
+	w.Lock()
+	flag = contains(w.pathSet, zkPath)
+	if !flag {
+		w.pathSet = append(w.pathSet, zkPath)
+	}
+	w.Unlock()
+	if flag {
+		log.Warn("zookeeper path has been watched.", zkPath)
+		return
 	}
 
 	event = make(chan struct{}, ZKCLIENT_EVENT_CHANNEL_SIZE)
@@ -201,11 +247,15 @@ func (w *Watcher) watchDir(zkPath string) {
 	defer func() {
 		w.wg.Done()
 		close(event)
+		w.Lock()
+		w.Unlock()
 	}()
 
+	failTimes = 1
 	for {
-		// get current newChildren for a zkPath
-		newChildren, childEventCh, err = w.reg.client.GetChildrenW(zkPath)
+		// get current children for a zkPath
+		children, childEventCh, err = w.reg.client.GetChildrenW(zkPath)
+		log.Debug("path:%s, children:%#v", zkPath, children)
 		if err != nil {
 			failTimes++
 			if MAX_TIMES <= failTimes {
@@ -221,13 +271,6 @@ func (w *Watcher) watchDir(zkPath string) {
 					break CLEAR
 				}
 			}
-			//if rootFlag {
-			//	for _,c := range newChildren {
-			//		if !contains(children, c) {
-			//			go  w.watchDir(path.Join(zkPath, c))
-			//		}
-			//	}
-			//}
 
 			w.reg.registerEvent(zkPath, &event)
 			select {
@@ -247,7 +290,6 @@ func (w *Watcher) watchDir(zkPath string) {
 				continue
 			}
 		}
-		failTimes = 0
 
 		select {
 		case zkEvent = <-childEventCh:
@@ -257,15 +299,24 @@ func (w *Watcher) watchDir(zkPath string) {
 			if zkEvent.Type != zk.EventNodeChildrenChanged {
 				continue
 			}
-			w.handleZkNodeEvent(zkEvent.Path, newChildren)
+
+			if zkPath == w.opts.Root {
+				w.handleZkPathEvent(zkEvent.Path, children)
+			} else {
+				if failTimes == 0 {
+					// 重连成功或者是第一次连接，则 children 全部置空，以方便把现有节点都添加到 selector 中
+					children = children[:0]
+				}
+				failTimes = 0
+
+				w.handleZkNodeEvent(zkEvent.Path, children)
+			}
 		case <-w.reg.done:
 			// There is no way to stop GetW/ChildrenW so just quit
 			log.Warn("client.done(), watch(path{%s}, ServiceConfig{%#v}) goroutine exit now...",
 				zkPath, w.opts.Filter)
 			return
 		}
-
-		//children = newChildren
 	}
 }
 
@@ -283,17 +334,18 @@ func (w *Watcher) watchService() {
 	if len(zkPath) == 0 {
 		return
 	}
+	w.reg.client.DeleteZkPath(zkPath)
 
 	// 先把现有的服务节点通过watch发送给selector
 	children, err = w.reg.client.GetChildren(zkPath)
 	if err != nil {
 		children = nil
-		log.Error("fail to get children of zk path{%s}", zkPath)
+		log.Warn("fail to get children of zk path{%s}", zkPath)
 		// 不要发送不必要的error给selector，以防止selector/cache/cache.go:(cacheSelector)watch
 		// 调用(Watcher)Next获取error后，不断退出
 		// w.events <- event{nil, err}
 	}
-	fmt.Println("zk path ", zkPath, ", children: ", children)
+	log.Debug("zk path %s, children:%#v", zkPath, children)
 
 	for _, c := range children {
 		if err = attr.UnmarshalPath(gxstrings.Slice(c)); err != nil {
@@ -306,11 +358,21 @@ func (w *Watcher) watchService() {
 		}
 
 		// watch w service node
-		log.Info("watch service key{%s}", servicePath)
 		servicePath = path.Join(zkPath, c)
-		go w.watchDir(servicePath)
+		log.Debug("watch service key{%s}", servicePath)
+
+		go func(path string) {
+			log.Info("start to watch service path: %s", path)
+			w.watchDir(path)
+			log.Info("watch service path %s goroutine exit now.", path)
+		}(servicePath)
 	}
-	//go w.watchDir(zkPath)
+
+	go func(path string) {
+		log.Info("start to watch root: %s", zkPath)
+		w.watchDir(path)
+		log.Info("watch root %s goroutine exit now.", zkPath)
+	}(zkPath)
 }
 
 func (w *Watcher) Notify() (*gxregistry.EventResult, error) {
@@ -334,7 +396,6 @@ func (w *Watcher) Valid() bool {
 
 	default:
 		zkState := w.reg.client.ZkConn().State()
-		//fmt.Println("state:", w.reg.client.StateToString(zkState))
 		if zkState == zk.StateConnected || zkState == zk.StateHasSession {
 			return true
 		}
