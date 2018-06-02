@@ -52,9 +52,7 @@ func (suite *WatcherTestSuite) SetupTest() {
 }
 
 func (suite *WatcherTestSuite) TearDownTest() {
-	fmt.Println("close watcher")
 	suite.wt.Close()
-	fmt.Println("close registry")
 	suite.reg.Close()
 }
 
@@ -68,7 +66,7 @@ func (suite *WatcherTestSuite) TestWatchService() {
 	}
 
 	// case1
-	// 先注册两个consumer节点，然后再依次注册两个provider节点
+	// 先注册两个 consumer 节点
 	node := gxregistry.Node{ID: "node1", Address: "127.0.0.1", Port: 12341}
 	consumerService := gxregistry.Service{
 		Attr:  &suite.sa,
@@ -78,31 +76,44 @@ func (suite *WatcherTestSuite) TestWatchService() {
 	gxlog.CInfo("register consumer service %s", consumerService)
 	suite.Equalf(nil, err, "Register(service:%+v)", consumerService)
 
-	//time.Sleep(1e9)
-
-	node = gxregistry.Node{ID: "node0", Address: "127.0.0.1", Port: 22341}
+	// 注册两个 provider 节点
+	node0 := gxregistry.Node{ID: "node0", Address: "127.0.0.1", Port: 22340}
+	node1 := gxregistry.Node{ID: "node1", Address: "127.0.0.1", Port: 22341}
 	providerService := gxregistry.Service{
 		Attr:  &sa,
-		Nodes: []*gxregistry.Node{&node},
+		Nodes: []*gxregistry.Node{&node0, &node1},
 	}
 	gxlog.CInfo("register provider service %s", providerService)
 	err = suite.reg.Register(providerService)
 	suite.Equalf(nil, err, "Register(service:%+v)", providerService)
 
-	time.Sleep(5e9)
+	time.Sleep(3e9)
 
-	node = gxregistry.Node{ID: "node1", Address: "127.0.0.1", Port: 22342}
+	// 注册一个 provider 节点
+	node2 := gxregistry.Node{ID: "node2", Address: "127.0.0.1", Port: 22342}
 	providerService = gxregistry.Service{
 		Attr:  &sa,
-		Nodes: []*gxregistry.Node{&node},
+		Nodes: []*gxregistry.Node{&node2},
 	}
 	gxlog.CInfo("register provider service %s", providerService)
 	err = suite.reg.Register(providerService)
 	suite.Equalf(nil, err, "Register(service:%+v)", providerService)
+
 	time.Sleep(3e9)
+
+	// 注册一个新的 provider service 路径
+	sa.Service = "shopx"
+	node3 := gxregistry.Node{ID: "node3", Address: "127.0.0.1", Port: 22343}
+	providerService = gxregistry.Service{
+		Attr:  &sa,
+		Nodes: []*gxregistry.Node{&node3},
+	}
+	gxlog.CInfo("register provider service %s", providerService)
+	err = suite.reg.Register(providerService)
+	suite.Equalf(nil, err, "Register(service:%+v)", providerService)
+	time.Sleep(5e9)
 }
 
-/*
 func (suite *WatcherTestSuite) TestValid() {
 	time.Sleep(3e9)
 	flag := suite.wt.Valid()
@@ -114,7 +125,6 @@ func (suite *WatcherTestSuite) TestValid() {
 	suite.Equal(true, flag, "after watcher.Close()")
 }
 
-/*
 // 在 sleep 语句中，重启 zookeeper 来测试注册数据可靠性
 func (suite *WatcherTestSuite) TestZookeeperRestart() {
 	var (
@@ -149,7 +159,6 @@ func (suite *WatcherTestSuite) TestZookeeperRestart() {
 	suite.Equalf(1, len(service1[0].Nodes), "registry.GetService(ServiceAttr:%+v)", suite.sa)
 	suite.Equalf(2, len(service1), "registry.GetService(ServiceAttr:%+v)", suite.sa)
 }
-*/
 
 /*
 func (suite *WatcherTestSuite) TestNotify() {
