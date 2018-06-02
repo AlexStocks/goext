@@ -67,26 +67,25 @@ func (suite *WatcherTestSuite) TestWatchService() {
 		Role:     gxregistry.SRT_Provider,
 	}
 
-	// test case 1: 先启动 watcher， 然后再注册 provider node0 & node1，结果只能收到 node1 的注册
-	// 原因： WatchDir()
-	//
+	// case1
+	// 先注册两个consumer节点，然后再依次注册两个provider节点
 	node := gxregistry.Node{ID: "node1", Address: "127.0.0.1", Port: 12341}
 	consumerService := gxregistry.Service{
 		Attr:  &suite.sa,
 		Nodes: []*gxregistry.Node{&suite.node, &node},
 	}
 	err := suite.reg.Register(consumerService)
-	fmt.Println("register consumer service ", gxlog.PrettyString(consumerService))
+	gxlog.CInfo("register consumer service %s", consumerService)
 	suite.Equalf(nil, err, "Register(service:%+v)", consumerService)
 
-	time.Sleep(4e9)
+	time.Sleep(13e9)
 
 	node = gxregistry.Node{ID: "node0", Address: "127.0.0.1", Port: 22341}
 	providerService := gxregistry.Service{
 		Attr:  &sa,
 		Nodes: []*gxregistry.Node{&node},
 	}
-	fmt.Println("register provider service ", gxlog.PrettyString(providerService))
+	gxlog.CInfo("register provider service %s", providerService)
 	err = suite.reg.Register(providerService)
 	suite.Equalf(nil, err, "Register(service:%+v)", providerService)
 
@@ -95,10 +94,10 @@ func (suite *WatcherTestSuite) TestWatchService() {
 		Attr:  &sa,
 		Nodes: []*gxregistry.Node{&node},
 	}
-	fmt.Println("register provider service ", gxlog.PrettyString(providerService))
+	gxlog.CInfo("register provider service %s", providerService)
 	err = suite.reg.Register(providerService)
 	suite.Equalf(nil, err, "Register(service:%+v)", providerService)
-	time.Sleep(2e9)
+	time.Sleep(3e9)
 }
 
 /*
