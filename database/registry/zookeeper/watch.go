@@ -158,7 +158,6 @@ func (w *Watcher) handleZkPathEvent(zkRoot string, children []string) error {
 			continue
 		}
 		newPath = path.Join(zkRoot, n)
-		log.Debug("watch path{%#v}", newPath)
 		go func(path string) {
 			log.Info("start to watch path %s", path)
 			w.watchDir(path)
@@ -306,11 +305,10 @@ func (w *Watcher) watchDir(zkPath string) {
 		failTimes = 0
 
 		if flag {
-			children = nil
 			if zkPath == w.opts.Root {
-				err = w.handleZkPathEvent(zkEvent.Path, children)
+				err = w.handleZkPathEvent(zkPath, nil)
 			} else {
-				err = w.handleZkNodeEvent(zkEvent.Path, children)
+				err = w.handleZkNodeEvent(zkPath, nil)
 			}
 			if err == nil {
 				flag = false
@@ -326,7 +324,7 @@ func (w *Watcher) watchDir(zkPath string) {
 				continue
 			}
 
-			if zkPath == w.opts.Root {
+			if zkEvent.Path == w.opts.Root {
 				w.handleZkPathEvent(zkEvent.Path, children)
 			} else {
 				w.handleZkNodeEvent(zkEvent.Path, children)

@@ -78,7 +78,7 @@ func (suite *WatcherTestSuite) TestWatchService() {
 	gxlog.CInfo("register consumer service %s", consumerService)
 	suite.Equalf(nil, err, "Register(service:%+v)", consumerService)
 
-	time.Sleep(13e9)
+	//time.Sleep(1e9)
 
 	node = gxregistry.Node{ID: "node0", Address: "127.0.0.1", Port: 22341}
 	providerService := gxregistry.Service{
@@ -88,6 +88,8 @@ func (suite *WatcherTestSuite) TestWatchService() {
 	gxlog.CInfo("register provider service %s", providerService)
 	err = suite.reg.Register(providerService)
 	suite.Equalf(nil, err, "Register(service:%+v)", providerService)
+
+	time.Sleep(5e9)
 
 	node = gxregistry.Node{ID: "node1", Address: "127.0.0.1", Port: 22342}
 	providerService = gxregistry.Service{
