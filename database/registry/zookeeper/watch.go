@@ -40,6 +40,7 @@ type Watcher struct {
 	sync.Mutex // lock path set
 	pathSet    []string
 	wg         sync.WaitGroup
+	sync.Once  // for Close
 }
 
 type event struct {
@@ -368,11 +369,13 @@ func (w *Watcher) Valid() bool {
 }
 
 func (w *Watcher) Close() {
-	if !w.IsClosed() {
-		close(w.done)
-	}
+	w.Once.Do(func() {
+		if !w.IsClosed() {
+			close(w.done)
+		}
 
-	w.wg.Wait()
+		w.wg.Wait()
+	})
 }
 
 // check whether the session has been closed.

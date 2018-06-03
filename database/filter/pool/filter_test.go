@@ -8,7 +8,8 @@ import (
 import (
 	"github.com/AlexStocks/goext/database/filter"
 	"github.com/AlexStocks/goext/database/registry"
-	"github.com/AlexStocks/goext/database/registry/etcdv3"
+	//"github.com/AlexStocks/goext/database/registry/etcdv3"
+	"github.com/AlexStocks/goext/database/registry/zookeeper"
 	"github.com/AlexStocks/goext/log"
 	"github.com/stretchr/testify/suite"
 )
@@ -26,9 +27,10 @@ type FilterTestSuite struct {
 }
 
 func (suite *FilterTestSuite) SetupSuite() {
-	suite.root = "/etcd_test"
+	suite.root = "/test"
 
-	suite.etcdAddrs = []string{"127.0.0.1:2379"}
+	// suite.etcdAddrs = []string{"127.0.0.1:2379"} // etcd
+	suite.etcdAddrs = []string{"127.0.0.1:2181"} // zookeeper
 
 	suite.pSA = gxregistry.ServiceAttr{
 		Group:    "bjtelecom",
@@ -60,11 +62,11 @@ func (suite *FilterTestSuite) TearDownSuite() {
 
 func (suite *FilterTestSuite) SetupTest() {
 	var err error
-	suite.reg, err = gxetcd.NewRegistry(
+	//suite.reg, err = gxetcd.NewRegistry(
+	suite.reg, err = gxzookeeper.NewRegistry(
 		gxregistry.WithAddrs(suite.etcdAddrs...),
 		gxregistry.WithTimeout(3e9),
 		gxregistry.WithRoot(suite.root),
-		gxregistry.WithTimeout(5e9),
 	)
 	suite.Equal(nil, err, "NewRegistry()")
 

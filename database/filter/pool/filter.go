@@ -232,7 +232,7 @@ func (s *Filter) watch(w gxregistry.Watcher) error {
 
 	defer func() {
 		close(done)
-		w.Close()
+		w.Close() // 此处与 line241 冲突，可能导致两次 close watcher
 	}()
 	s.wg.Add(1)
 	go func() {

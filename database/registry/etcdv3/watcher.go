@@ -9,6 +9,7 @@ package gxetcd
 import (
 	"context"
 	"strings"
+	"sync"
 )
 
 import (
@@ -24,11 +25,12 @@ import (
 
 // watcher的watch系列函数暴露给registry，而Next函数则暴露给selector
 type Watcher struct {
-	done   chan struct{}
-	cancel context.CancelFunc
-	w      clientv3.WatchChan
-	opts   gxregistry.WatchOptions
-	client *etcd.Client
+	done      chan struct{}
+	cancel    context.CancelFunc
+	w         clientv3.WatchChan
+	opts      gxregistry.WatchOptions
+	client    *etcd.Client
+	sync.Once // for Close
 }
 
 func NewWatcher(client *etcd.Client, opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
@@ -130,13 +132,15 @@ func (w *Watcher) Valid() bool {
 }
 
 func (w *Watcher) Close() {
-	select {
-	case <-w.done:
-		return
-	default:
-		close(w.done)
-		w.cancel()
-	}
+	w.Once.Do(func() {
+		select {
+		case <-w.done:
+			return
+		default:
+			close(w.done)
+			w.cancel()
+		}
+	})
 }
 
 // check whether the session has been closed.
