@@ -166,13 +166,16 @@ func (*Node) Descriptor() ([]byte, []int) { return fileDescriptorService, []int{
 
 func (m *Node) Copy() *Node {
 	n := Node{
-		ID:       m.ID,
-		Address:  m.Address,
-		Port:     m.Port,
-		Metadata: make(map[string]string, len(m.Metadata)),
+		ID:      m.ID,
+		Address: m.Address,
+		Port:    m.Port,
 	}
-	for k, v := range m.Metadata {
-		n.Metadata[k] = v
+
+	if len(m.Metadata) != 0 {
+		n.Metadata = make(map[string]string, len(m.Metadata))
+		for k, v := range m.Metadata {
+			n.Metadata[k] = v
+		}
 	}
 
 	return &n
@@ -189,16 +192,20 @@ func (*Service) ProtoMessage()               {}
 func (*Service) Descriptor() ([]byte, []int) { return fileDescriptorService, []int{2} }
 func (s *Service) Copy() *Service {
 	c := Service{
-		Nodes:    make([]*Node, 0, len(s.Nodes)),
-		Metadata: make(map[string]string, len(s.Metadata)),
+		Attr: s.Attr.Copy(),
 	}
-	c.Attr = s.Attr.Copy()
 
-	for i := range s.Nodes {
-		c.Nodes = append(c.Nodes, s.Nodes[i].Copy())
+	if len(s.Nodes) != 0 {
+		c.Nodes = make([]*Node, 0, len(s.Nodes))
+		for i := range s.Nodes {
+			c.Nodes = append(c.Nodes, s.Nodes[i].Copy())
+		}
 	}
-	for k, v := range s.Metadata {
-		c.Metadata[k] = v
+	if len(s.Metadata) != 0 {
+		c.Metadata = make(map[string]string, len(s.Metadata))
+		for k, v := range s.Metadata {
+			c.Metadata[k] = v
+		}
 	}
 
 	return &c
