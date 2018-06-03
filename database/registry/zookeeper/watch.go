@@ -7,6 +7,7 @@ package gxzookeeper
 
 import (
 	"path"
+	"strings"
 	"sync"
 	"time"
 )
@@ -18,12 +19,10 @@ import (
 )
 
 import (
-	"github.com/AlexStocks/dubbogo/registry"
 	"github.com/AlexStocks/goext/container/array"
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/strings"
 	"github.com/AlexStocks/goext/time"
-	"strings"
 )
 
 const (
@@ -207,14 +206,14 @@ func (w *Watcher) handleZkNodeEvent(zkPath string, children []string) error {
 			continue
 		}
 		log.Debug("add service{%#v}", service)
-		w.events <- event{&gxregistry.EventResult{registry.ServiceURLAdd, service}, nil}
+		w.events <- event{&gxregistry.EventResult{gxregistry.ServiceAdd, service}, nil}
 		// watch w service node
 		go func(node string, service *gxregistry.Service) {
 			// watch goroutine退出，原因可能是service node不存在或者是与registry连接断开了
 			// 为了selector服务的稳定，仅在收到delete event的情况下向selector发送delete service event
 			if w.watchServiceNode(node) {
 				log.Info("delete service{%#v}", service)
-				w.events <- event{&gxregistry.EventResult{registry.ServiceURLDel, service}, nil}
+				w.events <- event{&gxregistry.EventResult{gxregistry.ServiceDel, service}, nil}
 			}
 			log.Warn("watchSelf(zk path{%s}) goroutine exit now", zkPath)
 		}(newNode, service)

@@ -2,11 +2,15 @@ package gxzookeeper
 
 import (
 	"fmt"
+	"sync"
+	"testing"
+	"time"
+)
+
+import (
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/log"
 	"github.com/stretchr/testify/suite"
-	"testing"
-	"time"
 )
 
 type WatcherTestSuite struct {
@@ -149,10 +153,10 @@ func (suite *WatcherTestSuite) TestZookeeperRestart() {
 	suite.Equal(true, flag, "before watcher.Close()")
 	fmt.Println("Test zookeeper restart now. Please restart zookeeper in 7s.")
 
-	for i := 0; i < 20; i++ {
-		time.Sleep(2e9)
-		fmt.Printf("sleep %d seconds\n", (i+1)*2)
-	}
+	//for i := 0; i < 20; i++ {
+	//	time.Sleep(2e9)
+	//	fmt.Printf("sleep %d seconds\n", (i+1)*2)
+	//}
 
 	service1, err = suite.reg.GetServices(suite.sa)
 	suite.Equalf(nil, err, "registry.GetService(ServiceAttr:%+v)", suite.sa)
@@ -160,24 +164,32 @@ func (suite *WatcherTestSuite) TestZookeeperRestart() {
 	suite.Equalf(2, len(service1), "registry.GetService(ServiceAttr:%+v)", suite.sa)
 }
 
-/*
 func (suite *WatcherTestSuite) TestNotify() {
 	var (
 		err   error
 		event *gxregistry.EventResult
 		wg    sync.WaitGroup
 		f     func()
+		sa    gxregistry.ServiceAttr
 		//node  gxregistry.Node
 	)
 	f = func() {
 		defer wg.Done()
 		event, err = suite.wt.Notify()
 		suite.Equal(nil, err, "watch.Notify")
-		//fmt.Printf("ttl:%d, event:%s, err:%+v\n", suite.wt.(*Watcher).client.TTL(), event.GoString(), err)
+		fmt.Printf("event:%s, err:%+v\n", event.GoString(), err)
+	}
+
+	sa = gxregistry.ServiceAttr{
+		Group:    "bjtelecom",
+		Service:  "shopping",
+		Protocol: "pb",
+		Version:  "1.0.1",
+		Role:     gxregistry.SRT_Provider,
 	}
 
 	service := gxregistry.Service{
-		Attr:  &suite.sa,
+		Attr:  &sa,
 		Nodes: []*gxregistry.Node{&suite.node},
 	}
 
@@ -193,7 +205,7 @@ func (suite *WatcherTestSuite) TestNotify() {
 	wg.Add(1)
 	go f()
 	service = gxregistry.Service{
-		Attr:  &suite.sa,
+		Attr:  &sa,
 		Nodes: []*gxregistry.Node{&suite.node},
 	}
 	err = suite.reg.Deregister(service)
@@ -203,7 +215,6 @@ func (suite *WatcherTestSuite) TestNotify() {
 	suite.Equalf(gxregistry.ServiceDel, event.Action, "event:%+v", event)
 	suite.Equalf(service, *event.Service, "event:%+v", event)
 }
-*/
 
 func TestWatcherTestSuite(t *testing.T) {
 	suite.Run(t, new(WatcherTestSuite))
