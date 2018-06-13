@@ -1,4 +1,4 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package gxregistry;
 
@@ -16,6 +16,7 @@ option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 option (gogoproto.goproto_getters_all) = false;
+option (gogoproto.goproto_enum_prefix_all) = false;
 
 
 //////////////////////////////////////////
@@ -28,24 +29,24 @@ enum ServiceRoleType {
 }
 
 message ServiceAttr {
-	string Group = 1;
-	string Service = 2;
-	string Protocol = 3;
-	string Version = 4;
-	ServiceRoleType Role = 5;
+	optional string Group = 1 [(gogoproto.nullable) = false];
+	optional string Service = 2 [(gogoproto.nullable) = false];
+	optional string Protocol = 3 [(gogoproto.nullable) = false];
+	optional string Version = 4 [(gogoproto.nullable) = false];
+	optional ServiceRoleType Role = 5 [(gogoproto.nullable) = false];
 }
 
 message Node {
-	string ID = 1;
-	string Address = 2;
-	int32 Port = 3;
-	map<string, string> Metadata = 4;
+	optional string ID = 1 [(gogoproto.nullable) = false];
+	optional string Address = 2 [(gogoproto.nullable) = false];
+	optional int32 Port = 3 [(gogoproto.nullable) = false];
+	map<string, string> Metadata = 4 [(gogoproto.nullable) = false];
 }
 
 message Service {
-	ServiceAttr Attr = 1;
-	repeated Node Nodes = 2;
-	map<string, string> Metadata = 3;
+	optional ServiceAttr Attr = 1 [(gogoproto.nullable) = false];
+	repeated Node Nodes = 2 [(gogoproto.nullable) = false];
+	map<string, string> Metadata = 3 [(gogoproto.nullable) = false];
 }
 
 //////////////////////////////////////////
@@ -61,6 +62,6 @@ enum ServiceEventType {
 // Result is returned by a call to Next on
 // the watcher. Actions can be create, update, delete
 message EventResult {
-	ServiceEventType	Action = 1;
-	Service Service = 2;
+	optional ServiceEventType	Action = 1 [(gogoproto.nullable) = false];
+	optional Service Service = 2 [(gogoproto.nullable) = false];
 }
