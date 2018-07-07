@@ -9,6 +9,7 @@
   > feature
   * add sync/atmoic from github.com/uber-go/atomic
   * add container/btree from github.com/google/btree
+  * add io/kv/disk
 
 - 2018/05/07
   > feature
