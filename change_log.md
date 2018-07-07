@@ -5,14 +5,18 @@
 ## dev list ##
 ---
 
+- 2018/07/07
+  > feature
+  * add sync/atmoic from github.com/uber-go/atomic
+
 - 2018/05/07
   > feature
   * add container/hashtable
 
 - 2018/05/02
   > bug fix
-  * use value copy in for-loop 
-  
+  * use value copy in for-loop
+
 - 2018/04/28
   > bug fix
   * add ServiceAttr GeneralEqual to filter service
