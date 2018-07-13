@@ -3,11 +3,9 @@ package gxconsistent
 import (
 	"log"
 	"testing"
-
-	"github.com/lafikl/consistent"
 )
 
-func Example_consistent(t *testing.T) {
+func TestConsistent(t *testing.T) {
 	c := New()
 
 	// adds the hosts to the ring
