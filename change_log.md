@@ -7,6 +7,10 @@
 
 - 2018/07/07
   > feature
+  * add consistent hash from lafikl/consistent
+
+- 2018/07/07
+  > feature
   * add sync/atmoic from github.com/uber-go/atomic
   * add container/btree from github.com/google/btree
   * add io/kv/disk
