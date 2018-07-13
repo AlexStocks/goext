@@ -25,7 +25,7 @@ func TestConsistent(t *testing.T) {
 	log.Println(host)
 }
 
-func Example_bounded() {
+func TestBounded(t *testing.T) {
 	c := New()
 
 	// adds the hosts to the ring
