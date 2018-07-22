@@ -7,8 +7,11 @@
 package gxnet
 
 import (
-	"fmt"
 	"net"
+)
+
+import (
+	jerrors "github.com/juju/errors"
 )
 
 var (
@@ -23,54 +26,6 @@ func init() {
 	}
 }
 
-// 如果@addr为空，则获取本机的私有地址
-func GetLocalIP(addr string) (string, error) {
-	// 不为空
-	if len(addr) > 0 && (addr != "0.0.0.0" && addr != "[::]") {
-		return addr, nil
-	}
-
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return "", fmt.Errorf("Failed to get interface addresses! Err: %v", err)
-	}
-
-	var ipAddr []byte
-
-	for _, rawAddr := range addrs {
-		var ip net.IP
-		switch addr := rawAddr.(type) {
-		case *net.IPAddr:
-			ip = addr.IP
-		case *net.IPNet:
-			ip = addr.IP
-		default:
-			continue
-		}
-
-		if ip.IsLoopback() {
-			continue
-		}
-
-		if ip.To4() == nil {
-			continue
-		}
-
-		if !isPrivateIP(ip.String()) {
-			continue
-		}
-
-		ipAddr = ip
-		break
-	}
-
-	if ipAddr == nil {
-		return "", fmt.Errorf("No private IP address found, and explicit IP not provided")
-	}
-
-	return net.IP(ipAddr).String(), nil
-}
-
 func isPrivateIP(ipAddr string) bool {
 	ip := net.ParseIP(ipAddr)
 	for _, priv := range privateBlocks {
@@ -79,4 +34,53 @@ func isPrivateIP(ipAddr string) bool {
 		}
 	}
 	return false
+}
+
+// ref: https://stackoverflow.com/questions/23558425/how-do-i-get-the-local-ip-address-in-go
+func GetLocalIP() (string, error) {
+	ifs, err := net.Interfaces()
+	if err != nil {
+		return "", jerrors.Trace(err)
+	}
+
+	var ipAddr []byte
+	for _, i := range ifs {
+		addrs, err := i.Addrs()
+		if err != nil {
+			return "", jerrors.Trace(err)
+		}
+		var ip net.IP
+		for _, addr := range addrs {
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+
+			if !ip.IsLoopback() && ip.To4() != nil && isPrivateIP(ip.String()) {
+				ipAddr = ip
+				break
+			}
+		}
+	}
+
+	if ipAddr == nil {
+		return "", jerrors.Errorf("can not get local IP")
+	}
+
+	return net.IP(ipAddr).String(), nil
+}
+
+// Get preferred outbound ip of this machine
+func GetOutboundIP() (string, error) {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return "", jerrors.Trace(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String(), nil
 }
