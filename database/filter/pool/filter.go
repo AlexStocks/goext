@@ -72,8 +72,6 @@ func (s *Filter) copy(current []*gxregistry.Service, by gxregistry.ServiceAttr) 
 
 func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilter.ServiceToken, error) {
 	s.Lock()
-	defer s.Unlock()
-
 	serviceString := attr.Service
 	// check the services first
 	services, sok := s.services[serviceString]
@@ -84,13 +82,17 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilt
 		// only return if its less than the ttl
 		// and copy the service array in case of its results is affected by function add/del
 		if tok && time.Since(ttl) < s.ttl {
+			s.Unlock()
 			return s.copy(services, attr), ttl.UnixNano(), nil
 		}
 		log.Warn("s.services[serviceString{%v}] = services{%v}, array ttl{%v} is less than services.ttl{%v}",
 			serviceString, services, ttl, s.ttl)
 	}
+	s.Unlock()
 
 	svcs, err := s.opts.Registry.GetServices(attr)
+	s.Lock()
+	defer s.Unlock()
 	log.Debug("Registry.GetServices(attr:%+v) = {err:%s, svcs:%+v}", attr, jerrors.ErrorStack(err), svcs)
 	if err != nil {
 		log.Error("registry.GetService(serviceString{%v}) = err:%+v}", serviceString, err)
