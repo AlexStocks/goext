@@ -1,197 +1,178 @@
-/*
-Open Source Initiative OSI - The MIT License (MIT):Licensing
+// Copyright (C) 2017 ScyllaDB
+// Use of this source code is governed by a ALv2-style
+// license that can be found in the LICENSE file.
 
-The MIT License (MIT)
-Copyright (c) 2013 Ralph Caraveo (deckarep@gmail.com)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
-so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
-
-// refs: https://github.com/deckarep/golang-set 20170413, branch master, latest version v1.6
-// Package gxset implements a simple and generic set collection.
-// Items stored within it are unordered and unique. It supports
-// typical set operations: membership testing, intersection, union,
-// difference, symmetric difference and cloning.
-//
-// Package gxset provides two implementations. The default
-// implementation is safe for concurrent access. There is a non-threadsafe
-// implementation which is slightly more performant.
 package gxset
 
-type Set interface {
-	// Adds an element to the set. Returns whether
-	// the item was added.
-	Add(i interface{}) bool
+import (
+	"github.com/scylladb/go-set/b16set"
+	"github.com/scylladb/go-set/b32set"
+	"github.com/scylladb/go-set/b64set"
+	"github.com/scylladb/go-set/b8set"
+	"github.com/scylladb/go-set/f32set"
+	"github.com/scylladb/go-set/f64set"
+	"github.com/scylladb/go-set/i16set"
+	"github.com/scylladb/go-set/i32set"
+	"github.com/scylladb/go-set/i64set"
+	"github.com/scylladb/go-set/i8set"
+	"github.com/scylladb/go-set/iset"
+	"github.com/scylladb/go-set/strset"
+	"github.com/scylladb/go-set/u16set"
+	"github.com/scylladb/go-set/u32set"
+	"github.com/scylladb/go-set/u64set"
+	"github.com/scylladb/go-set/u8set"
+	"github.com/scylladb/go-set/uset"
+)
 
-	// Returns the number of elements in the set.
-	Cardinality() int
+//go:generate mkdir -p b8set
+//go:generate go_generics -i internal/set/set.go -t T=[8]byte -o b8set/b8set.go -p b8set
+//go:generate go_generics -i internal/set/set_test.go -t P=[8]byte -o b8set/b8set_test.go -p b8set
 
-	// Removes all elements from the set, leaving
-	// the emtpy set.
-	Clear()
-
-	// Returns a clone of the set using the same
-	// implementation, duplicating all keys.
-	Clone() Set
-
-	// Returns whether the given items
-	// are all in the set.
-	Contains(i ...interface{}) bool
-
-	// Returns the difference between this set
-	// and other. The returned set will contain
-	// all elements of this set that are not also
-	// elements of other.
-	//
-	// Note that the argument to Difference
-	// must be of the same type as the receiver
-	// of the method. Otherwise, Difference will
-	// panic.
-	Difference(other Set) Set
-
-	// Determines if two sets are equal to each
-	// other. If they have the same cardinality
-	// and contain the same elements, they are
-	// considered equal. The order in which
-	// the elements were added is irrelevant.
-	//
-	// Note that the argument to Equal must be
-	// of the same type as the receiver of the
-	// method. Otherwise, Equal will panic.
-	Equal(other Set) bool
-
-	// Returns a new set containing only the elements
-	// that exist only in both sets.
-	//
-	// Note that the argument to Intersect
-	// must be of the same type as the receiver
-	// of the method. Otherwise, Intersect will
-	// panic.
-	Intersect(other Set) Set
-
-	// Determines if every element in this set is in
-	// the other set.
-	//
-	// Note that the argument to IsSubset
-	// must be of the same type as the receiver
-	// of the method. Otherwise, IsSubset will
-	// panic.
-	IsSubset(other Set) bool
-
-	// Determines if every element in the other set
-	// is in this set.
-	//
-	// Note that the argument to IsSuperset
-	// must be of the same type as the receiver
-	// of the method. Otherwise, IsSuperset will
-	// panic.
-	IsSuperset(other Set) bool
-
-	// Returns a channel of elements that you can
-	// range over.
-	Iter() <-chan interface{}
-
-	// Returns an Iterator object that you can
-	// use to range over the set.
-	Iterator() *Iterator
-
-	// Remove a single element from the set.
-	Remove(i interface{})
-
-	// Provides a convenient string representation
-	// of the current state of the set.
-	String() string
-
-	// Returns a new set with all elements which are
-	// in either this set or the other set but not in both.
-	//
-	// Note that the argument to SymmetricDifference
-	// must be of the same type as the receiver
-	// of the method. Otherwise, SymmetricDifference
-	// will panic.
-	SymmetricDifference(other Set) Set
-
-	// Returns a new set with all elements in both sets.
-	//
-	// Note that the argument to Union must be of the
-
-	// same type as the receiver of the method.
-	// Otherwise, IsSuperset will panic.
-	Union(other Set) Set
-
-	// Returns all subsets of a given set (Power Set).
-	PowerSet() Set
-
-	// Returns the Cartesian Product of two sets.
-	CartesianProduct(other Set) Set
-
-	// Returns the members of the set as a slice.
-	ToSlice() []interface{}
+// NewByte8Set is a convenience function to create a new b16set.Set
+func NewByte8Set() *b8set.Set {
+	return b8set.New()
 }
 
-// Creates and returns a reference to an empty set.
-func NewSet(s ...interface{}) Set {
-	set := newThreadSafeSet()
-	for _, item := range s {
-		set.Add(item)
-	}
-	return &set
+//go:generate mkdir -p b16set
+//go:generate go_generics -i internal/set/set.go -t T=[16]byte -o b16set/b16set.go -p b16set
+//go:generate go_generics -i internal/set/set_test.go -t P=[16]byte -o b16set/b16set_test.go -p b16set
+
+// NewByte16Set is a convenience function to create a new b16set.Set
+func NewByte16Set() *b16set.Set {
+	return b16set.New()
 }
 
-// Creates and returns a reference to a set from keys of @m.
-func NewSetFromMapKey(m map[interface{}]interface{}) Set {
-	set := newThreadSafeSet()
-	for key := range m {
-		set.Add(key)
-	}
-	return &set
+//go:generate mkdir -p b32set
+//go:generate go_generics -i internal/set/set.go -t T=[32]byte -o b32set/b32set.go -p b32set
+//go:generate go_generics -i internal/set/set_test.go -t P=[32]byte -o b32set/b32set_test.go -p b32set
+
+// NewByte32Set is a convenience function to create a new b32set.Set
+func NewByte32Set() *b32set.Set {
+	return b32set.New()
 }
 
-// Creates and returns a reference to a set from values of @m.
-func NewSetFromMapValue(m map[interface{}]interface{}) Set {
-	set := newThreadSafeSet()
-	for _, item := range m {
-		set.Add(item)
-	}
-	return &set
+//go:generate mkdir -p b64set
+//go:generate go_generics -i internal/set/set.go -t T=[64]byte -o b64set/b64set.go -p b64set
+//go:generate go_generics -i internal/set/set_test.go -t P=[64]byte -o b64set/b64set_test.go -p b64set
+
+// NewByte64Set is a convenience function to create a new b64set.Set
+func NewByte64Set() *b64set.Set {
+	return b64set.New()
 }
 
-// Creates and returns a new set with the given elements
-func NewSetWith(elts ...interface{}) Set {
-	return NewSetFromSlice(elts)
+//go:generate mkdir -p f32set
+//go:generate go_generics -i internal/set/set.go -t T=float32 -o f32set/f32set.go -p f32set
+//go:generate go_generics -i internal/set/set_test.go -t P=float32 -o f32set/f32set_test.go -p f32set
+
+// NewFloat32Set is a convenience function to create a new f32set.Set
+func NewFloat32Set() *f32set.Set {
+	return f32set.New()
 }
 
-// Creates and returns a reference to a set from an existing slice
-func NewSetFromSlice(s []interface{}) Set {
-	a := NewSet(s...)
-	return a
+//go:generate mkdir -p f64set
+//go:generate go_generics -i internal/set/set.go -t T=float64 -o f64set/f64set.go -p f64set
+//go:generate go_generics -i internal/set/set_test.go -t P=float64 -o f64set/f64set_test.go -p f64set
+
+// NewFloat64Set is a convenience function to create a new f64set.Set
+func NewFloat64Set() *f64set.Set {
+	return f64set.New()
 }
 
-func NewThreadUnsafeSet() Set {
-	set := newThreadUnsafeSet()
-	return &set
+//go:generate mkdir -p iset
+//go:generate go_generics -i internal/set/set.go -t T=int -o iset/iset.go -p iset
+//go:generate go_generics -i internal/set/set_test.go -t P=int -o iset/iset_test.go -p iset
+
+// NewIntSet is a convenience function to create a new iset.Set
+func NewIntSet() *iset.Set {
+	return iset.New()
 }
 
-func NewThreadUnsafeSetFromSlice(s []interface{}) Set {
-	a := NewThreadUnsafeSet()
-	for _, item := range s {
-		a.Add(item)
-	}
-	return a
+//go:generate mkdir -p i8set
+//go:generate go_generics -i internal/set/set.go -t T=int8 -o i8set/i8set.go -p i8set
+//go:generate go_generics -i internal/set/set_test.go -t P=int8 -o i8set/i8set_test.go -p i8set
+
+// NewInt8Set is a convenience function to create a new i8set.Set
+func NewInt8Set() *i8set.Set {
+	return i8set.New()
+}
+
+//go:generate mkdir -p i16set
+//go:generate go_generics -i internal/set/set.go -t T=int16 -o i16set/i16set.go -p i16set
+//go:generate go_generics -i internal/set/set_test.go -t P=int16 -o i16set/i16set_test.go -p i16set
+
+// NewInt16Set is a convenience function to create a new i16set.Set
+func NewInt16Set() *i16set.Set {
+	return i16set.New()
+}
+
+//go:generate mkdir -p i32set
+//go:generate go_generics -i internal/set/set.go -t T=int32 -o i32set/i32set.go -p i32set
+//go:generate go_generics -i internal/set/set_test.go -t P=int32 -o i32set/i32set_test.go -p i32set
+
+// NewInt32Set is a convenience function to create a new i32set.Set
+func NewInt32Set() *i32set.Set {
+	return i32set.New()
+}
+
+//go:generate mkdir -p i64set
+//go:generate go_generics -i internal/set/set.go -t T=int64 -o i64set/i64set.go -p i64set
+//go:generate go_generics -i internal/set/set_test.go -t P=int64 -o i64set/i64set_test.go -p i64set
+
+// NewInt64Set is a convenience function to create a new i64set.Set
+func NewInt64Set() *i64set.Set {
+	return i64set.New()
+}
+
+//go:generate mkdir -p uset
+//go:generate go_generics -i internal/set/set.go -t T=uint -o uset/uset.go -p uset
+//go:generate go_generics -i internal/set/set_test.go -t P=uint -o uset/uset_test.go -p uset
+
+// NewUintSet is a convenience function to create a new uset.Set
+func NewUintSet() *uset.Set {
+	return uset.New()
+}
+
+//go:generate mkdir -p u8set
+//go:generate go_generics -i internal/set/set.go -t T=uint8 -o u8set/set.go -p u8set
+//go:generate go_generics -i internal/set/set_test.go -t P=uint8 -o u8set/set_test.go -p u8set
+
+// NewUint8Set is a convenience function to create a new u8set.Set
+func NewUint8Set() *u8set.Set {
+	return u8set.New()
+}
+
+//go:generate mkdir -p u16set
+//go:generate go_generics -i internal/set/set.go -t T=uint16 -o u16set/u16set.go -p u16set
+//go:generate go_generics -i internal/set/set_test.go -t P=uint16 -o u16set/u16set_test.go -p u16set
+
+// NewUint16Set is a convenience function to create a new u16set.Set
+func NewUint16Set() *u16set.Set {
+	return u16set.New()
+}
+
+//go:generate mkdir -p u32set
+//go:generate go_generics -i internal/set/set.go -t T=uint32 -o u32set/u32set.go -p u32set
+//go:generate go_generics -i internal/set/set_test.go -t P=uint32 -o u32set/u32set_test.go -p u32set
+
+// NewUint32Set is a convenience function to create a new u32set.Set
+func NewUint32Set() *u32set.Set {
+	return u32set.New()
+}
+
+//go:generate mkdir -p u64set
+//go:generate go_generics -i internal/set/set.go -t T=uint64 -o u64set/u64set.go -p u64set
+//go:generate go_generics -i internal/set/set_test.go -t P=uint64 -o u64set/u64set_test.go -p u64set
+
+// NewUint64Set is a convenience function to create a new u64set.Set
+func NewUint64Set() *u64set.Set {
+	return u64set.New()
+}
+
+//go:generate mkdir -p strset
+//go:generate go_generics -i internal/set/set.go -t T=string -o strset/strset.go -p strset
+//go:generate go_generics -i internal/set/set_test.go -t P=string -o strset/strset_test.go -p strset
+
+// NewStringSet is a convenience function to create a new strset.Set
+func NewStringSet() *strset.Set {
+	return strset.New()
 }

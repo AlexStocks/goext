@@ -1,11 +1,19 @@
-# goext #
+# goext
 ---
 *my golang sdk package*
 
-## dev list ##
+## dev list
 ---
 
-- 2018/07/07
+- 2018/08/09
+  > feature
+  * add gxset from scylla/go-set
+
+- 2018/08/07
+  > feature
+  * add gxrsync from c4milo/gsync
+
+- 2018/07/17
   > feature
   * add consistent hash from lafikl/consistent
 
