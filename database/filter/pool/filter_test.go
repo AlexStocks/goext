@@ -71,7 +71,6 @@ func (suite *FilterTestSuite) SetupTest() {
 	suite.Equal(nil, err, "NewRegistry()")
 
 	suite.filter, err = NewFilter(
-		gxfilter.WithBalancerMode(gxfilter.SM_Hash),
 		gxfilter.WithRegistry(suite.reg),
 		WithTTL(10e9),
 	)
@@ -86,7 +85,6 @@ func (suite *FilterTestSuite) TearDownTest() {
 func (suite *FilterTestSuite) TestFilter_Options() {
 	opts := suite.filter.Options()
 	suite.Equal(suite.reg, opts.Registry)
-	suite.Equal(gxfilter.SM_Hash, opts.Mode)
 }
 
 func (suite *FilterTestSuite) TestFilter_get() {
@@ -102,12 +100,12 @@ func (suite *FilterTestSuite) TestFilter_get() {
 	time.Sleep(3e9)
 
 	attr := gxregistry.ServiceAttr{Service: "shopping", Role: gxregistry.SRT_Provider}
-	services, token, err := filter.get(attr)
+	svcArr, err := filter.get(attr)
 	suite.Equal(nil, err)
-	suite.NotEqual(0, token)
-	suite.Equal(2, len(services))
+	suite.NotEqual(0, svcArr.Active)
+	suite.Equal(2, len(svcArr.Arr))
 
-	flag := suite.filter.CheckTokenAlive(attr, token)
+	flag := suite.filter.CheckServiceAlive(attr, svcArr)
 	suite.Equal(true, flag)
 
 	// delete consumer service
@@ -117,21 +115,20 @@ func (suite *FilterTestSuite) TestFilter_get() {
 	time.Sleep(3e9)
 
 	// check token alive
-	flag = suite.filter.CheckTokenAlive(attr, token)
+	flag = suite.filter.CheckServiceAlive(attr, svcArr)
 	suite.Equal(false, flag)
 
 	// get alive again
 	attr = gxregistry.ServiceAttr{Service: "shopping", Role: gxregistry.SRT_Provider}
-	services, token, err = filter.get(attr)
+	svcArr, err = filter.get(attr)
 	suite.Equal(nil, err)
-	suite.NotEqual(0, token)
-	suite.Equal(1, len(services))
+	suite.NotEqual(0, svcArr.Active)
+	suite.Equal(1, len(svcArr.Arr))
 
 	service = gxregistry.Service{Attr: &suite.pSA, Nodes: []*gxregistry.Node{&suite.nodes[1]}}
 	//service1, _ := balancer(uint64(0))
-	suite.Equal(service, *services[0])
+	suite.Equal(*(svcArr.Arr[0]), service)
 }
-
 func (suite *FilterTestSuite) TestRegistry_EtcdRestart() {
 	filter := suite.filter.(*Filter)
 
@@ -145,12 +142,12 @@ func (suite *FilterTestSuite) TestRegistry_EtcdRestart() {
 	time.Sleep(3e9)
 
 	attr := gxregistry.ServiceAttr{Service: "shopping", Role: gxregistry.SRT_Provider}
-	services, token, err := filter.get(attr)
+	serviceArray, err := filter.get(attr)
 	suite.Equal(nil, err)
-	suite.NotEqual(0, token)
-	suite.Equal(2, len(services))
+	suite.NotEqual(0, serviceArray.Active.UnixNano())
+	suite.Equal(2, len(serviceArray.Arr))
 
-	flag := suite.filter.CheckTokenAlive(attr, token)
+	flag := suite.filter.CheckServiceAlive(attr, serviceArray)
 	suite.Equal(true, flag)
 
 	gxlog.CError("\n\nPls stop the etcd now...\n\n")
@@ -165,21 +162,19 @@ func (suite *FilterTestSuite) TestRegistry_EtcdRestart() {
 	time.Sleep(3e9)
 
 	// check token alive
-	flag = suite.filter.CheckTokenAlive(attr, token)
+	flag = suite.filter.CheckServiceAlive(attr, serviceArray)
 	suite.Equal(false, flag)
 
 	// get alive again
 	attr = gxregistry.ServiceAttr{Service: "shopping", Role: gxregistry.SRT_Provider}
-	services, token, err = filter.get(attr)
+	serviceArray, err = filter.get(attr)
 	suite.Equal(nil, err)
-	suite.NotEqual(0, token)
-	suite.Equal(1, len(services))
+	suite.Equal(1, len(serviceArray.Arr))
 
 	service = gxregistry.Service{Attr: &suite.pSA, Nodes: []*gxregistry.Node{&suite.nodes[1]}}
 	//service1, _ := balancer(uint64(0))
-	suite.Equal(service, *services[0])
+	suite.Equal(*(serviceArray.Arr[0]), service)
 }
-
 func TestFilterTestSuite(t *testing.T) {
 	suite.Run(t, new(FilterTestSuite))
 }

@@ -10,17 +10,12 @@ import (
 	jerrors "github.com/juju/errors"
 )
 
-type ServiceToken = int64
-
-// Balancer returns a available node based on its load balance algorithm.
-type Balancer func(ID uint64) (*gxregistry.Service, error)
-
 // Filter used to get service nodes from registry.
 type Filter interface {
 	Options() Options
-	GetService(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, error)
-	Filter(attr gxregistry.ServiceAttr) (Balancer, ServiceToken, error)
-	CheckTokenAlive(attr gxregistry.ServiceAttr, token ServiceToken) bool
+	GetService(gxregistry.ServiceAttr) ([]*gxregistry.Service, error)
+	Filter(gxregistry.ServiceAttr) (*ServiceArray, error)
+	CheckServiceAlive(gxregistry.ServiceAttr, *ServiceArray) bool
 	Close() error
 }
 

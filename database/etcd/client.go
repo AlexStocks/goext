@@ -58,7 +58,7 @@ func (c *Client) KeepAlive() (<-chan *ecv3.LeaseKeepAliveResponse, error) {
 		if err != nil {
 			return nil, jerrors.Trace(err)
 		}
-		id = ecv3.LeaseID(rsp.ID)
+		id = rsp.ID
 	}
 	c.Lock()
 	c.id = id

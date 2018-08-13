@@ -12,7 +12,6 @@ import (
 
 type Options struct {
 	Registry gxregistry.Registry
-	Mode     BalancerMode // filter mode
 	Context  *gxcontext.ValuesContext
 }
 
@@ -23,13 +22,6 @@ type Option func(*Options)
 func WithRegistry(r gxregistry.Registry) Option {
 	return func(o *Options) {
 		o.Registry = r
-	}
-}
-
-// WithBalancerMode sets the default strategy for the filter
-func WithBalancerMode(mode BalancerMode) Option {
-	return func(o *Options) {
-		o.Mode = mode
 	}
 }
 

@@ -5,6 +5,10 @@
 ## dev list
 ---
 
+- 2018/08/13
+  > Improvement
+  * use ServiceArray
+
 - 2018/08/09
   > feature
   * add gxset from scylla/go-set

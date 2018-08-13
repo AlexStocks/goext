@@ -11,20 +11,20 @@ import (
 )
 
 import (
+	"github.com/AlexStocks/goext/database/filter"
+	"github.com/AlexStocks/goext/database/registry"
+	"github.com/AlexStocks/goext/time"
 	log "github.com/AlexStocks/log4go"
 	jerrors "github.com/juju/errors"
 )
 
-import (
-	"github.com/AlexStocks/goext/database/filter"
-	"github.com/AlexStocks/goext/database/registry"
-	"github.com/AlexStocks/goext/time"
+var (
+	defaultTTL = 10 * time.Minute
 )
 
-var (
-	defaultTTL    = 10 * time.Minute
-	activeTimeout = 2 * time.Hour
-)
+/////////////////////////////////////
+// Filter
+/////////////////////////////////////
 
 type Filter struct {
 	// registry & strategy
@@ -33,9 +33,7 @@ type Filter struct {
 
 	wg sync.WaitGroup
 	sync.Mutex
-	services map[string][]*gxregistry.Service
-	// the creation time for every []*gxregistry.Service.
-	active map[string]time.Time
+	serviceMap map[string]*gxfilter.ServiceArray
 
 	done chan struct{}
 }
@@ -70,23 +68,20 @@ func (s *Filter) copy(current []*gxregistry.Service, by gxregistry.ServiceAttr) 
 	return services
 }
 
-func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilter.ServiceToken, error) {
+func (s *Filter) get(attr gxregistry.ServiceAttr) (*gxfilter.ServiceArray, error) {
 	s.Lock()
 	serviceString := attr.Service
-	// check the services first
-	services, sok := s.services[serviceString]
-	ttl, tok := s.active[serviceString]
-	log.Debug("s.services[serviceString{%v}] = services{%v}", serviceString, services)
+	serviceArray, sok := s.serviceMap[serviceString]
+	log.Debug("s.serviceMap[serviceString{%v}] = services{%}", serviceString, serviceArray)
 
-	if sok && len(services) > 0 {
-		// only return if its less than the ttl
-		// and copy the service array in case of its results is affected by function add/del
-		if tok && time.Since(ttl) < s.ttl {
+	if sok && len(serviceArray.Arr) > 0 {
+		ttl := time.Since(serviceArray.Active)
+		if ttl < s.ttl {
 			s.Unlock()
-			return s.copy(services, attr), ttl.UnixNano(), nil
+			return &gxfilter.ServiceArray{Arr: s.copy(serviceArray.Arr, attr), Active: serviceArray.Active}, nil
 		}
-		log.Warn("s.services[serviceString{%v}] = services{%v}, array ttl{%v} is less than services.ttl{%v}",
-			serviceString, services, ttl, s.ttl)
+		log.Warn("s.serviceMap[serviceString{%v}] = services{%s}, array ttl{%v} is less than services.ttl{%v}",
+			serviceString, serviceArray, ttl, s.ttl)
 	}
 	s.Unlock()
 
@@ -96,54 +91,26 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) ([]*gxregistry.Service, gxfilt
 	log.Debug("Registry.GetServices(attr:%+v) = {err:%s, svcs:%+v}", attr, jerrors.ErrorStack(err), svcs)
 	if err != nil {
 		log.Error("registry.GetService(serviceString{%v}) = err:%+v}", serviceString, err)
-		if sok && len(services) > 0 {
+		if sok && len(serviceArray.Arr) > 0 {
 			log.Error("serviceString{%v} timeout. can not get new serviceString array, use old instead", serviceString)
 			// all local services expired and can not get new services from registry, just use che cached instead
-			return services, ttl.UnixNano(), nil
+			return &gxfilter.ServiceArray{Arr: s.copy(serviceArray.Arr, attr), Active: serviceArray.Active}, nil
 		}
 
-		return nil, 0, jerrors.Annotatef(err, "cacheSelect.get(ServiceAttr:%+v)", attr)
+		return nil, jerrors.Annotatef(err, "cacheSelect.get(ServiceAttr:%+v)", attr)
 	}
 
-	var serviceArray []*gxregistry.Service
+	var arr []*gxregistry.Service
 	for i, svc := range svcs {
 		svc := svc
-		serviceArray = append(serviceArray, &svc)
-		log.Debug("i:%d, svc:%+v, serviceArray:%+v", i, svc, serviceArray)
+		arr = append(arr, &svc)
+		log.Debug("i:%d, svc:%+v, service array:%+v", i, svc, arr)
 	}
 
-	filterServiceArray := s.copy(serviceArray, attr)
-	s.services[serviceString] = serviceArray
-	ttl = time.Now().Add(s.ttl)
-	s.active[serviceString] = ttl
+	filterServiceArray := s.copy(arr, attr)
+	s.serviceMap[serviceString] = gxfilter.NewServiceArray(arr)
 
-	return filterServiceArray, ttl.UnixNano(), nil
-}
-
-// update will invoke set
-func (s *Filter) set(service string, services []*gxregistry.Service) {
-	if 0 < len(services) {
-		s.services[service] = services
-		s.active[service] = time.Now().Add(s.ttl)
-
-		return
-	}
-
-	delete(s.services, service)
-	delete(s.active, service)
-}
-
-func filterServices(array *[]*gxregistry.Service, i int) {
-	if i < 0 {
-		return
-	}
-
-	if len(*array) <= i {
-		return
-	}
-	s := *array
-	s = append(s[:i], s[i+1:]...)
-	*array = s
+	return &gxfilter.ServiceArray{Arr: filterServiceArray, Active: s.serviceMap[serviceString].Active}, nil
 }
 
 func (s *Filter) update(res *gxregistry.EventResult) {
@@ -151,41 +118,33 @@ func (s *Filter) update(res *gxregistry.EventResult) {
 		return
 	}
 	var (
-		ok       bool
-		name     string
-		services []*gxregistry.Service
+		ok           bool
+		name         string
+		serviceArray *gxfilter.ServiceArray
 	)
 
-	log.Debug("update @registry result{%s}", res)
 	name = res.Service.Attr.Service
 	s.Lock()
-	services, ok = s.services[name]
-	log.Debug("service name:%s, its current member lists:%+v", name, services)
-	if ok { // existing service found
-		for i, s := range services {
-			log.Debug("services.services[%s][%d] = service{%#v}", name, i, s)
-			if s.Equal(res.Service) {
-				filterServices(&(services), i)
-				log.Debug("i:%d, new services:%+v", i, services)
-			}
-		}
-	}
+	serviceArray, ok = s.serviceMap[name]
 
 	switch res.Action {
 	case gxregistry.ServiceAdd, gxregistry.ServiceUpdate:
-		services = append(services, res.Service)
-		log.Info("filter add serviceURL{%#v}", *res.Service)
+		if ok {
+			serviceArray.Add(res.Service, s.ttl)
+			log.Info("filter add serviceURL{%#v}", *res.Service)
+		} else {
+			s.serviceMap[name] = gxfilter.NewServiceArray([]*gxregistry.Service{res.Service})
+		}
 	case gxregistry.ServiceDel:
+		if ok {
+			serviceArray.Del(res.Service, s.ttl)
+			if len(serviceArray.Arr) == 0 {
+				delete(s.serviceMap, name)
+				log.Warn("delete service %s from service map", name)
+			}
+		}
 		log.Warn("filter delete serviceURL{%#v}", *res.Service)
 	}
-	s.set(name, services)
-	// services, ok = s.services[name]
-	log.Debug("after update, services.services[%s] member list size{%d}", name, len(s.services[name]))
-	// if ok { // debug
-	// 	for i, s := range services {
-	// 		log.Debug("services.services[%s][%d] = service{%#v}", name, i, s)
-	// 	}
-	// }
 	s.Unlock()
 }
 
@@ -267,62 +226,51 @@ func (s *Filter) Options() gxfilter.Options {
 }
 
 func (s *Filter) GetService(service gxregistry.ServiceAttr) ([]*gxregistry.Service, error) {
+	serviceArray, err := s.Filter(service)
+	if err != nil {
+		return nil, jerrors.Trace(err)
+	}
+
+	return serviceArray.Arr, nil
+}
+
+func (s *Filter) Filter(service gxregistry.ServiceAttr) (*gxfilter.ServiceArray, error) {
 	var (
 		err      error
-		services []*gxregistry.Service
+		svcArray *gxfilter.ServiceArray
 	)
 
-	services, _, err = s.get(service)
-	log.Debug("get(service{%+v} = serviceURL array{%+v})", service, services)
+	svcArray, err = s.get(service)
 	if err != nil {
-		log.Error("services.get(service{%s}) = error{%+v}", service, jerrors.ErrorStack(err))
+		log.Error("services.get(service{%s}) = error{%s}", service, jerrors.ErrorStack(err))
 		return nil, gxfilter.ErrNotFound
 	}
-	if len(services) == 0 {
+	if len(svcArray.Arr) == 0 {
 		return nil, gxfilter.ErrNoneAvailable
 	}
 
-	return services, nil
+	return svcArray, nil
 }
 
-func (s *Filter) Filter(service gxregistry.ServiceAttr) (gxfilter.Balancer, gxfilter.ServiceToken, error) {
-	var (
-		err      error
-		token    gxfilter.ServiceToken
-		services []*gxregistry.Service
-	)
-
-	services, token, err = s.get(service)
-	log.Debug("get(service{%+v} = serviceURL array{%+v})", service, services)
-	if err != nil {
-		log.Error("services.get(service{%s}) = error{%T-%v}", service, err, err)
-		return nil, 0, gxfilter.ErrNotFound
-	}
-	if len(services) == 0 {
-		return nil, 0, gxfilter.ErrNoneAvailable
-	}
-
-	return gxfilter.BalancerModeFunc(s.opts.Mode)(services), token, nil
-}
-
-func (s *Filter) CheckTokenAlive(attr gxregistry.ServiceAttr, token gxfilter.ServiceToken) bool {
+func (s *Filter) CheckServiceAlive(attr gxregistry.ServiceAttr, svcArray *gxfilter.ServiceArray) bool {
 	var (
 		ok     bool
-		active time.Time
-		t      time.Time
+		arr    *gxfilter.ServiceArray
+		t0, t1 time.Time
 	)
 
 	s.Lock()
-	active, ok = s.active[attr.Service]
+	arr, ok = s.serviceMap[attr.Service]
 	s.Unlock()
 
 	if ok {
-		t = gxtime.UnixNano2Time(token)
-		if activeTimeout < active.Sub(t) {
-			// active expire, the user should update its service array
+		t0 = arr.Active
+		t1 = svcArray.Active
+		if t0.Sub(t1) > 0 {
+			// Active expire, the user should update its service array
 			return false
 		}
-		return active.UnixNano() == token
+		return true
 	}
 
 	return false
@@ -330,7 +278,7 @@ func (s *Filter) CheckTokenAlive(attr gxregistry.ServiceAttr, token gxfilter.Ser
 
 func (s *Filter) Close() error {
 	s.Lock()
-	s.services = make(map[string][]*gxregistry.Service)
+	s.serviceMap = make(map[string]*gxfilter.ServiceArray)
 	s.Unlock()
 
 	select {
@@ -344,9 +292,7 @@ func (s *Filter) Close() error {
 }
 
 func NewFilter(opts ...gxfilter.Option) (gxfilter.Filter, error) {
-	sopts := gxfilter.Options{
-		Mode: gxfilter.SM_Random,
-	}
+	sopts := gxfilter.Options{}
 
 	for _, opt := range opts {
 		opt(&sopts)
@@ -364,11 +310,10 @@ func NewFilter(opts ...gxfilter.Option) (gxfilter.Filter, error) {
 	}
 
 	s := &Filter{
-		opts:     sopts,
-		ttl:      ttl,
-		services: make(map[string][]*gxregistry.Service),
-		active:   make(map[string]time.Time),
-		done:     make(chan struct{}),
+		opts:       sopts,
+		ttl:        ttl,
+		serviceMap: make(map[string]*gxfilter.ServiceArray),
+		done:       make(chan struct{}),
 	}
 
 	s.wg.Add(1)
