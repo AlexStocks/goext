@@ -50,26 +50,29 @@ func CPrintf(color []byte, format string, args ...interface{}) {
 }
 
 func CPrintfln(color []byte, format string, args ...interface{}) {
+	logStr := fmt.Sprintf(format, args...)
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		fmt.Fprintf(os.Stdout, string(color)+funcFileLine()+fmt.Sprintf(format, args...)+string(reset)+"\n")
+		fmt.Fprintf(os.Stdout, string(color)+funcFileLine()+"%s"+string(reset)+"\n", logStr)
 	} else {
-		fmt.Fprintf(os.Stdout, fmt.Sprintf(format, args...)+"\n")
+		fmt.Fprintf(os.Stdout, "%s\n", logStr)
 	}
 }
 
 func CEPrintf(color []byte, format string, args ...interface{}) {
+	logStr := fmt.Sprintf(format, args...)
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		fmt.Fprintf(os.Stderr, string(color)+funcFileLine()+fmt.Sprintf(format, args...)+string(reset))
+		fmt.Fprintf(os.Stderr, string(color)+funcFileLine()+"%s"+string(reset), logStr)
 	} else {
-		fmt.Fprintf(os.Stderr, fmt.Sprintf(format, args...))
+		fmt.Fprintf(os.Stderr, "%s", logStr)
 	}
 }
 
 func CEPrintfln(color []byte, format string, args ...interface{}) {
+	logStr := fmt.Sprintf(format, args...)
 	if isatty.IsTerminal(os.Stdout.Fd()) {
-		fmt.Fprintf(os.Stderr, string(color)+funcFileLine()+fmt.Sprintf(format, args...)+string(reset)+"\n")
+		fmt.Fprintf(os.Stderr, string(color)+funcFileLine()+"%s"+string(reset)+"\n", logStr)
 	} else {
-		fmt.Fprintf(os.Stderr, fmt.Sprintf(format, args...)+"\n")
+		fmt.Fprintf(os.Stderr, "%s\n", logStr)
 	}
 }
 

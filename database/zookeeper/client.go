@@ -13,6 +13,7 @@ import (
 import (
 	jerrors "github.com/juju/errors"
 	"github.com/samuel/go-zookeeper/zk"
+	"github.com/AlexStocks/goext/log"
 )
 
 type Client struct {
@@ -108,10 +109,9 @@ func (c *Client) RegisterTemp(path string, data []byte) (string, error) {
 	}
 
 	tmpPath, err = c.conn.Create(path, data, zk.FlagEphemeral, zk.WorldACL(zk.PermAll))
+	gxlog.CInfo("fuck$$$$$$$$$$$$$$, path:%s, data:%s, err:%s", path, string(path), err)
 	if err != nil {
-		// if err != zk.ErrNodeExists {
 		return "", jerrors.Annotatef(err, "zk.Create(%s, ephemeral)", path)
-		// }
 	}
 
 	return tmpPath, nil
@@ -129,9 +129,7 @@ func (c *Client) RegisterTempSeq(path string, data []byte) (string, error) {
 
 	tmpPath, err = c.conn.Create(path, data, zk.FlagEphemeral|zk.FlagSequence, zk.WorldACL(zk.PermAll))
 	if err != nil {
-		// if err != zk.ErrNodeExists {
 		return "", jerrors.Annotatef(err, "zk.Create(%s, sequence | ephemeral)", path)
-		// }
 	}
 
 	return tmpPath, nil

@@ -23,8 +23,7 @@ import (
 /////////////////////////////////////
 
 var (
-	ErrServiceArrayEmpty   = jerrors.New("ServiceArray empty")
-	ErrServiceArrayTimeout = jerrors.New("ServiceArray timeout")
+	ErrServiceArrayEmpty = jerrors.New("ServiceArray empty")
 )
 
 // ServiceHash is a user service hash interface to select a service provider.
@@ -55,14 +54,10 @@ func (s ServiceArray) String() string {
 	return builder.String()
 }
 
-func (s *ServiceArray) Select(ctx context.Context, hash ServiceHash, ttl time.Duration) (*gxregistry.Service, error) {
+func (s *ServiceArray) Select(ctx context.Context, hash ServiceHash) (*gxregistry.Service, error) {
 	arrSize := len(s.Arr)
 	if arrSize == 0 {
 		return nil, ErrServiceArrayEmpty
-	}
-
-	if ttl != 0 && time.Since(s.Active) > ttl {
-		return nil, ErrServiceArrayTimeout
 	}
 
 	if hash != nil {

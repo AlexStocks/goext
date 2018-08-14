@@ -313,7 +313,7 @@ func (r *Registry) register(s gxregistry.Service) error {
 		_, err = r.client.RegisterTemp(zkPath, []byte(data))
 		//r.Unlock()
 		if err != nil {
-			return jerrors.Annotatef(err, "gxregister.RegisterTempSeq(path:%s)", zkPath)
+			return jerrors.Annotatef(err, "gxregister.RegisterTemp(path:%s)", zkPath)
 		}
 	}
 
