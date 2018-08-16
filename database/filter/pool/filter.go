@@ -88,7 +88,6 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) (*gxfilter.ServiceArray, error
 	svcs, err := s.opts.Registry.GetServices(attr)
 	s.Lock()
 	defer s.Unlock()
-	log.Debug("Registry.GetServices(attr:%+v) = {err:%s, svcs:%+v}", attr, jerrors.ErrorStack(err), svcs)
 	if err != nil {
 		log.Error("registry.GetService(serviceString{%v}) = err:%+v}", serviceString, err)
 		if sok && len(serviceArray.Arr) > 0 {
@@ -148,7 +147,7 @@ func (s *Filter) update(res *gxregistry.EventResult) {
 	s.Unlock()
 }
 
-func (s *Filter) run() {
+func (s *Filter) run(attr gxregistry.ServiceAttr) {
 	defer s.wg.Done()
 	for {
 		// quit asap
@@ -159,6 +158,7 @@ func (s *Filter) run() {
 
 		w, err := s.opts.Registry.Watch(
 			gxregistry.WithWatchRoot(s.opts.Registry.Options().Root),
+			gxregistry.WithWatchFilter(attr),
 		)
 		log.Debug("services.Registry.Watch() = watch:%+v, error:%+v", w, jerrors.ErrorStack(err))
 		if err != nil {
@@ -316,7 +316,14 @@ func NewFilter(opts ...gxfilter.Option) (gxfilter.Filter, error) {
 		done:       make(chan struct{}),
 	}
 
+	var serviceAttr gxregistry.ServiceAttr
+	if sopts.Context != nil {
+		if attr, ok := sopts.Context.Get(GxfilterServiceAttrKey); ok {
+			serviceAttr = attr.(gxregistry.ServiceAttr)
+		}
+	}
+
 	s.wg.Add(1)
-	go s.run()
+	go s.run(serviceAttr)
 	return s, nil
 }

@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	GxfilterDefaultKey = 0X201804201515
+	GxfilterDefaultKey     = 0X201804201515
+	GxfilterServiceAttrKey = 0X201808162038
 )
 
 func WithTTL(t time.Duration) gxfilter.Option {

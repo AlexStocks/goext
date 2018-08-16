@@ -9,17 +9,13 @@ import (
 	"strings"
 	"sync"
 	//"io/ioutil"
-)
 
-import (
 	log "github.com/AlexStocks/log4go"
-	jerrors "github.com/juju/errors"
-	"github.com/samuel/go-zookeeper/zk"
-)
 
-import (
 	"github.com/AlexStocks/goext/database/registry"
 	"github.com/AlexStocks/goext/database/zookeeper"
+	jerrors "github.com/juju/errors"
+	"github.com/samuel/go-zookeeper/zk"
 )
 
 //////////////////////////////////////////////
@@ -300,18 +296,14 @@ func (r *Registry) register(s gxregistry.Service) error {
 		}
 
 		zkPath = service.Path(r.options.Root)
-		//r.Lock()
 		err = r.client.CreateZkPath(zkPath)
-		//r.Unlock()
 		if err != nil {
 			log.Error("zkClient.CreateZkPath(root{%s})", zkPath, err)
 			return jerrors.Trace(err)
 		}
 
 		zkPath = service.NodePath(r.options.Root, *node)
-		//r.Lock()
 		_, err = r.client.RegisterTemp(zkPath, []byte(data))
-		//r.Unlock()
 		if err != nil {
 			return jerrors.Annotatef(err, "gxregister.RegisterTemp(path:%s)", zkPath)
 		}

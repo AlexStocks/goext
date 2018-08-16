@@ -5,6 +5,10 @@
 ## dev list
 ---
 
+- 2018/08/16
+  > Improvement
+  * Add ServiceAttr as Watch filter
+
 - 2018/08/13
   > Improvement
   * use ServiceArray
