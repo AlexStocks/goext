@@ -27,7 +27,7 @@ var (
 )
 
 // ServiceHash is a user service hash interface to select a service provider.
-// @context is trasfered from ServiceArray::Select
+// @context is transfered from ServiceArray::Select
 type ServiceHash func(context.Context, *ServiceArray) (*gxregistry.Service, error)
 
 type ServiceArray struct {
