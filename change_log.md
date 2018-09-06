@@ -5,6 +5,11 @@
 ## dev list
 ---
 
+- 2018/09/06
+  > Improvement
+  * Add container/ring from glycerine/rbuf
+  * Add bytes/gxbuffer from intel-go/bytebuf
+
 - 2018/08/16
   > Improvement
   * Add ServiceAttr as Watch filter
