@@ -1,9 +1,34 @@
-# Circular Buffer
+rbuf: a circular ring buffer in Golang
+====
 
-[![GoDoc](https://godoc.org/github.com/ashishgandhi/buffer?status.svg)](https://godoc.org/github.com/ashishgandhi/buffer)
-[![Build Status](https://travis-ci.org/ashishgandhi/buffer.svg?branch=master)](https://travis-ci.org/ashishgandhi/buffer)
-[![Coverage Status](https://codecov.io/github/ashishgandhi/buffer/coverage.svg?branch=master)](https://codecov.io/github/ashishgandhi/buffer?branch=master)
 
-This is a circular buffer implementation designed to be used with gigabyte sized buffers. It uses a file as its backing store. The backing file is `mmap`'d into memory. One can lower the resident memory size of the program by advising where the customer cursor is (uses `madvise`). The buffer can be loaded again from the backing file if the program exists. 
+type FixedSizeRingBuf struct:
 
-For now please check tests for examples.
+   * is a fixed-size circular ring buffer. Yes, just what is says.
+     This structure is only for bytes, as it was written to
+     optimize I/O, but could be easily adapted to any other type.
+
+   * We keep a pair of ping/pong buffers so that we can linearize
+   the circular buffer into a contiguous slice if need be.
+
+For efficiency, a FixedSizeRingBuf may be vastly preferred to
+a bytes.Buffer. The ReadWithoutAdvance(), Advance(), and Adopt()
+methods are all non-standard methods written for speed.
+
+For an I/O heavy application, I have replaced bytes.Buffer with
+FixedSizeRingBuf and seen memory consumption go from 8GB to 25MB.
+Yes, that is a 300x reduction in memory footprint. Everything ran
+faster too.
+
+Note that Bytes(), while inescapable at times, is expensive: avoid
+it if possible. If all you need is len(Bytes()), then it is better 
+to use the FixedSizeRingBuf.Readable member directly.
+Bytes() is expensive because it may copy the back and then 
+the front of a wrapped buffer A[Use] into A[1-Use] in order to 
+get a contiguous, unwrapped, slice. If possible use ContigLen()
+first to get the size that can be read without copying, Read() that
+amount, and then Read() a second time -- to avoid the copy.
+
+copyright (c) 2014, Jason E. Aten
+
+license: MIT
