@@ -9,13 +9,17 @@ import (
 	"strings"
 	"sync"
 	//"io/ioutil"
+)
 
+import (
 	log "github.com/AlexStocks/log4go"
-
-	"github.com/AlexStocks/goext/database/registry"
-	"github.com/AlexStocks/goext/database/zookeeper"
 	jerrors "github.com/juju/errors"
 	"github.com/samuel/go-zookeeper/zk"
+)
+
+import (
+	"github.com/AlexStocks/goext/database/registry"
+	"github.com/AlexStocks/goext/database/zookeeper"
 )
 
 //////////////////////////////////////////////
