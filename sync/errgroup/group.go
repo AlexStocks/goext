@@ -12,8 +12,11 @@
 package gxerrgroup
 
 import (
-	"github.com/AlexStocks/goext/runtime"
 	"time"
+)
+
+import (
+	"github.com/AlexStocks/goext/runtime"
 )
 
 // Group collects actors (functions) and runs them concurrently.
