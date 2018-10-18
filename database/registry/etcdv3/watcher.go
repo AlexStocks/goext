@@ -98,7 +98,8 @@ func (w *Watcher) Notify() (*gxregistry.EventResult, error) {
 
 				service, err = gxregistry.DecodeService(ev.Kv.Value)
 				if err != nil || service == nil {
-					log.Warn("gxregistry.DecodeService() = {service:%p, error:%+v}", service, jerrors.ErrorStack(err))
+					log.Warn("gxregistry.DecodeService() = {service:%p, error:%+v}",
+						service, jerrors.ErrorStack(err))
 					continue
 				}
 
@@ -108,7 +109,8 @@ func (w *Watcher) Notify() (*gxregistry.EventResult, error) {
 				// get service from prevKv
 				service, err = gxregistry.DecodeService(ev.PrevKv.Value)
 				if err != nil || service == nil {
-					log.Warn("gxregistry.DecodeService() = {service:%p, error:%+v}", service, jerrors.ErrorStack(err))
+					log.Warn("gxregistry.DecodeService() = {service:%p, error:%+v}",
+						service, jerrors.ErrorStack(err))
 					continue
 				}
 			}

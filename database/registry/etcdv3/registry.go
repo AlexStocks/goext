@@ -272,7 +272,7 @@ func (r *Registry) register(s gxregistry.Service) error {
 		if err != nil {
 			service.Nodes = s.Nodes[:i]
 			r.unregister(service)
-			return jerrors.Annotatef(err, "etcdv3.Client.Put(path, data)",
+			return jerrors.Annotatef(err, "etcdv3.Client.Put(path:%s, data:%s)",
 				service.NodePath(r.options.Root, *node), data)
 		}
 	}
@@ -349,10 +349,11 @@ func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]gxregistry.Servic
 	services := make([]gxregistry.Service, 0, 32)
 	for _, n := range rsp.Kvs {
 		if sn, err := gxregistry.DecodeService(n.Value); err == nil && sn != nil {
-			if attr.Filter(*sn.Attr) {
+			if attr.MeshFilter(*sn.Attr) { // Fix: just filter service & role. 2018/10/18
 				for _, node := range sn.Nodes {
 					var service gxregistry.Service
-					service.Attr = sn.Attr // bug fix: @attr 仅仅用于过滤，其属性值比较少，etcd 返回的service.ServiceAttr 值比 @attr 精确
+					// bug fix: @attr 仅仅用于过滤，其属性值比较少，etcd 返回的service.ServiceAttr 值比 @attr 精确
+					service.Attr = sn.Attr
 					service.Nodes = append(service.Nodes, node)
 					services = append(services, service)
 				}

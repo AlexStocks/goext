@@ -121,6 +121,8 @@ type ServiceAttr struct {
 func (m *ServiceAttr) Reset()                    { *m = ServiceAttr{} }
 func (*ServiceAttr) ProtoMessage()               {}
 func (*ServiceAttr) Descriptor() ([]byte, []int) { return fileDescriptorService, []int{0} }
+
+// fine filtering
 func (m *ServiceAttr) Filter(service ServiceAttr) bool {
 	switch {
 	case "" != m.Protocol && service.Protocol != m.Protocol:
@@ -133,6 +135,19 @@ func (m *ServiceAttr) Filter(service ServiceAttr) bool {
 		return false
 
 	case "" != m.Version && service.Version != m.Version:
+		return false
+
+	case SRT_UNKOWN != m.Role && service.Role != m.Role:
+		return false
+
+	default:
+		return true
+	}
+}
+
+func (m *ServiceAttr) MeshFilter(service ServiceAttr) bool {
+	switch {
+	case "" != m.Service && service.Service != m.Service:
 		return false
 
 	case SRT_UNKOWN != m.Role && service.Role != m.Role:
@@ -181,6 +196,17 @@ func (m *Node) Copy() *Node {
 	return &n
 }
 
+type NodeMeta func(*Node)
+
+func WithNodeMeta(key, value string) NodeMeta {
+	return func(n *Node) {
+		if n.Metadata == nil {
+			n.Metadata = make(map[string]string)
+		}
+		n.Metadata[key] = value
+	}
+}
+
 type Service struct {
 	Attr     *ServiceAttr      `protobuf:"bytes,1,opt,name=Attr" json:"Attr,omitempty"`
 	Nodes    []*Node           `protobuf:"bytes,2,rep,name=Nodes" json:"Nodes,omitempty"`
@@ -209,6 +235,17 @@ func (s *Service) Copy() *Service {
 	}
 
 	return &c
+}
+
+type ServiceMeta func(*Service)
+
+func WithServiceMeta(key, value string) ServiceMeta {
+	return func(s *Service) {
+		if s.Metadata == nil {
+			s.Metadata = make(map[string]string)
+		}
+		s.Metadata[key] = value
+	}
 }
 
 // Result is returned by a call to Next on

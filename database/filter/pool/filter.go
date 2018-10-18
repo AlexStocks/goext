@@ -33,7 +33,7 @@ type Filter struct {
 
 	wg sync.WaitGroup
 	sync.Mutex
-	serviceMap map[string]*gxfilter.ServiceArray
+	serviceMap map[string]*gxfilter.ServiceArray // key is service name
 
 	done chan struct{}
 }
@@ -72,7 +72,7 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) (*gxfilter.ServiceArray, error
 	s.Lock()
 	serviceString := attr.Service
 	serviceArray, sok := s.serviceMap[serviceString]
-	log.Debug("s.serviceMap[serviceString{%v}] = services{%}", serviceString, serviceArray)
+	log.Debug("s.serviceMap[serviceString{%v}] = services{%#v}", serviceString, serviceArray)
 
 	if sok && len(serviceArray.Arr) > 0 {
 		ttl := time.Since(serviceArray.Active)
@@ -80,7 +80,7 @@ func (s *Filter) get(attr gxregistry.ServiceAttr) (*gxfilter.ServiceArray, error
 			s.Unlock()
 			return &gxfilter.ServiceArray{Arr: s.copy(serviceArray.Arr, attr), Active: serviceArray.Active}, nil
 		}
-		log.Warn("s.serviceMap[serviceString{%v}] = services{%s}, array ttl{%v} is less than services.ttl{%v}",
+		log.Warn("s.serviceMap[serviceString{%s}] = services{%s}, array ttl{%v} is less than services.ttl{%v}",
 			serviceString, serviceArray, ttl, s.ttl)
 	}
 	s.Unlock()
@@ -130,7 +130,7 @@ func (s *Filter) update(res *gxregistry.EventResult) {
 	case gxregistry.ServiceAdd, gxregistry.ServiceUpdate:
 		if ok {
 			serviceArray.Add(res.Service, s.ttl)
-			log.Info("filter add serviceURL{%#v}", *res.Service)
+			log.Debug("filter add serviceURL{%#v}", *res.Service)
 		} else {
 			s.serviceMap[name] = gxfilter.NewServiceArray([]*gxregistry.Service{res.Service})
 		}

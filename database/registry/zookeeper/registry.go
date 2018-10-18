@@ -385,7 +385,7 @@ func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]gxregistry.Servic
 			log.Warn("gxregistry.DecodeService(data:%#v) = error:%s", childData, jerrors.ErrorStack(err))
 			continue
 		}
-		if attr.Filter(*sn.Attr) {
+		if attr.MeshFilter(*sn.Attr) { // Fix: just filter service & role. 2018/10/18
 			for _, node := range sn.Nodes {
 				var service gxregistry.Service
 				service.Attr = sn.Attr
