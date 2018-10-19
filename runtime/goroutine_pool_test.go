@@ -1,4 +1,5 @@
 // +build !leak
+
 package gxruntime
 
 import (

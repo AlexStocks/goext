@@ -153,7 +153,9 @@ func (w *Watcher) handleZkPathEvent(zkRoot string, children []string) error {
 			continue
 		}
 
-		if !conf.MeshFilter(attr) { // Fix: just filter service & role. 2018/10/18
+		if !conf.MeshFilter(attr) {
+			// Fix: just filter service & role. database/filter/pool/filter.go:Filter::copy
+			// will use Filter to get valid service. 2018/10/18
 			log.Warn("path attr:{%#v} is not compatible with Config{%#v}", attr, conf)
 			continue
 		}
@@ -206,7 +208,9 @@ func (w *Watcher) handleZkNodeEvent(zkPath string, children []string) error {
 			continue
 		}
 
-		if !conf.MeshFilter(*service.Attr) { // Fix: just filter service & role. 2018/10/18
+		if !conf.MeshFilter(*service.Attr) {
+			// Fix: just filter service & role. database/filter/pool/filter.go:Filter::copy
+			// will use Filter to get valid service. 2018/10/18
 			log.Warn("service{%#v} is not compatible with Config{%#v}", service, conf)
 			continue
 		}

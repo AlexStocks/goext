@@ -349,7 +349,9 @@ func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]gxregistry.Servic
 	services := make([]gxregistry.Service, 0, 32)
 	for _, n := range rsp.Kvs {
 		if sn, err := gxregistry.DecodeService(n.Value); err == nil && sn != nil {
-			if attr.MeshFilter(*sn.Attr) { // Fix: just filter service & role. 2018/10/18
+			if attr.MeshFilter(*sn.Attr) {
+				// Fix: just filter service & role. database/filter/pool/filter.go:Filter::copy
+				// will use Filter to get valid service. 2018/10/18
 				for _, node := range sn.Nodes {
 					var service gxregistry.Service
 					// bug fix: @attr 仅仅用于过滤，其属性值比较少，etcd 返回的service.ServiceAttr 值比 @attr 精确

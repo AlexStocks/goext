@@ -48,6 +48,7 @@ func (s *Filter) isClosed() bool {
 }
 
 // copy is invoked by function get.
+// copy will use ServiceAttr.Filter to get exactly the service node that the service need.
 func (s *Filter) copy(current []*gxregistry.Service, by gxregistry.ServiceAttr) []*gxregistry.Service {
 	var services []*gxregistry.Service
 

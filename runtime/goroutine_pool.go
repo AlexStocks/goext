@@ -57,6 +57,18 @@ type goroutine struct {
 }
 
 // New returns a new *Pool object.
+// DEPRECATED: https://github.com/pingcap/tidb/pull/7564
+// After Go1.11, goroutine pool is harmful.
+//
+// The test result is as follows:
+// go test -test.bench Benchmark
+// goos: darwin
+// goarch: amd64
+// pkg: github.com/AlexStocks/goext/runtime
+// BenchmarkGoPool-4          	 3000000	       619 ns/op
+// BenchmarkGo-4              	 5000000	       319 ns/op
+// BenchmarkMorestackPool-4   	 3000000	       534 ns/op
+// BenchmarkMoreStack-4       	 2000000	       667 ns/op
 func NewGoroutinePool(idleTimeout time.Duration) *Pool {
 	pool := &Pool{
 		idleTimeout: idleTimeout,
