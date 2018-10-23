@@ -8,64 +8,169 @@ package gxconsistent
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
+)
 
+import (
+	"github.com/AlexStocks/goext/strings"
+	jerrors "github.com/juju/errors"
 	blake2b "github.com/minio/blake2b-simd"
 )
 
-const replicationFactor = 10
+const (
+	replicationFactor = 10
+	maxBucketNum      = math.MaxUint32
+)
 
-var ErrNoHosts = errors.New("no hosts added")
+var (
+	ErrNoHosts = jerrors.New("no hosts added")
+)
+
+type hashArray []uint32
+
+// Len returns the length of the hashArray.
+func (x hashArray) Len() int { return len(x) }
+
+// Less returns true if element i is less than element j.
+func (x hashArray) Less(i, j int) bool { return x[i] < x[j] }
+
+// Swap exchanges elements i and j.
+func (x hashArray) Swap(i, j int) { x[i], x[j] = x[j], x[i] }
 
 type Host struct {
 	Name string
 	Load int64
 }
 
+type HashFunc func([]byte) uint64
+
+func hash(key []byte) uint64 {
+	out := blake2b.Sum512(key)
+	return binary.LittleEndian.Uint64(out[:])
+}
+
 type Consistent struct {
-	hosts     map[uint64]string
-	sortedSet []uint64
-	loadMap   map[string]*Host
-	totalLoad int64
+	circle        map[uint32]string // hash -> node name
+	sortedHashes  hashArray         // hash valid in ascending
+	loadMap       map[string]*Host  // node name -> struct Host
+	totalLoad     int64             // total load
+	replicaFactor uint32
+	bucketNum     uint32
+	hashFunc      HashFunc
 
 	sync.RWMutex
 }
 
-func New() *Consistent {
-	return &Consistent{
-		hosts:     map[uint64]string{},
-		sortedSet: []uint64{},
-		loadMap:   map[string]*Host{},
+func NewConsistentHash(replicaFactor, bucketNum int) *Consistent {
+	if replicaFactor <= 0 {
+		replicaFactor = replicationFactor
 	}
+	if bucketNum <= 0 {
+		bucketNum = maxBucketNum
+	}
+	return &Consistent{
+		circle:        map[uint32]string{},
+		loadMap:       map[string]*Host{},
+		replicaFactor: uint32(replicaFactor),
+		bucketNum:     uint32(bucketNum),
+		hashFunc:      hash,
+	}
+}
+
+func (c *Consistent) SetHashFunc(f HashFunc) {
+	c.hashFunc = f
+}
+
+// eltKey generates a string key for an element with an index.
+func (c *Consistent) eltKey(elt string, idx int) string {
+	// return elt + "|" + strconv.Itoa(idx)
+	return strconv.Itoa(idx) + elt
+}
+
+func (c *Consistent) hash(key string) uint32 {
+	return uint32(c.hashFunc(gxstrings.Slice(key))) % c.bucketNum
+}
+
+// sort hashes in ascending
+func (c *Consistent) updateSortedHashes() {
+	hashes := c.sortedHashes[:0]
+	//reallocate if we're holding on to too much (1/4th)
+	if c.sortedHashes.Len()/int(c.replicaFactor*4) > len(c.circle) {
+		hashes = nil
+	}
+	for k := range c.circle {
+		hashes = append(hashes, uint32(k))
+	}
+	sort.Sort(hashes)
+	c.sortedHashes = hashes
 }
 
 func (c *Consistent) Add(host string) {
 	c.Lock()
 	defer c.Unlock()
+	c.add(host)
+}
 
+func (c *Consistent) add(host string) {
 	if _, ok := c.loadMap[host]; ok {
 		return
 	}
 
-	c.loadMap[host] = &Host{Name: host, Load: 0}
-	for i := 0; i < replicationFactor; i++ {
-		h := c.hash(fmt.Sprintf("%s%d", host, i))
-		c.hosts[h] = host
-		c.sortedSet = append(c.sortedSet, h)
-
+	c.loadMap[host] = &Host{Name: host}
+	for i := uint32(0); i < c.replicaFactor; i++ {
+		h := c.hash(c.eltKey(host, int(i)))
+		c.circle[h] = host
+		c.sortedHashes = append(c.sortedHashes, uint32(h))
 	}
-	// sort hashes ascendingly
-	sort.Slice(c.sortedSet, func(i int, j int) bool {
-		if c.sortedSet[i] < c.sortedSet[j] {
-			return true
+
+	// sort.Slice(c.sortedHashes, func(i int, j int) bool {
+	// 	if c.sortedHashes[i] < c.sortedHashes[j] {
+	// 		return true
+	// 	}
+	// 	return false
+	// })
+	c.updateSortedHashes()
+}
+
+// Set sets all the elements in the hash. If there are existing elements not
+// present in elts, they will be removed.
+func (c *Consistent) Set(elts []string) {
+	c.Lock()
+	defer c.Unlock()
+	for k := range c.loadMap {
+		found := false
+		for _, v := range elts {
+			if k == v {
+				found = true
+				break
+			}
 		}
-		return false
-	})
+		if !found {
+			c.remove(k)
+		}
+	}
+	for _, v := range elts {
+		_, exists := c.loadMap[v]
+		if exists {
+			continue
+		}
+		c.add(v)
+	}
+}
+
+func (c *Consistent) Members() []string {
+	c.RLock()
+	defer c.RUnlock()
+	var m []string
+	for k := range c.loadMap {
+		m = append(m, k)
+	}
+	return m
 }
 
 // Returns the host that owns `key`.
@@ -77,13 +182,94 @@ func (c *Consistent) Get(key string) (string, error) {
 	c.RLock()
 	defer c.RUnlock()
 
-	if len(c.hosts) == 0 {
+	if len(c.circle) == 0 {
 		return "", ErrNoHosts
 	}
 
 	h := c.hash(key)
 	idx := c.search(h)
-	return c.hosts[c.sortedSet[idx]], nil
+	return c.circle[c.sortedHashes[idx]], nil
+}
+
+// GetTwo returns the two closest distinct elements to the name input in the circle.
+func (c *Consistent) GetTwo(name string) (string, string, error) {
+	c.RLock()
+	defer c.RUnlock()
+	if len(c.circle) == 0 {
+		return "", "", ErrNoHosts
+	}
+	key := c.hash(name)
+	i := c.search(key)
+	a := c.circle[c.sortedHashes[i]]
+
+	if len(c.loadMap) == 1 {
+		return a, "", nil
+	}
+
+	start := i
+	var b string
+	for i = start + 1; i != start; i++ {
+		if i >= len(c.sortedHashes) {
+			i = 0
+		}
+		b = c.circle[c.sortedHashes[i]]
+		if b != a {
+			break
+		}
+	}
+	return a, b, nil
+}
+
+func sliceContainsMember(set []string, member string) bool {
+	for _, m := range set {
+		if m == member {
+			return true
+		}
+	}
+	return false
+}
+
+// GetN returns the N closest distinct elements to the name input in the circle.
+func (c *Consistent) GetN(name string, n int) ([]string, error) {
+	c.RLock()
+	defer c.RUnlock()
+
+	if len(c.circle) == 0 {
+		return nil, ErrNoHosts
+	}
+
+	if len(c.loadMap) < n {
+		n = int(len(c.loadMap))
+	}
+
+	var (
+		key   = c.hash(name)
+		i     = c.search(key)
+		start = i
+		res   = make([]string, 0, n)
+		elem  = c.circle[c.sortedHashes[i]]
+	)
+
+	res = append(res, elem)
+
+	if len(res) == n {
+		return res, nil
+	}
+
+	for i = start + 1; i != start; i++ {
+		if i >= len(c.sortedHashes) {
+			i = 0
+		}
+		elem = c.circle[c.sortedHashes[i]]
+		if !sliceContainsMember(res, elem) {
+			res = append(res, elem)
+		}
+		if len(res) == n {
+			break
+		}
+	}
+
+	return res, nil
 }
 
 // It uses Consistent Hashing With Bounded loads
@@ -98,7 +284,7 @@ func (c *Consistent) GetLeast(key string) (string, error) {
 	c.RLock()
 	defer c.RUnlock()
 
-	if len(c.hosts) == 0 {
+	if len(c.circle) == 0 {
 		return "", ErrNoHosts
 	}
 
@@ -107,23 +293,23 @@ func (c *Consistent) GetLeast(key string) (string, error) {
 
 	i := idx
 	for {
-		host := c.hosts[c.sortedSet[i]]
+		host := c.circle[c.sortedHashes[i]]
 		if c.loadOK(host) {
 			return host, nil
 		}
 		i++
-		if i >= len(c.hosts) {
+		if i >= len(c.circle) {
 			i = 0
 		}
 	}
 }
 
-func (c *Consistent) search(key uint64) int {
-	idx := sort.Search(len(c.sortedSet), func(i int) bool {
-		return c.sortedSet[i] >= key
+func (c *Consistent) search(key uint32) int {
+	idx := sort.Search(len(c.sortedHashes), func(i int) bool {
+		return c.sortedHashes[i] >= key
 	})
 
-	if idx >= len(c.sortedSet) {
+	if idx >= len(c.sortedHashes) {
 		idx = 0
 	}
 	return idx
@@ -148,7 +334,6 @@ func (c *Consistent) UpdateLoad(host string, load int64) {
 func (c *Consistent) Inc(host string) {
 	atomic.AddInt64(&c.loadMap[host].Load, 1)
 	atomic.AddInt64(&c.totalLoad, 1)
-
 }
 
 // Decrements the load of host by 1
@@ -169,13 +354,19 @@ func (c *Consistent) Done(host string) {
 func (c *Consistent) Remove(host string) bool {
 	c.Lock()
 	defer c.Unlock()
+	return c.remove(host)
+}
 
-	for i := 0; i < replicationFactor; i++ {
-		h := c.hash(fmt.Sprintf("%s%d", host, i))
-		delete(c.hosts, h)
+func (c *Consistent) remove(host string) bool {
+	for i := uint32(0); i < c.replicaFactor; i++ {
+		h := c.hash(c.eltKey(host, int(i)))
+		delete(c.circle, h)
 		c.delSlice(h)
 	}
-	delete(c.loadMap, host)
+	if _, ok := c.loadMap[host]; ok {
+		atomic.AddInt64(&c.totalLoad, -c.loadMap[host].Load)
+		delete(c.loadMap, host)
+	}
 	return true
 }
 
@@ -243,15 +434,10 @@ func (c *Consistent) loadOK(host string) bool {
 	return false
 }
 
-func (c *Consistent) delSlice(val uint64) {
-	for i := 0; i < len(c.sortedSet); i++ {
-		if c.sortedSet[i] == val {
-			c.sortedSet = append(c.sortedSet[:i], c.sortedSet[i+1:]...)
+func (c *Consistent) delSlice(val uint32) {
+	for i := 0; i < len(c.sortedHashes); i++ {
+		if c.sortedHashes[i] == val {
+			c.sortedHashes = append(c.sortedHashes[:i], c.sortedHashes[i+1:]...)
 		}
 	}
-}
-
-func (c *Consistent) hash(key string) uint64 {
-	out := blake2b.Sum512([]byte(key))
-	return binary.LittleEndian.Uint64(out[:])
 }

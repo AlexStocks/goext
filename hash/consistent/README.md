@@ -18,7 +18,7 @@ import (
 )
 
 func main() {
-	c := consistent.New()
+	c := consistent.NewConsistentHash()
 
 	// adds the hosts to the ring
 	c.Add("127.0.0.1:8000")
@@ -52,7 +52,7 @@ import (
 )
 
 func main() {
-	c := consistent.New()
+	c := consistent.NewConsistentHash()
 
 	// adds the hosts to the ring
 	c.Add("127.0.0.1:8000")
