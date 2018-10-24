@@ -191,6 +191,21 @@ func (c *Consistent) Get(key string) (string, error) {
 	return c.circle[c.sortedHashes[idx]], nil
 }
 
+// Returns the host that owns `hashKey`.
+//
+// It returns ErrNoHosts if the ring has no hosts in it.
+func (c *Consistent) GetHash(hashKey uint32) (string, error) {
+	c.RLock()
+	defer c.RUnlock()
+
+	if len(c.circle) == 0 {
+		return "", ErrNoHosts
+	}
+
+	idx := c.search(hashKey)
+	return c.circle[c.sortedHashes[idx]], nil
+}
+
 // GetTwo returns the two closest distinct elements to the name input in the circle.
 func (c *Consistent) GetTwo(name string) (string, string, error) {
 	c.RLock()

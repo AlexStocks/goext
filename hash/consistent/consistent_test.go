@@ -65,6 +65,20 @@ func TestGet(t *testing.T) {
 	}
 }
 
+func TestGetHash(t *testing.T) {
+	c := NewConsistentHash(10, 1023)
+
+	c.Add("127.0.0.1:8000")
+	host, err := c.GetHash(123)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if host != "127.0.0.1:8000" {
+		t.Fatal("returned host is not what expected")
+	}
+}
+
 func TestGetEmpty(t *testing.T) {
 	c := NewConsistentHash(13, 1023)
 	_, err := c.Get("asdfsadfsadf")

@@ -8,6 +8,8 @@
 - 2018/10/24
   > Improvement
   * Add database/influxdb
+  * Add load for hash/consistent
+  * tag v0.3.1
 
 - 2018/09/06
   > Improvement
