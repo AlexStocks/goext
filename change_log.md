@@ -5,6 +5,10 @@
 ## dev list
 ---
 
+- 2018/10/24
+  > Improvement
+  * Add database/influxdb
+
 - 2018/09/06
   > Improvement
   * Add container/ring from glycerine/rbuf
