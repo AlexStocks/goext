@@ -201,6 +201,15 @@ func (r *Registry) Options() gxregistry.Options {
 	return r.options
 }
 
+func (r *Registry) Client() *gxzookeeper.Client {
+	select {
+	case <-r.done:
+		return nil
+	default:
+		return r.client
+	}
+}
+
 // 如果s.nodes为空，则返回当前registry中的service
 // 若非空，则检查其中的每个node是否存在
 func (r *Registry) exist(s gxregistry.Service) (gxregistry.Service, bool) {
