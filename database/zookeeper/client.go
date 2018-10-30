@@ -6,23 +6,20 @@
 package gxzookeeper
 
 import (
-	"fmt"
-	"log"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-)
 
-import (
 	jerrors "github.com/juju/errors"
 	"github.com/samuel/go-zookeeper/zk"
 )
 
 type Client struct {
-	conn *zk.Conn // 这个conn不能被close两次，否则会收到 “panic: close of closed channel”
-	lock sync.Mutex
+	conn  *zk.Conn // 这个conn不能被close两次，否则会收到 “panic: close of closed channel”
+	mutex sync.Mutex
 }
 
 func NewClient(conn *zk.Conn) *Client {
@@ -224,6 +221,20 @@ func (c *Client) GetChildren(path string) ([]string, error) {
 	return children, nil
 }
 
+func (c *Client) Exist(path string) (bool, error) {
+	var (
+		exist bool
+		err   error
+	)
+
+	if strings.HasSuffix(path, "/") {
+		path = strings.TrimSuffix(path, "/")
+	}
+
+	exist, _, err = c.conn.Exists(path)
+	return exist, jerrors.Trace(err)
+}
+
 func (c *Client) ExistW(path string) (<-chan zk.Event, error) {
 	var (
 		exist bool
@@ -245,8 +256,6 @@ func (c *Client) ExistW(path string) (<-chan zk.Event, error) {
 
 	return watch, nil
 }
-
-// refer from https://github.com/nladuo/go-zk-lock
 
 func getSequenceNumber(path, prefix string) (int, error) {
 	str := strings.TrimPrefix(path, prefix)
@@ -320,9 +329,22 @@ func GetMaxSequenceNumber(children []string, prefix string) (seq int, index int,
 	return
 }
 
-func GetLastNodeName(lockerName, basePath, prefix string) (string, error) {
+func (c *Client) GetMinZkPath(baseZkPath, prefix string) ([]string, string, error) {
+	children, err := c.GetChildren(baseZkPath)
+	if err != nil {
+		return nil, "", jerrors.Trace(err)
+	}
+	_, index, err := GetMinSequenceNumber(children, prefix)
+	if err != nil {
+		return nil, "", jerrors.Trace(err)
+	}
+
+	return children, baseZkPath + "/" + children[index], nil
+}
+
+func getLockPrefixPath(basePath, prefix, zkLockPath string, siblings []string) (string, error) {
 	path := basePath + "/" + prefix
-	seq, err := getSequenceNumber(lockerName, path)
+	seq, err := getSequenceNumber(zkLockPath, path)
 	if err != nil {
 		return "", jerrors.Trace(err)
 	}
@@ -330,11 +352,29 @@ func GetLastNodeName(lockerName, basePath, prefix string) (string, error) {
 		return "", jerrors.New("can not get legal numeric digit")
 	}
 
-	lastSeqStr := fmt.Sprintf("%010d", seq-1)
-	return prefix + lastSeqStr, nil
+	sort.Slice(siblings, func(i, j int) bool {
+		seqI, _ := getSequenceNumber(siblings[i], path)
+		seqJ, _ := getSequenceNumber(siblings[j], path)
+
+		return seqI < seqJ
+	})
+
+	pos := -1
+	for idx := range siblings {
+		if siblings[idx] == zkLockPath {
+			pos = idx
+			break
+		}
+	}
+
+	if 0 < pos {
+		return siblings[pos-1], nil
+	}
+
+	return "", jerrors.New("illegal pos " + strconv.Itoa(pos-1))
 }
 
-func CheckOutTimeOut(data []byte, timeout time.Duration) bool {
+func checkOutTimeOut(data []byte, timeout time.Duration) bool {
 	nowUnixTime := time.Now().Unix()
 	//get the znode create time
 	createUnixTime, err := strconv.ParseInt(string(data), 10, 64)
@@ -346,188 +386,110 @@ func CheckOutTimeOut(data []byte, timeout time.Duration) bool {
 	return timeoutUnixTime < nowUnixTime
 }
 
-func (c *Client) xlock(path string, timeout time.Duration) bool {
+// string is the lock path
+// when error is not nil, the lock is failed.
+func (c *Client) lock(basePath, lockPrefix string, timeout time.Duration) (string, error) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-}
-
-type Dlocker struct {
-	lockerPath string
-	prefix     string
-	basePath   string
-	timeout    time.Duration
-	innerLock  *sync.Mutex
-}
-
-func NewLocker(path string, timeout time.Duration) *Dlocker {
-
-	var locker Dlocker
-	locker.basePath = path
-	locker.prefix = "lock-" //the prefix of a znode, any string is okay.
-	locker.timeout = timeout
-	locker.innerLock = &sync.Mutex{}
-
-	isExsit, _, err := getZkConn().Exists(path)
-
-	locker.checkErr(err)
-	if !isExsit {
-		log.Println("create the znode:" + path)
-		getZkConn().Create(path, []byte(""), int32(0), zk.WorldACL(zk.PermAll))
-	} else {
-		log.Println("the znode " + path + " existed")
+	if strings.HasSuffix(basePath, "/") {
+		basePath = strings.TrimSuffix(basePath, "/")
 	}
 
-	return &locker
-}
-
-func (c *Dlocker) createZnodePath() (string, error) {
-	path := c.basePath + "/" + c.prefix
-	//save the create unixTime into znode
-	nowUnixTime := time.Now().Unix()
-	nowUnixTimeBytes := []byte(strconv.FormatInt(nowUnixTime, 10))
-	return getZkConn().Create(path, nowUnixTimeBytes, zk.FlagSequence|zk.FlagEphemeral, zk.WorldACL(zk.PermAll))
-}
-
-//get the path of minimum serial number znode from sequential children
-func (c *Dlocker) getMinZnodePath() (string, error) {
-	children, err := c.getPathChildren()
+	// create seq/tmp zk path, its data value is current unix time.
+	zkPrefixPath := basePath + "/" + lockPrefix
+	zkData := []byte(strconv.FormatInt(time.Now().Unix(), 10))
+	zkLockPath, err := c.RegisterTempSeq(zkPrefixPath, zkData)
 	if err != nil {
-		return "", err
+		return zkLockPath, jerrors.Trace(err)
 	}
-	minSNum := modules.GetMinSerialNumber(children, c.prefix)
-	minZnodePath := c.basePath + "/" + children[minSNum]
-	return minZnodePath, nil
-}
 
-//get the children of basePath znode
-func (c *Dlocker) getPathChildren() ([]string, error) {
-	children, _, err := getZkConn().Children(c.basePath)
-	return children, err
-}
-
-//get the last znode of created znode
-func (c *Dlocker) getLastZnodePath() string {
-	return modules.GetLastNodeName(c.lockerPath,
-		c.basePath, c.prefix)
-}
-
-//just list mutex.Lock()
-func (c *Dlocker) Lock() {
-	for !c.lock() {
+	children, minSequencePath, err := c.GetMinZkPath(basePath, lockPrefix)
+	if err != nil {
+		return zkLockPath, jerrors.Trace(err)
 	}
-}
+	// the created lock path is the minimum znode.
+	if minSequencePath == zkLockPath {
+		return zkLockPath, nil
+	}
 
-//just list mutex.Unlock(), return false when zookeeper connection error or locker timeout
-func (c *Dlocker) Unlock() bool {
-	return c.unlock()
-}
-
-func (c *Dlocker) lock() (isSuccess bool) {
-	isSuccess = false
-	defer func() {
-		e := recover()
-		if e == zk.ErrConnectionClosed {
-			//try reconnect the zk server
-			log.Println("connection closed, reconnect to the zk server")
-			reConnectZk()
+	// if the created znode is not the minimum znode,
+	// listen for the last znode delete notification
+	prePath, err := getLockPrefixPath(basePath, lockPrefix, zkLockPath, children)
+	if err != nil {
+		return zkLockPath, jerrors.Trace(err)
+	}
+	existFlag, _, w, err := c.conn.ExistsW(prePath)
+	if err != nil {
+		return zkLockPath, jerrors.Trace(err)
+	}
+	if !existFlag {
+		// recheck the min znode
+		// the last znode may be deleted too fast to let the next znode cannot listen to it deletion
+		_, minSequencePath, err := c.GetMinZkPath(basePath, lockPrefix)
+		if err != nil {
+			return zkLockPath, jerrors.Trace(err)
 		}
-	}()
-	c.innerLock.Lock()
-	defer c.innerLock.Unlock()
-	//create a znode for the locker path
-	var err error
-	c.lockerPath, err = c.createZnodePath()
-	c.checkErr(err)
-
-	//get the znode which get the lock
-	minZnodePath, err := c.getMinZnodePath()
-	c.checkErr(err)
-
-	if minZnodePath == c.lockerPath {
-		// if the created node is the minimum znode, getLock success
-		isSuccess = true
-	} else {
-		// if the created znode is not the minimum znode,
-		// listen for the last znode delete notification
-		lastNodeName := c.getLastZnodePath()
-		watchPath := c.basePath + "/" + lastNodeName
-		isExist, _, watch, err := getZkConn().ExistsW(watchPath)
-		c.checkErr(err)
-		if isExist {
-			select {
-			//get lastNode been deleted event
-			case event := <-watch:
-				if event.Type == zk.EventNodeDeleted {
-					//check out the lockerPath existence
-					isExist, _, err = getZkConn().Exists(c.lockerPath)
-					c.checkErr(err)
-					if isExist {
-						//checkout the minZnodePath is equal to the lockerPath
-						minZnodePath, err := c.getMinZnodePath()
-						c.checkErr(err)
-						if minZnodePath == c.lockerPath {
-							isSuccess = true
-						}
-					}
+		if minSequencePath == zkLockPath {
+			return zkLockPath, nil
+		}
+	}
+	select {
+	case event := <-w:
+		if event.Type == zk.EventNodeDeleted {
+			exist, err := c.Exist(basePath)
+			if err != nil {
+				return zkLockPath, jerrors.Trace(err)
+			}
+			if exist {
+				_, minSequencePath, err = c.GetMinZkPath(basePath, lockPrefix)
+				if err != nil {
+					return zkLockPath, jerrors.Trace(err)
 				}
-			//time out
-			case <-time.After(c.timeout):
-				// if timeout, delete the timeout znode
-				children, err := c.getPathChildren()
-				c.checkErr(err)
-				for _, child := range children {
-					data, _, err := getZkConn().Get(c.basePath + "/" + child)
-					if err != nil {
-						continue
-					}
-					if modules.CheckOutTimeOut(data, c.timeout) {
-						err := getZkConn().Delete(c.basePath+"/"+child, 0)
-						if err == nil {
-							log.Println("timeout delete:", c.basePath+"/"+child)
-						}
-					}
+
+				if minSequencePath == zkLockPath {
+					return zkLockPath, nil
 				}
 			}
-		} else {
-			// recheck the min znode
-			// the last znode may be deleted too fast to let the next znode cannot listen to it deletion
-			minZnodePath, err := c.getMinZnodePath()
-			c.checkErr(err)
-			if minZnodePath == c.lockerPath {
-				isSuccess = true
+		}
+	case <-time.After(timeout):
+		// timeout, delete its znode
+		children, err := c.GetChildren(basePath)
+		if err != nil {
+			return zkLockPath, jerrors.Trace(err)
+		}
+
+		// delete timeout zookeeper path
+		for idx := range children {
+			data, err := c.Get(basePath + "/" + children[idx])
+			if err != nil {
+				continue
+			}
+			if checkOutTimeOut(data, timeout) {
+				c.DeleteZkPath(basePath + "/" + children[idx])
 			}
 		}
 	}
 
-	return
+	return "", jerrors.New("lock timeout")
 }
 
-func (c *Dlocker) unlock() (isSuccess bool) {
-	isSuccess = false
-	defer func() {
-		e := recover()
-		if e == zk.ErrConnectionClosed {
-			//try reconnect the zk server
-			log.Println("connection closed, reconnect to the zk server")
-			reConnectZk()
+func (c *Client) Lock(basePath, lockPrefix string, timeout time.Duration) string {
+	var (
+		err  error
+		path string
+	)
+
+	for {
+		path, err = c.lock(basePath, lockPrefix, timeout)
+		if err == nil {
+			break
 		}
-	}()
-	err := getZkConn().Delete(c.lockerPath, 0)
-	if err == zk.ErrNoNode {
-		isSuccess = false
-		return
-	} else {
-		c.checkErr(err)
 	}
-	isSuccess = true
-	return
+
+	return path
 }
 
-func (c *Dlocker) checkErr(err error) {
-	if err != nil {
-		log.Println(err)
-		panic(err)
-	}
+func (c *Client) Unlock(lockPath string) error {
+	return jerrors.Trace(c.DeleteZkPath(lockPath))
 }
