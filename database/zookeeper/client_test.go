@@ -67,3 +67,105 @@ func (suite *ClientTestSuite) TestClient_RegisterTemp() {
 func TestClientTestSuite(t *testing.T) {
 	suite.Run(t, new(ClientTestSuite))
 }
+
+func TestGetSequenceNumber(t *testing.T) {
+	prefix := "/test/seq-"
+	num, err := getSequenceNumber(prefix+"1", prefix)
+	if err != nil {
+		t.Errorf("err should be nil")
+	}
+	if num != 1 {
+		t.Errorf("num should be equal to 1")
+	}
+
+	num = 0
+	num, err = getSequenceNumber(prefix, prefix)
+	if err == nil {
+		t.Errorf("err should nil be nil")
+	}
+	if num == 1 {
+		t.Errorf("num should not be equal to 1")
+	}
+}
+
+func TestGetMinSequenceNumber(t *testing.T) {
+	prefix := "/test/seq-"
+	seq, index, err := GetMinSequenceNumber(nil, prefix)
+	if err == nil {
+		t.Errorf("err should not be nil")
+	}
+
+	seq, index, err = GetMinSequenceNumber([]string{prefix + "1"}, prefix)
+	if err != nil {
+		t.Errorf("err should be nil")
+	}
+	if seq != 1 {
+		t.Errorf("seq should be 1")
+	}
+	if index != 0 {
+		t.Errorf("index should be 0")
+	}
+
+	seq, index, err = GetMinSequenceNumber([]string{prefix + "2", prefix + "1", prefix + "3"}, prefix)
+	if err != nil {
+		t.Errorf("err should be nil")
+	}
+	if seq != 1 {
+		t.Errorf("seq should be 1")
+	}
+	if index != 1 {
+		t.Errorf("index should be 1")
+	}
+
+	seq, index, err = GetMinSequenceNumber([]string{prefix + "2", prefix + "1", prefix + "3", prefix + "-1"}, prefix)
+	if err != nil {
+		t.Errorf("err should be nil")
+	}
+	if seq != -1 {
+		t.Errorf("seq should be -1")
+	}
+	if index != 3 {
+		t.Errorf("index should be 3")
+	}
+}
+
+func TestGetMaxSequenceNumber(t *testing.T) {
+	prefix := "/test/seq-"
+	seq, index, err := GetMinSequenceNumber(nil, prefix)
+	if err == nil {
+		t.Errorf("err should not be nil")
+	}
+
+	seq, index, err = GetMaxSequenceNumber([]string{prefix + "1"}, prefix)
+	if err != nil {
+		t.Errorf("err should be nil")
+	}
+	if seq != 1 {
+		t.Errorf("seq should be 1")
+	}
+	if index != 0 {
+		t.Errorf("index should be 0")
+	}
+
+	seq, index, err = GetMaxSequenceNumber([]string{prefix + "4", prefix + "1", prefix + "3"}, prefix)
+	if err != nil {
+		t.Errorf("err should be nil")
+	}
+	if seq != 4 {
+		t.Errorf("seq should be 2")
+	}
+	if index != 0 {
+		t.Errorf("index should be 0")
+	}
+
+	seq, index, err = GetMaxSequenceNumber([]string{prefix + "2", prefix + "1", prefix + "3", prefix + "4"}, prefix)
+	if err != nil {
+		t.Errorf("err should be nil")
+	}
+	if seq != 4 {
+		t.Errorf("seq should be 4")
+	}
+	if index != 3 {
+		t.Errorf("index should be 3")
+	}
+}
