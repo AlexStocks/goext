@@ -1,15 +1,15 @@
 package gxzookeeper
 
 import (
-	// "fmt"
-
 	"sync"
 	"testing"
 	"time"
+)
 
+import (
+	jerrors "github.com/juju/errors"
 	"github.com/samuel/go-zookeeper/zk"
 	"github.com/stretchr/testify/suite"
-	// "time"
 )
 
 // jerrors "github.com/juju/errors"
@@ -67,18 +67,26 @@ func (suite *ClientTestSuite) TestClient_RegisterTemp() {
 }
 */
 
-func (suite *ClientTestSuite) TestClient_Lock() {
-	var wg sync.WaitGroup
+func (suite *ClientTestSuite) TestClient_Leader() {
+	var (
+		err error
+		wg  sync.WaitGroup
+	)
 
-	for i := 0; i < 33; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			lockPath := suite.client.Lock("/test-lock/", "aila", 5e9)
-			suite.T().Logf("index:%d, lockPath:%s", i, lockPath)
+	fn := func(i int, timeout time.Duration) {
+		defer wg.Done()
+		err = suite.client.Compaign("/test-lock/", timeout)
+		if err == nil {
 			time.Sleep(3e9)
-			suite.client.Unlock(lockPath)
-		}(i)
+			suite.client.Resign("/test-lock/")
+		} else {
+			suite.T().Logf("index:%d, err:%s", i, jerrors.ErrorStack(err))
+		}
+	}
+
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go fn(i, time.Duration(i*3e9))
 	}
 
 	wg.Wait()

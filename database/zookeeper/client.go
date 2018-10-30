@@ -21,13 +21,30 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 )
 
+const (
+	lockPrefix = "lock-"
+)
+
+var (
+	// ErrDeadlock is returned by Lock when trying to lock twice without unlocking first
+	ErrDeadlock = jerrors.New("zk: trying to acquire a lock twice")
+	// ErrNotLocked is returned by Unlock when trying to release a lock that has not first be acquired.
+	ErrNotLocked = jerrors.New("zk: not locked")
+)
+
 type Client struct {
-	conn  *zk.Conn // 这个conn不能被close两次，否则会收到 “panic: close of closed channel”
-	mutex sync.Mutex
+	conn      *zk.Conn // 这个conn不能被close两次，否则会收到 “panic: close of closed channel”
+	mutex     sync.Mutex
+	leaderMap map[string]string
+	lockMap   map[int]*zk.Lock
 }
 
 func NewClient(conn *zk.Conn) *Client {
-	return &Client{conn: conn}
+	return &Client{
+		conn:      conn,
+		leaderMap: make(map[string]string),
+		lockMap:   make(map[int]*zk.Lock),
+	}
 }
 
 func (c *Client) ZkConn() *zk.Conn {
@@ -388,8 +405,8 @@ func checkOutTimeOut(data []byte, timeout time.Duration) bool {
 	}
 	timeoutUnixTime := int64(createUnixTime) + int64(timeout.Seconds())
 
-	log.Debug("gr:%d, zk time:%d, timeout:%d %d, now:%d",
-		gxruntime.GoID(), createUnixTime, timeout.Seconds(), timeoutUnixTime, nowUnixTime)
+	// log.Debug("gr:%d, zk time:%d, timeout:%d %d, now:%d",
+	// 	gxruntime.GoID(), createUnixTime, timeout.Seconds(), timeoutUnixTime, nowUnixTime)
 	return timeoutUnixTime <= nowUnixTime
 }
 
@@ -415,7 +432,7 @@ func (c *Client) lock(basePath, lockPrefix string, timeout time.Duration) (strin
 	if err != nil {
 		return zkLockPath, jerrors.Trace(err)
 	}
-	log.Debug("gr:%d, lock path:%s, lock data:%s", gxruntime.GoID(), zkLockPath, string(zkData))
+	// log.Debug("gr:%d, lock path:%s, lock data:%s", gxruntime.GoID(), zkLockPath, string(zkData))
 
 	children, minSequencePath, err := c.GetMinZkPath(basePath, lockPrefix)
 	if err != nil {
@@ -443,10 +460,11 @@ func (c *Client) lock(basePath, lockPrefix string, timeout time.Duration) (strin
 			return zkLockPath, nil
 		}
 		// return zkLockPath, jerrors.Errorf("c.ExistW(path:%s) = flag:%v, err:%s", prePath, existFlag, err)
-		timeout /= 15
-		if timeout < 1e6 {
-			timeout = 1e6
-		}
+
+		// timeout /= 15
+		// if timeout < 1e6 {
+		// 	timeout = 1e6
+		// }
 	}
 	select {
 	case event := <-w:
@@ -482,7 +500,7 @@ func (c *Client) lock(basePath, lockPrefix string, timeout time.Duration) (strin
 			} else {
 				data, err := c.Get(zkTimeoutPath)
 				if err != nil {
-					log.Warn("gr:%d, c.Get(%s) = error:%s", gxruntime.GoID(), zkTimeoutPath, jerrors.Trace(err))
+					// log.Warn("gr:%d, c.Get(%s) = error:%s", gxruntime.GoID(), zkTimeoutPath, jerrors.Trace(err))
 					continue
 				}
 				timeoutFlag = checkOutTimeOut(data, timeout)
@@ -490,7 +508,7 @@ func (c *Client) lock(basePath, lockPrefix string, timeout time.Duration) (strin
 
 			if timeoutFlag {
 				err = c.DeleteZkPath(zkTimeoutPath)
-				log.Debug("gr:%d, c.DeleteZkPath(%s) = error:%s", gxruntime.GoID(), zkTimeoutPath)
+				// log.Debug("gr:%d, c.DeleteZkPath(%s) = error:%s", gxruntime.GoID(), zkTimeoutPath)
 			}
 		}
 	}
@@ -498,25 +516,61 @@ func (c *Client) lock(basePath, lockPrefix string, timeout time.Duration) (strin
 	return "", jerrors.New("lock timeout")
 }
 
-func (c *Client) Lock(basePath, lockPrefix string, timeout time.Duration) string {
+// if @timeout <= 0, Compaign will loop to get the leadership until success.
+func (c *Client) Compaign(basePath string, timeout time.Duration) error {
 	var (
-		err  error
-		path string
+		grID            int
+		flag            bool
+		err             error
+		path            string
+		leaderKey       string
+		timeoutInterval time.Duration
 	)
 
+	grID = gxruntime.GoID()
+	leaderKey = basePath + strconv.Itoa(grID)
+
+	c.mutex.Lock()
+	_, flag = c.leaderMap[leaderKey]
+	c.mutex.Unlock()
+	if flag {
+		return jerrors.Annotatef(ErrDeadlock, "gr:%d", grID)
+	}
+
+	timeoutInterval = timeout
+	if timeoutInterval <= 0 {
+		timeoutInterval = 1e6
+	}
 	for {
 		path, err = c.lock(basePath, lockPrefix, timeout)
-		log.Debug("gr:%d, path:%s, error:%s", gxruntime.GoID(), path, jerrors.ErrorStack(err))
+		// log.Debug("gr:%d, path:%s, error:%s", gxruntime.GoID(), path, jerrors.ErrorStack(err))
 		if err == nil {
 			break
 		}
-		time.Sleep(1e6)
+		if timeout > 0 {
+			break
+		}
 	}
 
-	return path
+	if err == nil {
+		c.mutex.Lock()
+		c.leaderMap[leaderKey] = path
+		c.mutex.Unlock()
+	}
+
+	return jerrors.Trace(err)
 }
 
-func (c *Client) Unlock(lockPath string) error {
-	log.Debug("gr:%d, unlock path:%s", gxruntime.GoID(), lockPath)
-	return jerrors.Trace(c.DeleteZkPath(lockPath))
+func (c *Client) Resign(basePath string) error {
+	grID := gxruntime.GoID()
+	leaderKey := basePath + strconv.Itoa(grID)
+	c.mutex.Lock()
+	path, flag := c.leaderMap[leaderKey]
+	c.mutex.Unlock()
+	if !flag {
+		return jerrors.Annotatef(ErrNotLocked, "gr:%d", grID)
+	}
+
+	log.Debug("gr:%d, unlock path:%s", grID, path)
+	return jerrors.Trace(c.DeleteZkPath(path))
 }
