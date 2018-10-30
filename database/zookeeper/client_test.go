@@ -2,9 +2,10 @@ package gxzookeeper
 
 import (
 	// "fmt"
-	"strings"
+
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/samuel/go-zookeeper/zk"
 	"github.com/stretchr/testify/suite"
@@ -32,6 +33,8 @@ func (suite *ClientTestSuite) TearDownTest() {
 
 func (suite *ClientTestSuite) TearDownSuite() {
 }
+
+/*
 func (suite *ClientTestSuite) TestClient_RegisterTempSeq() {
 	path := "/test"
 	err := suite.client.CreateZkPath(path)
@@ -62,16 +65,18 @@ func (suite *ClientTestSuite) TestClient_RegisterTemp() {
 	suite.Equal(nil, err, "RegisterTemp")
 	suite.Equal(true, strings.HasPrefix(tempPath, path), "tempPath:%s", tempPath)
 }
+*/
 
 func (suite *ClientTestSuite) TestClient_Lock() {
 	var wg sync.WaitGroup
 
-	for i := 0; i < 1; i++ {
+	for i := 0; i < 33; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			lockPath := suite.client.Lock("/test-lock/", "aila", 15e9)
+			lockPath := suite.client.Lock("/test-lock/", "aila", 5e9)
 			suite.T().Logf("index:%d, lockPath:%s", i, lockPath)
+			time.Sleep(3e9)
 			suite.client.Unlock(lockPath)
 		}(i)
 	}

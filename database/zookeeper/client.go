@@ -12,7 +12,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+)
 
+import (
+	"github.com/AlexStocks/goext/runtime"
+	log "github.com/AlexStocks/log4go"
 	jerrors "github.com/juju/errors"
 	"github.com/samuel/go-zookeeper/zk"
 )
@@ -353,15 +357,15 @@ func getLockPrefixPath(basePath, prefix, zkLockPath string, siblings []string) (
 	}
 
 	sort.Slice(siblings, func(i, j int) bool {
-		seqI, _ := getSequenceNumber(siblings[i], path)
-		seqJ, _ := getSequenceNumber(siblings[j], path)
+		seqI, _ := getSequenceNumber(siblings[i], prefix)
+		seqJ, _ := getSequenceNumber(siblings[j], prefix)
 
 		return seqI < seqJ
 	})
 
 	pos := -1
 	for idx := range siblings {
-		if siblings[idx] == zkLockPath {
+		if basePath+"/"+siblings[idx] == zkLockPath {
 			pos = idx
 			break
 		}
@@ -371,6 +375,7 @@ func getLockPrefixPath(basePath, prefix, zkLockPath string, siblings []string) (
 		return siblings[pos-1], nil
 	}
 
+	log.Debug("basePath:%s, prefix:%s, zkLockPath:%s, siblings:%v", basePath, prefix, zkLockPath, siblings)
 	return "", jerrors.New("illegal pos " + strconv.Itoa(pos-1))
 }
 
@@ -383,7 +388,9 @@ func checkOutTimeOut(data []byte, timeout time.Duration) bool {
 	}
 	timeoutUnixTime := int64(createUnixTime) + int64(timeout.Seconds())
 
-	return timeoutUnixTime < nowUnixTime
+	log.Debug("gr:%d, zk time:%d, timeout:%d %d, now:%d",
+		gxruntime.GoID(), createUnixTime, timeout.Seconds(), timeoutUnixTime, nowUnixTime)
+	return timeoutUnixTime <= nowUnixTime
 }
 
 // string is the lock path
@@ -396,6 +403,11 @@ func (c *Client) lock(basePath, lockPrefix string, timeout time.Duration) (strin
 		basePath = strings.TrimSuffix(basePath, "/")
 	}
 
+	err := c.CreateZkPath(basePath)
+	if err != nil {
+		return "", jerrors.Trace(err)
+	}
+
 	// create seq/tmp zk path, its data value is current unix time.
 	zkPrefixPath := basePath + "/" + lockPrefix
 	zkData := []byte(strconv.FormatInt(time.Now().Unix(), 10))
@@ -403,6 +415,7 @@ func (c *Client) lock(basePath, lockPrefix string, timeout time.Duration) (strin
 	if err != nil {
 		return zkLockPath, jerrors.Trace(err)
 	}
+	log.Debug("gr:%d, lock path:%s, lock data:%s", gxruntime.GoID(), zkLockPath, string(zkData))
 
 	children, minSequencePath, err := c.GetMinZkPath(basePath, lockPrefix)
 	if err != nil {
@@ -414,24 +427,25 @@ func (c *Client) lock(basePath, lockPrefix string, timeout time.Duration) (strin
 	}
 
 	// if the created znode is not the minimum znode,
-	// listen for the last znode delete notification
+	// watch the last znode delete notification
 	prePath, err := getLockPrefixPath(basePath, lockPrefix, zkLockPath, children)
 	if err != nil {
 		return zkLockPath, jerrors.Trace(err)
 	}
 	existFlag, _, w, err := c.conn.ExistsW(prePath)
-	if err != nil {
-		return zkLockPath, jerrors.Trace(err)
-	}
-	if !existFlag {
-		// recheck the min znode
-		// the last znode may be deleted too fast to let the next znode cannot listen to it deletion
+	if !existFlag || err != nil {
+		// recheck the minimum zookeeper path in case of the leaky zookeeper notification
 		_, minSequencePath, err := c.GetMinZkPath(basePath, lockPrefix)
 		if err != nil {
 			return zkLockPath, jerrors.Trace(err)
 		}
 		if minSequencePath == zkLockPath {
 			return zkLockPath, nil
+		}
+		// return zkLockPath, jerrors.Errorf("c.ExistW(path:%s) = flag:%v, err:%s", prePath, existFlag, err)
+		timeout /= 15
+		if timeout < 1e6 {
+			timeout = 1e6
 		}
 	}
 	select {
@@ -461,12 +475,22 @@ func (c *Client) lock(basePath, lockPrefix string, timeout time.Duration) (strin
 
 		// delete timeout zookeeper path
 		for idx := range children {
-			data, err := c.Get(basePath + "/" + children[idx])
-			if err != nil {
-				continue
+			timeoutFlag := false
+			zkTimeoutPath := basePath + "/" + children[idx]
+			if zkTimeoutPath == zkLockPath {
+				timeoutFlag = true
+			} else {
+				data, err := c.Get(zkTimeoutPath)
+				if err != nil {
+					log.Warn("gr:%d, c.Get(%s) = error:%s", gxruntime.GoID(), zkTimeoutPath, jerrors.Trace(err))
+					continue
+				}
+				timeoutFlag = checkOutTimeOut(data, timeout)
 			}
-			if checkOutTimeOut(data, timeout) {
-				c.DeleteZkPath(basePath + "/" + children[idx])
+
+			if timeoutFlag {
+				err = c.DeleteZkPath(zkTimeoutPath)
+				log.Debug("gr:%d, c.DeleteZkPath(%s) = error:%s", gxruntime.GoID(), zkTimeoutPath)
 			}
 		}
 	}
@@ -482,14 +506,17 @@ func (c *Client) Lock(basePath, lockPrefix string, timeout time.Duration) string
 
 	for {
 		path, err = c.lock(basePath, lockPrefix, timeout)
+		log.Debug("gr:%d, path:%s, error:%s", gxruntime.GoID(), path, jerrors.ErrorStack(err))
 		if err == nil {
 			break
 		}
+		time.Sleep(1e6)
 	}
 
 	return path
 }
 
 func (c *Client) Unlock(lockPath string) error {
+	log.Debug("gr:%d, unlock path:%s", gxruntime.GoID(), lockPath)
 	return jerrors.Trace(c.DeleteZkPath(lockPath))
 }
