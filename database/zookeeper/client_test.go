@@ -1,18 +1,15 @@
 package gxzookeeper
 
 import (
+	"strings"
 	"sync"
 	"testing"
 	"time"
-)
 
-import (
 	jerrors "github.com/juju/errors"
 	"github.com/samuel/go-zookeeper/zk"
 	"github.com/stretchr/testify/suite"
 )
-
-// jerrors "github.com/juju/errors"
 
 type ClientTestSuite struct {
 	suite.Suite
@@ -34,7 +31,6 @@ func (suite *ClientTestSuite) TearDownTest() {
 func (suite *ClientTestSuite) TearDownSuite() {
 }
 
-/*
 func (suite *ClientTestSuite) TestClient_RegisterTempSeq() {
 	path := "/test"
 	err := suite.client.CreateZkPath(path)
@@ -65,7 +61,6 @@ func (suite *ClientTestSuite) TestClient_RegisterTemp() {
 	suite.Equal(nil, err, "RegisterTemp")
 	suite.Equal(true, strings.HasPrefix(tempPath, path), "tempPath:%s", tempPath)
 }
-*/
 
 func (suite *ClientTestSuite) TestClient_Leader() {
 	var (
@@ -90,6 +85,51 @@ func (suite *ClientTestSuite) TestClient_Leader() {
 	}
 
 	wg.Wait()
+}
+
+func (suite *ClientTestSuite) TestClient_LongLiveLeader() {
+	var (
+		err error
+		wg  sync.WaitGroup
+	)
+
+	fn := func(i int, timeout time.Duration) {
+		defer wg.Done()
+		err = suite.client.Compaign("/test-leader/", timeout)
+		if err == nil {
+			time.Sleep(3e9)
+			suite.client.Resign("/test-leader/")
+		} else {
+			suite.T().Logf("index:%d, err:%s", i, jerrors.ErrorStack(err))
+		}
+	}
+
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go fn(i, time.Duration(i*3e9))
+	}
+	wg.Add(1)
+	go fn(4, time.Duration(0))
+
+	wg.Wait()
+}
+
+func (suite *ClientTestSuite) TestClient_Lock() {
+	path := "/test-client-lock/"
+	err := suite.client.Lock(path)
+	suite.Equal(nil, err)
+	err = suite.client.Lock(path)
+	suite.Equal(jerrors.Cause(err).Error(), ErrDeadlock.Error())
+
+	err = suite.client.Unlock(path)
+	suite.Equal(nil, err)
+	err = suite.client.Unlock(path)
+	suite.Equal(jerrors.Cause(err).Error(), ErrNotLocked.Error())
+
+	err = suite.client.Lock(path)
+	suite.Equal(nil, err)
+	err = suite.client.Unlock(path)
+	suite.Equal(nil, err)
 }
 
 func TestClientTestSuite(t *testing.T) {
