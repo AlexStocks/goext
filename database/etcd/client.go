@@ -200,6 +200,23 @@ func (c *Client) Resign(basePath string, stop bool) error {
 	return jerrors.Trace(err)
 }
 
+func (c *Client) CheckLeadership(basePath string) bool {
+	if basePath[0] != '/' {
+		basePath = "/" + basePath
+	}
+
+	grID := gxruntime.GoID()
+	leaderKey := basePath + strconv.Itoa(grID)
+	c.mutex.Lock()
+	es, flag := c.leaderMap[leaderKey]
+	c.mutex.Unlock()
+	if !flag {
+		return false
+	}
+
+	return string((<-es.Election.Observe(context.Background())).Kvs[0].Value) == leaderKey
+}
+
 func (c *Client) Lock(basePath string) error {
 	if basePath[0] != '/' {
 		basePath = "/" + basePath

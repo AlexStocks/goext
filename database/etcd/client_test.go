@@ -146,7 +146,8 @@ func (suite *ClientTestSuite) TestClient_Campain() {
 		time.Sleep(2e9)
 
 		es = <-electc
-		fmt.Println("completed second election with", string((<-es.Election.Observe(context.Background())).Kvs[0].Value))
+		// fmt.Println("completed second election with", string((<-es.Election.Observe(context.Background())).Kvs[0].Value))
+		fmt.Println(role, " completed second election with:", suite.client.CheckLeadership(role))
 	}()
 	go func() {
 		defer wg.Done()
