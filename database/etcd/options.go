@@ -11,7 +11,7 @@ import (
 )
 
 import (
-	ecv3 "github.com/coreos/etcd/clientv3"
+	ecv3 "go.etcd.io/etcd/clientv3"
 )
 
 const (

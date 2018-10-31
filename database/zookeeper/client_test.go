@@ -5,7 +5,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+)
 
+import (
 	jerrors "github.com/juju/errors"
 	"github.com/samuel/go-zookeeper/zk"
 	"github.com/stretchr/testify/suite"

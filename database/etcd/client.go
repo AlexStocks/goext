@@ -7,13 +7,23 @@ package gxetcd
 
 import (
 	"context"
+	"strconv"
 	"sync"
 )
 
 import (
+	"github.com/AlexStocks/goext/runtime"
 	log "github.com/AlexStocks/log4go"
-	ecv3 "github.com/coreos/etcd/clientv3"
 	jerrors "github.com/juju/errors"
+	ecv3 "go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/clientv3/concurrency"
+)
+
+var (
+	// ErrDeadlock is returned by Lock when trying to lock twice without unlocking first
+	ErrDeadlock = jerrors.New("etcd: trying to acquire a lock twice")
+	// ErrNotLocked is returned by Unlock when trying to release a lock that has not first be acquired.
+	ErrNotLocked = jerrors.New("etcd: not locked")
 )
 
 //////////////////////////////////////////
@@ -23,12 +33,13 @@ import (
 // Client represents a lease kept alive for the lifetime of a client.
 // Fault-tolerant applications may use sessions to reason about liveness.
 type Client struct {
-	client *ecv3.Client
-	opts   *clientOptions
-	done   chan struct{}
-	sync.Mutex
-	id     ecv3.LeaseID
-	cancel context.CancelFunc
+	client  *ecv3.Client
+	opts    *clientOptions
+	done    chan struct{}
+	mutex   sync.Mutex
+	id      ecv3.LeaseID
+	cancel  context.CancelFunc
+	lockMap map[string]*concurrency.Mutex
 }
 
 // NewClient gets the leased session for a client.
@@ -38,20 +49,26 @@ func NewClient(client *ecv3.Client, options ...ClientOption) (*Client, error) {
 		opt(opts)
 	}
 
-	c := &Client{client: client, opts: opts, id: opts.leaseID, done: make(chan struct{})}
+	c := &Client{
+		client:  client,
+		opts:    opts,
+		id:      opts.leaseID,
+		done:    make(chan struct{}),
+		lockMap: make(map[string]*concurrency.Mutex),
+	}
 	log.Info("new etcd client %+v", c)
 
 	return c, nil
 }
 
 func (c *Client) KeepAlive() (<-chan *ecv3.LeaseKeepAliveResponse, error) {
-	c.Lock()
+	c.mutex.Lock()
 	if c.cancel != nil {
 		c.cancel()
 		c.cancel = nil
 	}
 	id := c.id
-	c.Unlock()
+	c.mutex.Unlock()
 
 	if id == ecv3.NoLease {
 		rsp, err := c.client.Grant(c.opts.ctx, int64(c.opts.ttl.Seconds()))
@@ -60,9 +77,9 @@ func (c *Client) KeepAlive() (<-chan *ecv3.LeaseKeepAliveResponse, error) {
 		}
 		id = rsp.ID
 	}
-	c.Lock()
+	c.mutex.Lock()
 	c.id = id
-	c.Unlock()
+	c.mutex.Unlock()
 
 	ctx, cancel := context.WithCancel(c.opts.ctx)
 	keepAlive, err := c.client.KeepAlive(ctx, id)
@@ -73,9 +90,9 @@ func (c *Client) KeepAlive() (<-chan *ecv3.LeaseKeepAliveResponse, error) {
 		return nil, jerrors.Annotatef(err, "etcdv3.KeepAlive(id:%#X)", id)
 	}
 
-	c.Lock()
+	c.mutex.Lock()
 	c.cancel = cancel
-	c.Unlock()
+	c.mutex.Unlock()
 
 	return keepAlive, nil
 }
@@ -96,6 +113,58 @@ func (c *Client) TTL() int64 {
 	}
 
 	return rsp.TTL
+}
+
+func (c *Client) Lock(basePath string) error {
+	if basePath[0] != '/' {
+		basePath += "/" + basePath
+	}
+
+	grID := gxruntime.GoID()
+	leaderKey := basePath + strconv.Itoa(grID)
+
+	c.mutex.Lock()
+	lock, flag := c.lockMap[leaderKey]
+	c.mutex.Unlock()
+	if !flag {
+		// create two separate sessions for lock competition
+		session, err := concurrency.NewSession(c.client)
+		if err != nil {
+			return jerrors.Trace(err)
+		}
+		defer session.Close()
+		lock = concurrency.NewMutex(session, basePath)
+	}
+
+	err := lock.Lock(context.Background())
+	if err == nil && !flag {
+		c.mutex.Lock()
+		c.lockMap[leaderKey] = lock
+		c.mutex.Unlock()
+	}
+
+	return jerrors.Trace(err)
+}
+
+func (c *Client) Unlock(basePath string) error {
+	if basePath[0] != '/' {
+		basePath += "/" + basePath
+	}
+
+	grID := gxruntime.GoID()
+	leaderKey := basePath + strconv.Itoa(grID)
+
+	c.mutex.Lock()
+	lock, flag := c.lockMap[leaderKey]
+	if flag {
+		delete(c.lockMap, leaderKey)
+	}
+	c.mutex.Unlock()
+	if !flag {
+		return jerrors.Trace(ErrNotLocked)
+	}
+
+	return jerrors.Trace(lock.Unlock(context.Background()))
 }
 
 // Done returns a channel that closes when the lease is orphaned, expires, or
@@ -122,13 +191,13 @@ func (c *Client) Stop() {
 		return
 
 	default:
-		c.Lock()
+		c.mutex.Lock()
 		if c.cancel != nil {
 			c.cancel()
 			c.cancel = nil
 		}
 		close(c.done)
-		c.Unlock()
+		c.mutex.Unlock()
 		return
 	}
 }
@@ -137,10 +206,10 @@ func (c *Client) Stop() {
 func (c *Client) Close() error {
 	c.Stop()
 	var err error
-	c.Lock()
+	c.mutex.Lock()
 	id := c.id
 	c.id = ecv3.NoLease
-	c.Unlock()
+	c.mutex.Unlock()
 	if id != ecv3.NoLease {
 		// if revoke takes longer than the ttl, lease is expired anyway
 		ctx, cancel := context.WithTimeout(c.opts.ctx, c.opts.ttl)

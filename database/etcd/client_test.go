@@ -1,28 +1,25 @@
 package gxetcd
 
 import (
-	"fmt"
 	"sync"
 	"testing"
-	"time"
 )
 
 import (
-	"github.com/AlexStocks/goext/database/registry"
-	etcdv3 "github.com/coreos/etcd/clientv3"
 	jerrors "github.com/juju/errors"
 	"github.com/stretchr/testify/suite"
+	ecv3 "go.etcd.io/etcd/clientv3"
 )
 
 type ClientTestSuite struct {
 	suite.Suite
-	config etcdv3.Config
+	config ecv3.Config
 	client *Client
 	wg     sync.WaitGroup
 }
 
 func (suite *ClientTestSuite) SetupSuite() {
-	suite.config = etcdv3.Config{
+	suite.config = ecv3.Config{
 		Endpoints:            []string{"127.0.0.1:2379"},
 		DialTimeout:          8e9,
 		DialKeepAliveTimeout: 3e9,
@@ -30,9 +27,9 @@ func (suite *ClientTestSuite) SetupSuite() {
 }
 
 func (suite *ClientTestSuite) SetupTest() {
-	etcdClient, err := etcdv3.New(suite.config)
+	etcdClient, err := ecv3.New(suite.config)
 	if err != nil {
-		panic(jerrors.Errorf("etcdv3.New(config:%+v) = error:%s", suite.config, err))
+		panic(jerrors.Errorf("ecv3.New(config:%+v) = error:%s", suite.config, err))
 	}
 	suite.client, _ = NewClient(etcdClient, WithTTL(7e9))
 }
@@ -46,6 +43,7 @@ func (suite *ClientTestSuite) TearDownSuite() {
 	suite.wg.Wait()
 }
 
+/*
 func (suite *ClientTestSuite) TestClient_TTL() {
 	suite.T().Logf("ttl:%s", time.Duration(suite.client.TTL()))
 }
@@ -105,6 +103,25 @@ func (suite *ClientTestSuite) TestClient_Close() {
 	flag = suite.client.IsClosed()
 	suite.Equal(true, flag)
 	// suite.T().Logf("Client.Close() = error:%s", jerrors.ErrorStack(err))
+}
+*/
+
+func (suite *ClientTestSuite) TestClient_Lock() {
+	path := "/test-client-lock/"
+	err := suite.client.Lock(path)
+	suite.Equal(nil, err)
+	err = suite.client.Lock(path)
+	suite.NotEqual(nil, err)
+
+	err = suite.client.Unlock(path)
+	suite.Equal(nil, err)
+	err = suite.client.Unlock(path)
+	suite.NotEqual(nil, err)
+
+	err = suite.client.Lock(path)
+	suite.Equal(nil, err)
+	err = suite.client.Unlock(path)
+	suite.Equal(nil, err)
 }
 
 func TestClientTestSuite(t *testing.T) {
