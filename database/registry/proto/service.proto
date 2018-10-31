@@ -53,10 +53,10 @@ message Service {
 // service url event type
 //////////////////////////////////////////
 enum ServiceEventType {
-    SET_UNKNOWN = 0;
-    ServiceAdd = 1;
-	ServiceDel = 2;
-	ServiceUpdate = 3;
+	SET_UNKNOWN = 0;
+	ServiceAdd = 1;
+    ServiceDel = 2;
+    ServiceUpdate = 3;
 }
 
 // Result is returned by a call to Next on

@@ -7,7 +7,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+)
 
+import (
 	jerrors "github.com/juju/errors"
 	"github.com/stretchr/testify/suite"
 
@@ -46,7 +48,6 @@ func (suite *ClientTestSuite) TearDownSuite() {
 	suite.wg.Wait()
 }
 
-/*
 func (suite *ClientTestSuite) TestClient_TTL() {
 	suite.T().Logf("ttl:%s", time.Duration(suite.client.TTL()))
 }
@@ -125,7 +126,6 @@ func (suite *ClientTestSuite) TestClient_Lock() {
 	err = suite.client.Unlock(path)
 	suite.Equal(nil, err)
 }
-*/
 
 func (suite *ClientTestSuite) TestClient_Campain() {
 	// create competing candidates, with e1 initially losing to e2

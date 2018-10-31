@@ -145,9 +145,9 @@ func (c *Client) RegisterTempSeq(path string, data []byte) (string, error) {
 		tmpPath string
 	)
 
-	if strings.HasSuffix(path, "/") {
-		path = strings.TrimSuffix(path, "/")
-	}
+	// if strings.HasSuffix(path, "/") {
+	// 	path = strings.TrimSuffix(path, "/")
+	// }
 
 	tmpPath, err = c.conn.Create(path, data, zk.FlagEphemeral|zk.FlagSequence, zk.WorldACL(zk.PermAll))
 	if err != nil {

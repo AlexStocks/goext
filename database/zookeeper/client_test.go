@@ -34,6 +34,17 @@ func (suite *ClientTestSuite) TearDownSuite() {
 }
 
 func (suite *ClientTestSuite) TestClient_RegisterTempSeq() {
+	suite.client.CreateZkPath("/test/hello/xx-")
+	path, err := suite.client.RegisterTempSeq("/test/hello/xx-", []byte("v0"))
+	suite.T().Logf("path:%s, error:%v", path, err)
+	suite.Equal(nil, err)
+	path, err = suite.client.RegisterTempSeq("/test/hello/xx-", []byte("v1"))
+	suite.T().Logf("path:%s, error:%v", path, err)
+	suite.Equal(nil, err)
+	// time.Sleep(90e9)
+}
+
+func (suite *ClientTestSuite) TestClient_RegisterTempSeq() {
 	path := "/test"
 	err := suite.client.CreateZkPath(path)
 	suite.Equal(nil, err, "CreateZkPath")

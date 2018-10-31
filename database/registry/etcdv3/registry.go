@@ -14,8 +14,8 @@ import (
 
 import (
 	log "github.com/AlexStocks/log4go"
-	etcdv3 "github.com/coreos/etcd/clientv3"
 	jerrors "github.com/juju/errors"
+	etcdv3 "go.etcd.io/etcd/clientv3"
 )
 
 import (
