@@ -9,6 +9,7 @@ import (
 	"context"
 	"strconv"
 	"sync"
+	"time"
 )
 
 import (
@@ -30,16 +31,23 @@ var (
 // Lease Client
 //////////////////////////////////////////
 
+type ElectionSession struct {
+	Path     string
+	Session  *concurrency.Session
+	Election *concurrency.Election
+}
+
 // Client represents a lease kept alive for the lifetime of a client.
 // Fault-tolerant applications may use sessions to reason about liveness.
 type Client struct {
-	client  *ecv3.Client
-	opts    *clientOptions
-	done    chan struct{}
-	mutex   sync.Mutex
-	id      ecv3.LeaseID
-	cancel  context.CancelFunc
-	lockMap map[string]*concurrency.Mutex
+	client    *ecv3.Client
+	opts      *clientOptions
+	done      chan struct{}
+	mutex     sync.Mutex
+	id        ecv3.LeaseID
+	cancel    context.CancelFunc
+	leaderMap map[string]ElectionSession
+	lockMap   map[string]*concurrency.Mutex
 }
 
 // NewClient gets the leased session for a client.
@@ -50,11 +58,12 @@ func NewClient(client *ecv3.Client, options ...ClientOption) (*Client, error) {
 	}
 
 	c := &Client{
-		client:  client,
-		opts:    opts,
-		id:      opts.leaseID,
-		done:    make(chan struct{}),
-		lockMap: make(map[string]*concurrency.Mutex),
+		client:    client,
+		opts:      opts,
+		id:        opts.leaseID,
+		done:      make(chan struct{}),
+		leaderMap: make(map[string]ElectionSession),
+		lockMap:   make(map[string]*concurrency.Mutex),
 	}
 	log.Info("new etcd client %+v", c)
 
@@ -115,9 +124,85 @@ func (c *Client) TTL() int64 {
 	return rsp.TTL
 }
 
+// if @timeout <= 0, Campaign will loop to get the leadership until success.
+func (c *Client) Campaign(basePath string, timeout time.Duration) (ElectionSession, error) {
+	var (
+		grID      int
+		flag      bool
+		err       error
+		leaderKey string
+		ctx       context.Context
+		cancel    context.CancelFunc
+		session   *concurrency.Session
+		election  *concurrency.Election
+		es        ElectionSession
+	)
+
+	if basePath[0] != '/' {
+		basePath = "/" + basePath
+	}
+
+	grID = gxruntime.GoID()
+	leaderKey = basePath + strconv.Itoa(grID)
+
+	ctx = context.Background()
+	if 0 < timeout {
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	c.mutex.Lock()
+	es, flag = c.leaderMap[leaderKey]
+	c.mutex.Unlock()
+	if !flag {
+		session, err = concurrency.NewSession(c.client)
+		if err != nil {
+			return es, jerrors.Trace(err)
+		}
+		election = concurrency.NewElection(session, basePath)
+		es = ElectionSession{Path: basePath, Session: session, Election: election}
+		c.mutex.Lock()
+		c.leaderMap[leaderKey] = es
+		c.mutex.Unlock()
+	}
+
+	err = es.Election.Campaign(ctx, leaderKey)
+	if err != nil {
+		session.Close()
+		return es, jerrors.Trace(err)
+	}
+
+	return es, nil
+}
+
+func (c *Client) Resign(basePath string, stop bool) error {
+	if basePath[0] != '/' {
+		basePath = "/" + basePath
+	}
+
+	grID := gxruntime.GoID()
+	leaderKey := basePath + strconv.Itoa(grID)
+	c.mutex.Lock()
+	es, flag := c.leaderMap[leaderKey]
+	if stop {
+		delete(c.leaderMap, leaderKey)
+	}
+	c.mutex.Unlock()
+	if !flag {
+		return jerrors.Annotatef(ErrNotLocked, "gr:%d", grID)
+	}
+
+	log.Debug("gr:%d, unlock path:%s", grID, basePath)
+	err := es.Election.Resign(context.Background())
+	if stop {
+		es.Session.Close()
+	}
+	return jerrors.Trace(err)
+}
+
 func (c *Client) Lock(basePath string) error {
 	if basePath[0] != '/' {
-		basePath += "/" + basePath
+		basePath = "/" + basePath
 	}
 
 	grID := gxruntime.GoID()
@@ -148,7 +233,7 @@ func (c *Client) Lock(basePath string) error {
 
 func (c *Client) Unlock(basePath string) error {
 	if basePath[0] != '/' {
-		basePath += "/" + basePath
+		basePath = "/" + basePath
 	}
 
 	grID := gxruntime.GoID()
@@ -156,9 +241,7 @@ func (c *Client) Unlock(basePath string) error {
 
 	c.mutex.Lock()
 	lock, flag := c.lockMap[leaderKey]
-	if flag {
-		delete(c.lockMap, leaderKey)
-	}
+	delete(c.lockMap, leaderKey)
 	c.mutex.Unlock()
 	if !flag {
 		return jerrors.Trace(ErrNotLocked)

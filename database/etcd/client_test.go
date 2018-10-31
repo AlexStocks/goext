@@ -1,13 +1,16 @@
 package gxetcd
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"sync"
 	"testing"
-)
+	"time"
 
-import (
 	jerrors "github.com/juju/errors"
 	"github.com/stretchr/testify/suite"
+
 	ecv3 "go.etcd.io/etcd/clientv3"
 )
 
@@ -104,7 +107,6 @@ func (suite *ClientTestSuite) TestClient_Close() {
 	suite.Equal(true, flag)
 	// suite.T().Logf("Client.Close() = error:%s", jerrors.ErrorStack(err))
 }
-*/
 
 func (suite *ClientTestSuite) TestClient_Lock() {
 	path := "/test-client-lock/"
@@ -122,6 +124,53 @@ func (suite *ClientTestSuite) TestClient_Lock() {
 	suite.Equal(nil, err)
 	err = suite.client.Unlock(path)
 	suite.Equal(nil, err)
+}
+*/
+
+func (suite *ClientTestSuite) TestClient_Campain() {
+	// create competing candidates, with e1 initially losing to e2
+	var wg sync.WaitGroup
+	wg.Add(2)
+	electc := make(chan ElectionSession, 2)
+	go func() {
+		defer wg.Done()
+		// delay candidancy so e2 wins first
+		time.Sleep(3 * time.Second)
+		role := "e1-"
+		es, err := suite.client.Campaign(role, 10e9)
+		if err != nil {
+			log.Fatal(err)
+		}
+		electc <- es
+
+		time.Sleep(2e9)
+
+		es = <-electc
+		fmt.Println("completed second election with", string((<-es.Election.Observe(context.Background())).Kvs[0].Value))
+	}()
+	go func() {
+		defer wg.Done()
+		role := "e2-"
+		es, err := suite.client.Campaign(role, 10e9)
+		if err != nil {
+			log.Fatal(err)
+		}
+		electc <- es
+
+		// resign so next candidate can be elected
+		// if err := e.Resign(context.TODO()); err != nil {
+		if err := suite.client.Resign(role, false); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	cctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	e := <-electc
+	fmt.Println("completed first election with", string((<-e.Election.Observe(cctx)).Kvs[0].Value))
+
+	wg.Wait()
 }
 
 func TestClientTestSuite(t *testing.T) {

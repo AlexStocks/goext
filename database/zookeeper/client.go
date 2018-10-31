@@ -520,8 +520,8 @@ func (c *Client) lock(basePath, lockPrefix string, timeout time.Duration) (strin
 	return "", jerrors.New("lock timeout")
 }
 
-// if @timeout <= 0, Compaign will loop to get the leadership until success.
-func (c *Client) Compaign(basePath string, timeout time.Duration) error {
+// if @timeout <= 0, Campaign will loop to get the leadership until success.
+func (c *Client) Campaign(basePath string, timeout time.Duration) error {
 	var (
 		grID            int
 		flag            bool

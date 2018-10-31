@@ -72,7 +72,7 @@ func (suite *ClientTestSuite) TestClient_Leader() {
 
 	fn := func(i int, timeout time.Duration) {
 		defer wg.Done()
-		err = suite.client.Compaign("/test-lock/", timeout)
+		err = suite.client.Campaign("/test-lock/", timeout)
 		if err == nil {
 			time.Sleep(3e9)
 			suite.client.Resign("/test-lock/")
@@ -97,7 +97,7 @@ func (suite *ClientTestSuite) TestClient_LongLiveLeader() {
 
 	fn := func(i int, timeout time.Duration) {
 		defer wg.Done()
-		err = suite.client.Compaign("/test-leader/", timeout)
+		err = suite.client.Campaign("/test-leader/", timeout)
 		if err == nil {
 			time.Sleep(3e9)
 			suite.client.Resign("/test-leader/")
