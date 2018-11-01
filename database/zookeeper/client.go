@@ -139,6 +139,24 @@ func (c *Client) RegisterTemp(path string, data []byte) (string, error) {
 	return tmpPath, nil
 }
 
+func (c *Client) RegisterSeq(path string, data []byte) (string, error) {
+	var (
+		err     error
+		tmpPath string
+	)
+
+	// if strings.HasSuffix(path, "/") {
+	// 	path = strings.TrimSuffix(path, "/")
+	// }
+
+	tmpPath, err = c.conn.Create(path, data, zk.FlagSequence, zk.WorldACL(zk.PermAll))
+	if err != nil {
+		return "", jerrors.Annotatef(err, "zk.Create(%s, sequence)", path)
+	}
+
+	return tmpPath, nil
+}
+
 func (c *Client) RegisterTempSeq(path string, data []byte) (string, error) {
 	var (
 		err     error
