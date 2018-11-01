@@ -61,7 +61,7 @@ func NewWatcher(client *etcd.Client, opts ...gxregistry.WatchOption) (gxregistry
 	w := client.EtcdClient().Watch(ctx, watchPath, clientv3.WithPrefix(), clientv3.WithPrevKV())
 
 	wc := &Watcher{
-		done:   make(chan struct{}, 1),
+		done:   make(chan struct{}),
 		cancel: cancel,
 		w:      w,
 		opts:   options,

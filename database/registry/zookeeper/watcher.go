@@ -67,7 +67,7 @@ func NewWatcher(r gxregistry.Registry, opts ...gxregistry.WatchOption) (gxregist
 		opts:   options,
 		reg:    reg,
 		events: make(chan event, Wactch_Event_Channel_Size),
-		done:   make(chan struct{}, 1),
+		done:   make(chan struct{}),
 	}
 
 	//go w.watchService()
