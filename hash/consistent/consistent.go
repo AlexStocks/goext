@@ -1,7 +1,7 @@
 // An implementation of Consistent Hashing and
 // Consistent Hashing With Bounded Loads.
 //
-// https://en.wikipedia.org/wiki/Consistent_hashing
+// https://en.wikipedia.org/wiki/ConsistentHash_hashing
 //
 // https://research.googleblog.com/2017/04/consistent-hashing-with-bounded-loads.html
 package gxconsistent
@@ -54,7 +54,7 @@ func hash(key []byte) uint64 {
 	return binary.LittleEndian.Uint64(out[:])
 }
 
-type Consistent struct {
+type ConsistentHash struct {
 	circle        map[uint32]string // hash -> node name
 	sortedHashes  hashArray         // hash valid in ascending
 	loadMap       map[string]*Host  // node name -> struct Host
@@ -66,14 +66,14 @@ type Consistent struct {
 	sync.RWMutex
 }
 
-func NewConsistentHash(replicaFactor, bucketNum int) *Consistent {
+func NewConsistentHashHash(replicaFactor, bucketNum int) *ConsistentHash {
 	if replicaFactor <= 0 {
 		replicaFactor = replicationFactor
 	}
 	if bucketNum <= 0 {
 		bucketNum = maxBucketNum
 	}
-	return &Consistent{
+	return &ConsistentHash{
 		circle:        map[uint32]string{},
 		loadMap:       map[string]*Host{},
 		replicaFactor: uint32(replicaFactor),
@@ -82,22 +82,22 @@ func NewConsistentHash(replicaFactor, bucketNum int) *Consistent {
 	}
 }
 
-func (c *Consistent) SetHashFunc(f HashFunc) {
+func (c *ConsistentHash) SetHashFunc(f HashFunc) {
 	c.hashFunc = f
 }
 
 // eltKey generates a string key for an element with an index.
-func (c *Consistent) eltKey(elt string, idx int) string {
+func (c *ConsistentHash) eltKey(elt string, idx int) string {
 	// return elt + "|" + strconv.Itoa(idx)
 	return strconv.Itoa(idx) + elt
 }
 
-func (c *Consistent) hash(key string) uint32 {
+func (c *ConsistentHash) hash(key string) uint32 {
 	return uint32(c.hashFunc(gxstrings.Slice(key))) % c.bucketNum
 }
 
 // sort hashes in ascending
-func (c *Consistent) updateSortedHashes() {
+func (c *ConsistentHash) updateSortedHashes() {
 	hashes := c.sortedHashes[:0]
 	//reallocate if we're holding on to too much (1/4th)
 	if c.sortedHashes.Len()/int(c.replicaFactor*4) > len(c.circle) {
@@ -110,13 +110,13 @@ func (c *Consistent) updateSortedHashes() {
 	c.sortedHashes = hashes
 }
 
-func (c *Consistent) Add(host string) {
+func (c *ConsistentHash) Add(host string) {
 	c.Lock()
 	defer c.Unlock()
 	c.add(host)
 }
 
-func (c *Consistent) add(host string) {
+func (c *ConsistentHash) add(host string) {
 	if _, ok := c.loadMap[host]; ok {
 		return
 	}
@@ -139,7 +139,7 @@ func (c *Consistent) add(host string) {
 
 // Set sets all the elements in the hash. If there are existing elements not
 // present in elts, they will be removed.
-func (c *Consistent) Set(elts []string) {
+func (c *ConsistentHash) Set(elts []string) {
 	c.Lock()
 	defer c.Unlock()
 	for k := range c.loadMap {
@@ -163,7 +163,7 @@ func (c *Consistent) Set(elts []string) {
 	}
 }
 
-func (c *Consistent) Members() []string {
+func (c *ConsistentHash) Members() []string {
 	c.RLock()
 	defer c.RUnlock()
 	var m []string
@@ -175,10 +175,10 @@ func (c *Consistent) Members() []string {
 
 // Returns the host that owns `key`.
 //
-// As described in https://en.wikipedia.org/wiki/Consistent_hashing
+// As described in https://en.wikipedia.org/wiki/ConsistentHash_hashing
 //
 // It returns ErrNoHosts if the ring has no hosts in it.
-func (c *Consistent) Get(key string) (string, error) {
+func (c *ConsistentHash) Get(key string) (string, error) {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -194,7 +194,7 @@ func (c *Consistent) Get(key string) (string, error) {
 // Returns the host that owns `hashKey`.
 //
 // It returns ErrNoHosts if the ring has no hosts in it.
-func (c *Consistent) GetHash(hashKey uint32) (string, error) {
+func (c *ConsistentHash) GetHash(hashKey uint32) (string, error) {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -207,7 +207,7 @@ func (c *Consistent) GetHash(hashKey uint32) (string, error) {
 }
 
 // GetTwo returns the two closest distinct elements to the name input in the circle.
-func (c *Consistent) GetTwo(name string) (string, string, error) {
+func (c *ConsistentHash) GetTwo(name string) (string, string, error) {
 	c.RLock()
 	defer c.RUnlock()
 	if len(c.circle) == 0 {
@@ -245,7 +245,7 @@ func sliceContainsMember(set []string, member string) bool {
 }
 
 // GetN returns the N closest distinct elements to the name input in the circle.
-func (c *Consistent) GetN(name string, n int) ([]string, error) {
+func (c *ConsistentHash) GetN(name string, n int) ([]string, error) {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -287,7 +287,7 @@ func (c *Consistent) GetN(name string, n int) ([]string, error) {
 	return res, nil
 }
 
-// It uses Consistent Hashing With Bounded loads
+// It uses ConsistentHash Hashing With Bounded loads
 //
 // https://research.googleblog.com/2017/04/consistent-hashing-with-bounded-loads.html
 //
@@ -295,7 +295,7 @@ func (c *Consistent) GetN(name string, n int) ([]string, error) {
 //
 // It returns ErrNoHosts if the ring has no hosts in it.
 //
-func (c *Consistent) GetLeast(key string) (string, error) {
+func (c *ConsistentHash) GetLeast(key string) (string, error) {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -319,7 +319,7 @@ func (c *Consistent) GetLeast(key string) (string, error) {
 	}
 }
 
-func (c *Consistent) search(key uint32) int {
+func (c *ConsistentHash) search(key uint32) int {
 	idx := sort.Search(len(c.sortedHashes), func(i int) bool {
 		return c.sortedHashes[i] >= key
 	})
@@ -331,7 +331,7 @@ func (c *Consistent) search(key uint32) int {
 }
 
 // Sets the load of `host` to the given `load`
-func (c *Consistent) UpdateLoad(host string, load int64) {
+func (c *ConsistentHash) UpdateLoad(host string, load int64) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -346,7 +346,7 @@ func (c *Consistent) UpdateLoad(host string, load int64) {
 // Increments the load of host by 1
 //
 // should only be used with if you obtained a host with GetLeast
-func (c *Consistent) Inc(host string) {
+func (c *ConsistentHash) Inc(host string) {
 	atomic.AddInt64(&c.loadMap[host].Load, 1)
 	atomic.AddInt64(&c.totalLoad, 1)
 }
@@ -354,7 +354,7 @@ func (c *Consistent) Inc(host string) {
 // Decrements the load of host by 1
 //
 // should only be used with if you obtained a host with GetLeast
-func (c *Consistent) Done(host string) {
+func (c *ConsistentHash) Done(host string) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -366,13 +366,13 @@ func (c *Consistent) Done(host string) {
 }
 
 // Deletes host from the ring
-func (c *Consistent) Remove(host string) bool {
+func (c *ConsistentHash) Remove(host string) bool {
 	c.Lock()
 	defer c.Unlock()
 	return c.remove(host)
 }
 
-func (c *Consistent) remove(host string) bool {
+func (c *ConsistentHash) remove(host string) bool {
 	for i := uint32(0); i < c.replicaFactor; i++ {
 		h := c.hash(c.eltKey(host, int(i)))
 		delete(c.circle, h)
@@ -386,7 +386,7 @@ func (c *Consistent) remove(host string) bool {
 }
 
 // Return the list of hosts in the ring
-func (c *Consistent) Hosts() (hosts []string) {
+func (c *ConsistentHash) Hosts() (hosts []string) {
 	c.RLock()
 	defer c.RUnlock()
 	for k, _ := range c.loadMap {
@@ -396,7 +396,7 @@ func (c *Consistent) Hosts() (hosts []string) {
 }
 
 // Returns the loads of all the hosts
-func (c *Consistent) GetLoads() map[string]int64 {
+func (c *ConsistentHash) GetLoads() map[string]int64 {
 	loads := map[string]int64{}
 
 	for k, v := range c.loadMap {
@@ -411,7 +411,7 @@ func (c *Consistent) GetLoads() map[string]int64 {
 // total_load = is the total number of active requests served by hosts
 // for more info:
 // https://research.googleblog.com/2017/04/consistent-hashing-with-bounded-loads.html
-func (c *Consistent) MaxLoad() int64 {
+func (c *ConsistentHash) MaxLoad() int64 {
 	if c.totalLoad == 0 {
 		c.totalLoad = 1
 	}
@@ -424,7 +424,7 @@ func (c *Consistent) MaxLoad() int64 {
 	return int64(avgLoadPerNode)
 }
 
-func (c *Consistent) loadOK(host string) bool {
+func (c *ConsistentHash) loadOK(host string) bool {
 	// a safety check if someone performed c.Done more than needed
 	if c.totalLoad < 0 {
 		c.totalLoad = 0
@@ -449,7 +449,7 @@ func (c *Consistent) loadOK(host string) bool {
 	return false
 }
 
-func (c *Consistent) delSlice(val uint32) {
+func (c *ConsistentHash) delSlice(val uint32) {
 	for i := 0; i < len(c.sortedHashes); i++ {
 		if c.sortedHashes[i] == val {
 			c.sortedHashes = append(c.sortedHashes[:i], c.sortedHashes[i+1:]...)
