@@ -92,22 +92,6 @@ type ConsistentHash struct {
 	sync.RWMutex
 }
 
-func newConsistentHashHash(replicaFactor, bucketNum int) *ConsistentHash {
-	if replicaFactor <= 0 {
-		replicaFactor = replicationFactor
-	}
-	if bucketNum <= 0 {
-		bucketNum = maxBucketNum
-	}
-	return &ConsistentHash{
-		circle:        map[uint32]string{},
-		loadMap:       map[string]*Host{},
-		replicaFactor: uint32(replicaFactor),
-		bucketNum:     uint32(bucketNum),
-		hashFunc:      hash,
-	}
-}
-
 func NewConsistentHashHash(opts ...Option) *ConsistentHash {
 	var options Options
 

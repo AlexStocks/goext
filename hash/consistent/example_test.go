@@ -6,7 +6,7 @@ import (
 )
 
 func TestConsistent(t *testing.T) {
-	c := NewConsistentHash(10, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 
 	// adds the hosts to the ring
 	c.Add("127.0.0.1:8000")
@@ -26,7 +26,7 @@ func TestConsistent(t *testing.T) {
 }
 
 func TestBounded(t *testing.T) {
-	c := NewConsistentHash(10, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 
 	// adds the hosts to the ring
 	c.Add("127.0.0.1:8000")
