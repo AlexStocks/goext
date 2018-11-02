@@ -31,6 +31,32 @@ var (
 	ErrNoHosts = jerrors.New("no hosts added")
 )
 
+type Options struct {
+	HashFunc    HashFunc
+	ReplicaNum  int
+	MaxVnodeNum int
+}
+
+type Option func(*Options)
+
+func WithHashFunc(hash HashFunc) Option {
+	return func(opts *Options) {
+		opts.HashFunc = hash
+	}
+}
+
+func WithReplicaNum(replicaNum int) Option {
+	return func(opts *Options) {
+		opts.ReplicaNum = replicaNum
+	}
+}
+
+func WithMaxVnodeNum(maxVnodeNum int) Option {
+	return func(opts *Options) {
+		opts.MaxVnodeNum = maxVnodeNum
+	}
+}
+
 type hashArray []uint32
 
 // Len returns the length of the hashArray.
@@ -66,7 +92,7 @@ type ConsistentHash struct {
 	sync.RWMutex
 }
 
-func NewConsistentHashHash(replicaFactor, bucketNum int) *ConsistentHash {
+func newConsistentHashHash(replicaFactor, bucketNum int) *ConsistentHash {
 	if replicaFactor <= 0 {
 		replicaFactor = replicationFactor
 	}
@@ -79,6 +105,31 @@ func NewConsistentHashHash(replicaFactor, bucketNum int) *ConsistentHash {
 		replicaFactor: uint32(replicaFactor),
 		bucketNum:     uint32(bucketNum),
 		hashFunc:      hash,
+	}
+}
+
+func NewConsistentHashHash(opts ...Option) *ConsistentHash {
+	var options Options
+
+	for idx := range opts {
+		opts[idx](&options)
+	}
+
+	if options.ReplicaNum <= 0 {
+		options.ReplicaNum = replicationFactor
+	}
+	if options.MaxVnodeNum <= 0 {
+		options.MaxVnodeNum = maxBucketNum
+	}
+	if options.HashFunc == nil {
+		options.HashFunc = hash
+	}
+	return &ConsistentHash{
+		circle:        map[uint32]string{},
+		loadMap:       map[string]*Host{},
+		replicaFactor: uint32(options.ReplicaNum),
+		bucketNum:     uint32(options.MaxVnodeNum),
+		hashFunc:      options.HashFunc,
 	}
 }
 

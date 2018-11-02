@@ -21,8 +21,8 @@ func checkNum(num, expected int, t *testing.T) {
 	}
 }
 
-func TestNewConsistentHashHash(t *testing.T) {
-	c := NewConsistentHashHash(13, 1023)
+func TestnewConsistentHashHash(t *testing.T) {
+	c := NewConsistentHashHash(WithReplicaNum(13), WithMaxVnodeNum(1023))
 	if c == nil {
 		t.Errorf("expected obj")
 	}
@@ -30,7 +30,7 @@ func TestNewConsistentHashHash(t *testing.T) {
 }
 
 func TestAdd(t *testing.T) {
-	c := NewConsistentHashHash(10, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 
 	c.Add("127.0.0.1:8000")
 	if len(c.sortedHashes) != replicationFactor {
@@ -52,7 +52,7 @@ func TestAdd(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	c := NewConsistentHashHash(10, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 
 	c.Add("127.0.0.1:8000")
 	host, err := c.Get("127.0.0.1:8000")
@@ -66,7 +66,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetHash(t *testing.T) {
-	c := NewConsistentHashHash(10, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 
 	c.Add("127.0.0.1:8000")
 	host, err := c.GetHash(123)
@@ -80,7 +80,7 @@ func TestGetHash(t *testing.T) {
 }
 
 func TestGetEmpty(t *testing.T) {
-	c := NewConsistentHashHash(13, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(13), WithMaxVnodeNum(1023))
 	_, err := c.Get("asdfsadfsadf")
 	if err == nil {
 		t.Errorf("expected error")
@@ -91,7 +91,7 @@ func TestGetEmpty(t *testing.T) {
 }
 
 func TestGetSingle(t *testing.T) {
-	c := NewConsistentHashHash(13, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(13), WithMaxVnodeNum(1023))
 	c.Add("abcdefg")
 	f := func(s string) bool {
 		y, err := c.Get(s)
@@ -119,7 +119,7 @@ var gmtests = []gtest{
 }
 
 func TestGetMultiple(t *testing.T) {
-	c := NewConsistentHashHash(10, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -135,7 +135,7 @@ func TestGetMultiple(t *testing.T) {
 }
 
 func TestGetMultipleQuick(t *testing.T) {
-	c := NewConsistentHashHash(13, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(13), WithMaxVnodeNum(1023))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -166,8 +166,7 @@ var rtestsAfter = []gtest{
 }
 
 func TestGetMultipleRemove(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -193,8 +192,7 @@ func TestGetMultipleRemove(t *testing.T) {
 }
 
 func TestGetMultipleRemoveQuick(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -213,7 +211,7 @@ func TestGetMultipleRemoveQuick(t *testing.T) {
 	}
 }
 func TestGetTwo(t *testing.T) {
-	c := NewConsistentHashHash(13, 10230)
+	c := NewConsistentHashHash(WithReplicaNum(13), WithMaxVnodeNum(10230))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -233,8 +231,7 @@ func TestGetTwo(t *testing.T) {
 }
 
 func TestGetTwoQuick(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -265,8 +262,7 @@ func TestGetTwoQuick(t *testing.T) {
 }
 
 func TestGetTwoOnlyTwoQuick(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	f := func(s string) bool {
@@ -296,8 +292,7 @@ func TestGetTwoOnlyTwoQuick(t *testing.T) {
 }
 
 func TestGetTwoOnlyOneInCircle(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abcdefg")
 	a, b, err := c.GetTwo("99999999")
 	if err != nil {
@@ -315,8 +310,7 @@ func TestGetTwoOnlyOneInCircle(t *testing.T) {
 }
 
 func TestGetN(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -339,8 +333,7 @@ func TestGetN(t *testing.T) {
 }
 
 func TestGetNLess(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -360,8 +353,7 @@ func TestGetNLess(t *testing.T) {
 }
 
 func TestGetNMore(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -384,8 +376,7 @@ func TestGetNMore(t *testing.T) {
 }
 
 func TestGetNQuick(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -419,8 +410,7 @@ func TestGetNQuick(t *testing.T) {
 }
 
 func TestGetNLessQuick(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -454,8 +444,7 @@ func TestGetNLessQuick(t *testing.T) {
 }
 
 func TestGetNMoreQuick(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abcdefg")
 	c.Add("hijklmn")
 	c.Add("opqrstu")
@@ -489,8 +478,7 @@ func TestGetNMoreQuick(t *testing.T) {
 }
 
 func TestSet(t *testing.T) {
-	c := NewConsistentHashHash(20, 1023)
-	c.SetHashFunc(murmurHash)
+	c := NewConsistentHashHash(WithReplicaNum(20), WithMaxVnodeNum(1023), WithHashFunc(murmurHash))
 	c.Add("abc")
 	c.Add("def")
 	c.Add("ghi")
@@ -548,7 +536,7 @@ func TestSet(t *testing.T) {
 }
 
 func TestRemove(t *testing.T) {
-	c := NewConsistentHashHash(10, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 
 	c.Add("127.0.0.1:8000")
 	c.Remove("127.0.0.1:8000")
@@ -561,14 +549,14 @@ func TestRemove(t *testing.T) {
 }
 
 func TestRemoveNonExisting(t *testing.T) {
-	c := NewConsistentHashHash(10, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 	c.Add("abcdefg")
 	c.Remove("abcdefghijk")
 	checkNum(len(c.circle), 10, t)
 }
 
 func TestGetLeast(t *testing.T) {
-	c := NewConsistentHashHash(10, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 
 	c.Add("127.0.0.1:8000")
 	c.Add("92.0.0.1:8000")
@@ -591,7 +579,7 @@ func TestGetLeast(t *testing.T) {
 }
 
 func TestIncDone(t *testing.T) {
-	c := NewConsistentHashHash(10, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 
 	c.Add("127.0.0.1:8000")
 	c.Add("92.0.0.1:8000")
@@ -619,7 +607,7 @@ func TestHosts(t *testing.T) {
 		"92.0.0.1:8000",
 	}
 
-	c := NewConsistentHashHash(10, 1023)
+	c := NewConsistentHashHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 	for _, h := range hosts {
 		c.Add(h)
 	}
