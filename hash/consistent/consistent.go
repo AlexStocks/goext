@@ -92,7 +92,7 @@ type ConsistentHash struct {
 	sync.RWMutex
 }
 
-func NewConsistentHashHash(opts ...Option) *ConsistentHash {
+func NewConsistentHash(opts ...Option) *ConsistentHash {
 	var options Options
 
 	for idx := range opts {
