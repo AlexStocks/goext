@@ -4,6 +4,8 @@
 // https://en.wikipedia.org/wiki/ConsistentHash_hashing
 //
 // https://research.googleblog.com/2017/04/consistent-hashing-with-bounded-loads.html
+//
+// refs: https://github.com/lafikl/consistent https://github.com/stathat/consistent
 package gxconsistent
 
 import (
@@ -163,6 +165,8 @@ func (c *ConsistentHash) add(host string) {
 		c.sortedHashes = append(c.sortedHashes, uint32(h))
 	}
 
+	// Bug fixed on 2018/11/05
+	// 不用下面这个排序方法的原因是 sortedHashes 中可能存在重复的hash值，updateSortedHashes 会对这些重复值进行过滤
 	// sort.Slice(c.sortedHashes, func(i int, j int) bool {
 	// 	if c.sortedHashes[i] < c.sortedHashes[j] {
 	// 		return true

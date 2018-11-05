@@ -534,7 +534,6 @@ func TestSet(t *testing.T) {
 		t.Errorf("expected a != b, they were both %s", a)
 	}
 }
-
 func TestRemove(t *testing.T) {
 	c := NewConsistentHash(WithReplicaNum(10), WithMaxVnodeNum(1023))
 
