@@ -21,7 +21,8 @@ import (
 import (
 	"github.com/AlexStocks/goext/strings"
 	jerrors "github.com/juju/errors"
-	blake2b "github.com/minio/blake2b-simd"
+	// blake2b "github.com/minio/blake2b-simd"
+	"golang.org/x/crypto/blake2b"
 )
 
 const (
