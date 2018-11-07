@@ -7,16 +7,21 @@
 package gxinfluxdb
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-)
+	"io/ioutil"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
 
-import (
 	"github.com/influxdata/influxdb/client/v2"
+
 	jerrors "github.com/juju/errors"
 )
 
 type InfluxDBClient struct {
+	host string
 	client.Client
 }
 
@@ -28,7 +33,7 @@ func NewInfluxDBClient(host, user, password string) (InfluxDBClient, error) {
 		Password: password,
 	})
 
-	return InfluxDBClient{Client: c}, jerrors.Trace(err)
+	return InfluxDBClient{host: host, Client: c}, jerrors.Trace(err)
 }
 
 func (c InfluxDBClient) Close() error {
@@ -86,4 +91,24 @@ func (c InfluxDBClient) TableSize(db, table string) (int, error) {
 func (c InfluxDBClient) Ping() error {
 	_, _, err := c.Client.Ping(0)
 	return jerrors.Trace(err)
+}
+
+func (c InfluxDBClient) Send(database string, raw_data []byte) ([]byte, error) {
+	// uri := "http://" + Host + "/write?db=" + database
+	// http://127.0.0.1:8080/write?db=xxx
+	uri := (&url.URL{
+		Scheme:   "http",
+		Host:     c.host,
+		Path:     "write",
+		RawQuery: "db=" + database,
+	}).String()
+
+	body := ioutil.NopCloser(bytes.NewBuffer(raw_data))
+	resp, err := http.Post(uri, "application/json", body)
+	if err != nil {
+		return nil, jerrors.Trace(err)
+	}
+
+	rsp, _ := httputil.DumpResponse(resp, true)
+	return rsp, nil
 }
