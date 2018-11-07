@@ -14,9 +14,12 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
+)
 
+import (
+	"github.com/AlexStocks/goext/strings"
 	"github.com/influxdata/influxdb/client/v2"
-
 	jerrors "github.com/juju/errors"
 )
 
@@ -93,7 +96,31 @@ func (c InfluxDBClient) Ping() error {
 	return jerrors.Trace(err)
 }
 
-func (c InfluxDBClient) Send(database string, raw_data []byte) ([]byte, error) {
+// from https://github.com/opera/logpeck/blob/master/sender_influxdb.go
+func (c InfluxDBClient) toInfluxdbLine(fields map[string]interface{}) string {
+	lines := ""
+	timestamp := fields["timestamp"].(int64)
+
+	for k, v := range fields {
+		if k == "timestamp" {
+			continue
+		}
+
+		aggregationResults := v.(map[string]float64)
+		line := k + ",host=" + c.host + " "
+		for aggregation, result := range aggregationResults {
+			line += aggregation + "=" + strconv.FormatFloat(result, 'f', 3, 64) + ","
+		}
+		length := len(line)
+		line = line[0:length-1] + " " + strconv.FormatInt(timestamp*1000000000, 10) + "\n"
+		lines += line
+	}
+
+	return lines
+}
+
+// from https://github.com/opera/logpeck/blob/master/sender_influxdb.go
+func (c InfluxDBClient) SendLines(database string, raw_data []byte) ([]byte, error) {
 	// uri := "http://" + Host + "/write?db=" + database
 	// http://127.0.0.1:8080/write?db=xxx
 	uri := (&url.URL{
@@ -111,4 +138,11 @@ func (c InfluxDBClient) Send(database string, raw_data []byte) ([]byte, error) {
 
 	rsp, _ := httputil.DumpResponse(resp, true)
 	return rsp, nil
+}
+
+func (c InfluxDBClient) Send(database string, fields map[string]interface{}) ([]byte, error) {
+	lines := c.toInfluxdbLine(fields)
+	rsp, err := c.SendLines(database, gxstrings.Slice(lines))
+
+	return rsp, jerrors.Trace(err)
 }
