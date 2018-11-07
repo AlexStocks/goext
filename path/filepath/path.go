@@ -3,7 +3,7 @@
 // governed by Apache License 2.0.
 
 // Package gxfilepath encapsulates some path.filepath functions
-// ref: https://github.com/golang/go/blob/master/src/path/filepath/path.go
+// ref: https://github.com/rogpeppe/go-internal/blob/master/dirhash/hash.go
 package gxfilepath
 
 import (
