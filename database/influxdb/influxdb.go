@@ -14,9 +14,10 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+)
 
+import (
 	"github.com/influxdata/influxdb/client/v2"
-
 	jerrors "github.com/juju/errors"
 )
 
