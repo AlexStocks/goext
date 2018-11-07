@@ -14,13 +14,9 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strconv"
-)
 
-import (
-	"github.com/AlexStocks/goext/strings"
-	"github.com/alexstocks/goext/net"
 	"github.com/influxdata/influxdb/client/v2"
+
 	jerrors "github.com/juju/errors"
 )
 
@@ -70,6 +66,21 @@ func (c InfluxDBClient) DropDB(db string) error {
 	return jerrors.Trace(err)
 }
 
+func (c InfluxDBClient) GetDBList() ([]string, error) {
+	res, err := c.queryDB("SHOW DATABASES", "")
+	if err != nil {
+		return nil, jerrors.Trace(err)
+	}
+
+	vals := res[0].Series[0].Values
+	databases := make([]string, 0, len(vals)+1)
+	for _, val := range vals {
+		databases = append(databases, val[0].(string))
+	}
+
+	return databases, nil
+}
+
 func (c InfluxDBClient) CreateAdmin(user, password string) error {
 	_, err := c.queryDB(fmt.Sprintf("create user \"%s\" "+
 		"with password '%s' with all privileges", user, password), "")
@@ -79,6 +90,35 @@ func (c InfluxDBClient) CreateAdmin(user, password string) error {
 func (c InfluxDBClient) DropAdmin(user string) error {
 	_, err := c.queryDB(fmt.Sprintf("DROP USER %s", user), "")
 	return jerrors.Trace(err)
+}
+
+func (c InfluxDBClient) GetUserList() ([]string, error) {
+	res, err := c.queryDB("SHOW USERS", "")
+	if err != nil {
+		return nil, jerrors.Trace(err)
+	}
+	vals := res[0].Series[0].Values
+	users := make([]string, 0, len(vals)+1)
+	for _, val := range vals {
+		users = append(users, val[0].(string))
+	}
+
+	return users, nil
+}
+
+func (c InfluxDBClient) GetTableList(db string) ([]string, error) {
+	res, err := c.queryDB("SHOW MEASUREMENTS", db)
+	if err != nil {
+		return nil, jerrors.Trace(err)
+	}
+
+	vals := res[0].Series[0].Values
+	tables := make([]string, 0, len(vals)+1)
+	for _, val := range vals {
+		tables = append(tables, val[0].(string))
+	}
+
+	return tables, nil
 }
 
 func (c InfluxDBClient) TableSize(db, table string) (int, error) {
@@ -95,30 +135,6 @@ func (c InfluxDBClient) TableSize(db, table string) (int, error) {
 func (c InfluxDBClient) Ping() error {
 	_, _, err := c.Client.Ping(0)
 	return jerrors.Trace(err)
-}
-
-// from https://github.com/opera/logpeck/blob/master/sender_influxdb.go
-func (c InfluxDBClient) toInfluxdbLine(fields map[string]interface{}) string {
-	lines := ""
-	timestamp := fields["timestamp"].(int64)
-
-	localhost, _ := gxnet.GetLocalIP()
-	for k, v := range fields {
-		if k == "timestamp" {
-			continue
-		}
-
-		aggregationResults := v.(map[string]float64)
-		line := k + ",host=" + localhost + " "
-		for aggregation, result := range aggregationResults {
-			line += aggregation + "=" + strconv.FormatFloat(result, 'f', 3, 64) + ","
-		}
-		length := len(line)
-		line = line[0:length-1] + " " + strconv.FormatInt(timestamp*1000000000, 10) + "\n"
-		lines += line
-	}
-
-	return lines
 }
 
 // from https://github.com/opera/logpeck/blob/master/sender_influxdb.go
@@ -140,11 +156,4 @@ func (c InfluxDBClient) SendLines(database string, raw_data []byte) ([]byte, err
 
 	rsp, _ := httputil.DumpResponse(resp, true)
 	return rsp, nil
-}
-
-func (c InfluxDBClient) Send(database string, fields map[string]interface{}) ([]byte, error) {
-	lines := c.toInfluxdbLine(fields)
-	rsp, err := c.SendLines(database, gxstrings.Slice(lines))
-
-	return rsp, jerrors.Trace(err)
 }

@@ -47,12 +47,31 @@ func TestGxInfluxDBClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// get dbs
+	dbs, err := c.GetDBList()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("databases:%#v", dbs)
+
+	// get tables
+	tables, err := c.GetTableList("_internal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("tables:%#v", tables)
 
 	// create admin
 	err = c.CreateAdmin(username, "stocks")
 	if err != nil {
 		t.Fatal(err)
 	}
+	// get users
+	users, err := c.GetUserList()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("users:%#v", users)
 
 	// Create a new point batch
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
@@ -68,7 +87,7 @@ func TestGxInfluxDBClient(t *testing.T) {
 	fields := map[string]interface{}{
 		"idle":   10.1,
 		"system": 53.3,
-		"user":   46.6,
+		"user":   1,
 	}
 
 	table := "test_table"
@@ -82,6 +101,16 @@ func TestGxInfluxDBClient(t *testing.T) {
 	if err := c.Write(bp); err != nil {
 		t.Fatal(err)
 	}
+
+	// Write single record
+	record := map[string]interface{}{
+		"idle":      20.1,
+		"system":    43.3,
+		"user":      6,
+		"timestamp": time.Now().UnixNano(),
+	}
+	rspData, err := c.Send("test_db", record)
+	t.Logf("rspData:%s, err:%#v", string(rspData), err)
 
 	tableSize, err := c.TableSize(db, table)
 	if err != nil {
