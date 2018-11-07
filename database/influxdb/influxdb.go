@@ -19,6 +19,7 @@ import (
 
 import (
 	"github.com/AlexStocks/goext/strings"
+	"github.com/alexstocks/goext/net"
 	"github.com/influxdata/influxdb/client/v2"
 	jerrors "github.com/juju/errors"
 )
@@ -101,13 +102,14 @@ func (c InfluxDBClient) toInfluxdbLine(fields map[string]interface{}) string {
 	lines := ""
 	timestamp := fields["timestamp"].(int64)
 
+	localhost, _ := gxnet.GetLocalIP()
 	for k, v := range fields {
 		if k == "timestamp" {
 			continue
 		}
 
 		aggregationResults := v.(map[string]float64)
-		line := k + ",host=" + c.host + " "
+		line := k + ",host=" + localhost + " "
 		for aggregation, result := range aggregationResults {
 			line += aggregation + "=" + strconv.FormatFloat(result, 'f', 3, 64) + ","
 		}
