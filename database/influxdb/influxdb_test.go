@@ -117,7 +117,7 @@ func TestGxInfluxDBClient(t *testing.T) {
 		"system": 33.0,
 		"user":   2,
 	}
-	err = c.AddPoint(table, tags, fields, time.Now())
+	err = c.AddPointData(table, tags, fields, time.Now())
 	if err != nil {
 		t.Fatal(jerrors.ErrorStack(err))
 	}

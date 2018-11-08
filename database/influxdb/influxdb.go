@@ -242,7 +242,11 @@ func (c InfluxDBClient) SendLines(host, database string, raw_data []byte) ([]byt
 	return rsp, nil
 }
 
-func (c InfluxDBClient) AddPoint(table string, tags map[string]string, fields map[string]interface{}, t time.Time) error {
+func (c InfluxDBClient) AddPoint(pt *client.Point) {
+	c.bp.AddPoint(pt)
+}
+
+func (c InfluxDBClient) AddPointData(table string, tags map[string]string, fields map[string]interface{}, t time.Time) error {
 	pt, err := client.NewPoint(table, tags, fields, t)
 	if err != nil {
 		return jerrors.Trace(err)
