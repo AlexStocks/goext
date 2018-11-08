@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 )
 
 import (
@@ -21,19 +22,101 @@ import (
 	jerrors "github.com/juju/errors"
 )
 
-type InfluxDBClient struct {
-	client.Client
+/////////////////////////////////////////////////
+// BatchPoints
+/////////////////////////////////////////////////
+
+type BatchPoints struct {
+	points           []*client.Point
+	database         string
+	precision        string
+	retentionPolicy  string
+	writeConsistency string
 }
 
-func NewInfluxDBClient(host, user, password string) (InfluxDBClient, error) {
+func NewBatchPoints(db, precision string) *BatchPoints {
+	return &BatchPoints{
+		points:    make([]*client.Point, 0, 4096),
+		database:  db,
+		precision: precision,
+	}
+}
+
+func (bp *BatchPoints) Size() int {
+	return len(bp.points)
+}
+
+func (bp *BatchPoints) Clear() {
+	bp.points = bp.points[:0]
+}
+
+func (bp *BatchPoints) AddPoint(p *client.Point) {
+	bp.points = append(bp.points, p)
+}
+
+func (bp *BatchPoints) AddPoints(ps []*client.Point) {
+	bp.points = append(bp.points, ps...)
+}
+
+func (bp *BatchPoints) Points() []*client.Point {
+	return bp.points
+}
+
+func (bp *BatchPoints) Precision() string {
+	return bp.precision
+}
+
+func (bp *BatchPoints) Database() string {
+	return bp.database
+}
+
+func (bp *BatchPoints) WriteConsistency() string {
+	return bp.writeConsistency
+}
+
+func (bp *BatchPoints) RetentionPolicy() string {
+	return bp.retentionPolicy
+}
+
+func (bp *BatchPoints) SetPrecision(p string) error {
+	if _, err := time.ParseDuration("1" + p); err != nil {
+		return err
+	}
+	bp.precision = p
+	return nil
+}
+
+func (bp *BatchPoints) SetDatabase(db string) {
+	bp.database = db
+}
+
+func (bp *BatchPoints) SetWriteConsistency(wc string) {
+	bp.writeConsistency = wc
+}
+
+func (bp *BatchPoints) SetRetentionPolicy(rp string) {
+	bp.retentionPolicy = rp
+}
+
+/////////////////////////////////////////////////
+// InfxluxDB Client
+/////////////////////////////////////////////////
+
+type InfluxDBClient struct {
+	client.Client
+	bp *BatchPoints
+}
+
+func NewInfluxDBClient(host, user, password, db, precision string) (InfluxDBClient, error) {
 	// Create a new HTTPClient
 	c, err := client.NewHTTPClient(client.HTTPConfig{
 		Addr:     host,
 		Username: user,
 		Password: password,
 	})
+	bp := NewBatchPoints(db, precision)
 
-	return InfluxDBClient{Client: c}, jerrors.Trace(err)
+	return InfluxDBClient{Client: c, bp: bp}, jerrors.Trace(err)
 }
 
 func (c InfluxDBClient) Close() error {
@@ -156,4 +239,28 @@ func (c InfluxDBClient) SendLines(host, database string, raw_data []byte) ([]byt
 
 	rsp, _ := httputil.DumpResponse(resp, true)
 	return rsp, nil
+}
+
+func (c InfluxDBClient) AddPoint(table string, tags map[string]string, fields map[string]interface{}, t time.Time) error {
+	pt, err := client.NewPoint(table, tags, fields, t)
+	if err != nil {
+		return jerrors.Trace(err)
+	}
+
+	c.bp.AddPoint(pt)
+
+	return nil
+}
+
+// return current point number
+func (c InfluxDBClient) Size() int {
+	return c.bp.Size()
+}
+
+func (c InfluxDBClient) Flush() (int, error) {
+	size := c.bp.Size()
+	err := c.Client.Write(c.bp)
+	c.bp.Clear()
+
+	return size, jerrors.Trace(err)
 }

@@ -7,11 +7,13 @@ import (
 
 import (
 	client "github.com/influxdata/influxdb/client/v2"
+	jerrors "github.com/juju/errors"
 )
 
 func TestGxInfluxDBClient(t *testing.T) {
 	// Create a new HTTPClient
-	c, err := NewInfluxDBClient("http://localhost:18086", "", "")
+	db := "test_db"
+	c, err := NewInfluxDBClient("http://localhost:18086", "", "", db, "s")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +26,6 @@ func TestGxInfluxDBClient(t *testing.T) {
 	}()
 
 	// drop db
-	db := "test_db"
 	err = c.DropDB(db)
 	if err != nil {
 		t.Fatal(err)
@@ -103,18 +104,31 @@ func TestGxInfluxDBClient(t *testing.T) {
 	}
 
 	// Write single record
-	record := map[string]interface{}{
-		"idle":      20.1,
-		"system":    43.3,
-		"user":      6,
-		"timestamp": time.Now().UnixNano(),
-	}
-	rspData, err := c.Send("test_db", record)
-	t.Logf("rspData:%s, err:%#v", string(rspData), err)
-
 	tableSize, err := c.TableSize(db, table)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal(jerrors.ErrorStack(err))
 	}
 	t.Log(table, " size:", tableSize)
+
+	// Use inner batchpoints
+	tags = map[string]string{"cpu": "cpu-free"}
+	fields = map[string]interface{}{
+		"idle":   90.0,
+		"system": 33.0,
+		"user":   2,
+	}
+	err = c.AddPoint(table, tags, fields, time.Now())
+	if err != nil {
+		t.Fatal(jerrors.ErrorStack(err))
+	}
+	size, err := c.Flush()
+	if err != nil {
+		t.Fatal(jerrors.ErrorStack(err))
+	}
+	if size != 1 {
+		t.Errorf("size:%d != 1", size)
+	}
+	if len(c.bp.points) != 0 {
+		t.Errorf("len(c.bp.points):%d != 0", c.bp.points)
+	}
 }
