@@ -258,7 +258,7 @@ func (c InfluxDBClient) AddPointData(table string, tags map[string]string, field
 }
 
 // return current point number
-func (c InfluxDBClient) Size() int {
+func (c InfluxDBClient) BatchPointSize() int {
 	return c.bp.Size()
 }
 
