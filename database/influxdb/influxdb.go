@@ -18,6 +18,7 @@ import (
 )
 
 import (
+	log "github.com/AlexStocks/log4go"
 	"github.com/influxdata/influxdb/client/v2"
 	jerrors "github.com/juju/errors"
 )
@@ -260,6 +261,9 @@ func (c InfluxDBClient) Size() int {
 func (c InfluxDBClient) Flush() (int, error) {
 	size := c.bp.Size()
 	err := c.Client.Write(c.bp)
+	if err != nil {
+		log.Error("failed to write BatchPoints[0]:%#v to database %s", c.bp.points[0], c.bp.database)
+	}
 	c.bp.Clear()
 
 	return size, jerrors.Trace(err)
