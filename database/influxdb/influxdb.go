@@ -22,7 +22,6 @@ import (
 )
 
 type InfluxDBClient struct {
-	host string
 	client.Client
 }
 
@@ -34,7 +33,7 @@ func NewInfluxDBClient(host, user, password string) (InfluxDBClient, error) {
 		Password: password,
 	})
 
-	return InfluxDBClient{host: host, Client: c}, jerrors.Trace(err)
+	return InfluxDBClient{Client: c}, jerrors.Trace(err)
 }
 
 func (c InfluxDBClient) Close() error {
@@ -139,12 +138,12 @@ func (c InfluxDBClient) Ping() error {
 }
 
 // from https://github.com/opera/logpeck/blob/master/sender_influxdb.go
-func (c InfluxDBClient) SendLines(database string, raw_data []byte) ([]byte, error) {
+func (c InfluxDBClient) SendLines(host, database string, raw_data []byte) ([]byte, error) {
 	// uri := "http://" + Host + "/write?db=" + database
 	// http://127.0.0.1:8080/write?db=xxx
 	uri := (&url.URL{
 		Scheme:   "http",
-		Host:     c.host,
+		Host:     host,
 		Path:     "write",
 		RawQuery: "db=" + database,
 	}).String()
