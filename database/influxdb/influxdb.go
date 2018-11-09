@@ -109,9 +109,14 @@ type InfluxDBClient struct {
 }
 
 func NewInfluxDBClient(host, user, password, db, precision string) (InfluxDBClient, error) {
+	uri := (&url.URL{
+		Scheme: "http",
+		Host:   host,
+	}).String()
+
 	// Create a new HTTPClient
 	c, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:     host,
+		Addr:     uri,
 		Username: user,
 		Password: password,
 	})
