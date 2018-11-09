@@ -16,6 +16,7 @@ import (
 	Log "github.com/AlexStocks/log4go"
 	"github.com/Shopify/sarama"
 	sc "github.com/bsm/sarama-cluster"
+	jerrors "github.com/juju/errors"
 )
 
 const (
@@ -118,7 +119,7 @@ func (c *consumer) Start() error {
 	// broker will be used).
 	config.Consumer.Offsets.Retention = 0
 	if c.cg, err = sc.NewConsumer(c.brokers, c.consumerGroup, c.topics, config); err != nil {
-		return err
+		return jerrors.Trace(err)
 	}
 
 	c.wg.Add(1)

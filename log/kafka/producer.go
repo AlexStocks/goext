@@ -19,6 +19,7 @@ import (
 	"github.com/AlexStocks/goext/time"
 	Log "github.com/AlexStocks/log4go"
 	"github.com/Shopify/sarama"
+	jerrors "github.com/juju/errors"
 )
 
 const (
@@ -87,7 +88,7 @@ func NewProducer(
 
 	kafkaProducer, err := sarama.NewSyncProducer(brokers, kafkaConfig)
 	if err != nil {
-		return nil, err
+		return nil, jerrors.Trace(err)
 	}
 
 	return &producer{producer: kafkaProducer}, nil
@@ -96,7 +97,7 @@ func NewProducer(
 func (p *producer) SendMessage(topic string, key interface{}, message interface{}) (partition int32, offset int64, err error) {
 	msg, err := json.Marshal(message)
 	if err != nil {
-		return -1, -1, fmt.Errorf("cannot marshal message %v: %v", message, err)
+		return -1, -1, jerrors.Annotatef(err, "cannot marshal message %v", message)
 	}
 
 	var keyEncoder, valueEncoder sarama.Encoder
@@ -108,7 +109,7 @@ func (p *producer) SendMessage(topic string, key interface{}, message interface{
 	if key != nil {
 		keyByte, err := json.Marshal(key)
 		if err != nil {
-			return -1, -1, fmt.Errorf("cannot marshal key%v: %v", key, err)
+			return -1, -1, jerrors.Annotatef(err, "cannot marshal key%v", key)
 		}
 
 		keyEncoder = sarama.ByteEncoder(keyByte)
@@ -117,7 +118,7 @@ func (p *producer) SendMessage(topic string, key interface{}, message interface{
 	}
 	partition, offset, err = p.producer.SendMessage(&producerMessage)
 	if err != nil {
-		return -1, -1, fmt.Errorf("cannot send message %v: %v", message, err)
+		return -1, -1, jerrors.Annotatef(err, "cannot send message %v", message)
 	}
 
 	return partition, offset, nil
@@ -136,7 +137,7 @@ func (p *producer) SendBytes(topic string, key []byte, message []byte) (partitio
 	}
 	partition, offset, err = p.producer.SendMessage(&producerMessage)
 	if err != nil {
-		return -1, -1, fmt.Errorf("cannot send message %v: %v", message, err)
+		return -1, -1, jerrors.Annotatef(err, "cannot send message %v", message)
 	}
 
 	return partition, offset, nil
@@ -218,7 +219,7 @@ func NewAsyncProducer(
 
 	kafkaProducer, err := sarama.NewAsyncProducer(brokers, kafkaConfig)
 	if err != nil {
-		return nil, err
+		return nil, jerrors.Trace(err)
 	}
 
 	return &asyncProducer{
@@ -238,7 +239,7 @@ func (p *asyncProducer) SendMessage(
 
 	msg, err := json.Marshal(message)
 	if err != nil {
-		return fmt.Errorf("cannot marshal message %v: %v", message, err)
+		return jerrors.Annotatef(err, "cannot marshal message %v", message)
 	}
 
 	var (
@@ -254,7 +255,7 @@ func (p *asyncProducer) SendMessage(
 	if key != nil {
 		keyByte, err := json.Marshal(key)
 		if err != nil {
-			return fmt.Errorf("cannot marshal key%v: %v", key, err)
+			return jerrors.Annotatef(err, "cannot marshal key %v", key)
 		}
 
 		producerMessage.Key = sarama.ByteEncoder(keyByte)
