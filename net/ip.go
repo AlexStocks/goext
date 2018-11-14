@@ -6,9 +6,7 @@
 
 package gxnet
 
-import (
-	"net"
-)
+import "net"
 
 import (
 	jerrors "github.com/juju/errors"
@@ -83,4 +81,14 @@ func GetOutboundIP() (string, error) {
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 
 	return localAddr.IP.String(), nil
+}
+
+// CheckIPValidity checks whether @IPString is a valid ip
+func CheckIPValidity(IPString string) bool {
+	ip := net.ParseIP(IPString)
+	if ip.To4() == nil {
+		return false
+	}
+
+	return true
 }
