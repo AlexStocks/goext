@@ -12,17 +12,13 @@ import (
 	"time"
 )
 
-import (
-	"github.com/AlexStocks/goext/sync"
-)
-
 type Wheel struct {
 	sync.RWMutex
 	span   time.Duration
 	period time.Duration
 	ticker *time.Ticker
 	index  int
-	ring   []chan gxsync.Empty
+	ring   []chan struct{}
 	once   sync.Once
 	now    time.Time
 }
@@ -44,12 +40,12 @@ func NewWheel(span time.Duration, buckets int) *Wheel {
 		period: span * (time.Duration(buckets)),
 		ticker: time.NewTicker(span),
 		index:  0,
-		ring:   make([](chan gxsync.Empty), buckets),
+		ring:   make([](chan struct{}), buckets),
 		now:    time.Now(),
 	}
 
 	go func() {
-		var notify chan gxsync.Empty
+		var notify chan struct{}
 		// var cw CountWatch
 		// cw.Start()
 		for t := range w.ticker.C {
@@ -77,7 +73,7 @@ func (w *Wheel) Stop() {
 	w.once.Do(func() { w.ticker.Stop() })
 }
 
-func (w *Wheel) After(timeout time.Duration) <-chan gxsync.Empty {
+func (w *Wheel) After(timeout time.Duration) <-chan struct{} {
 	if timeout >= w.period {
 		panic("@timeout over ring's life period")
 	}
@@ -90,7 +86,7 @@ func (w *Wheel) After(timeout time.Duration) <-chan gxsync.Empty {
 	w.Lock()
 	pos = (w.index + pos) % len(w.ring)
 	if w.ring[pos] == nil {
-		w.ring[pos] = make(chan gxsync.Empty)
+		w.ring[pos] = make(chan struct{})
 	}
 	// fmt.Println("pos:", pos)
 	c := w.ring[pos]

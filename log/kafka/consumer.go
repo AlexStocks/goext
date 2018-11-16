@@ -12,7 +12,6 @@ import (
 )
 
 import (
-	"github.com/AlexStocks/goext/sync"
 	Log "github.com/AlexStocks/log4go"
 	"github.com/Shopify/sarama"
 	sc "github.com/bsm/sarama-cluster"
@@ -43,7 +42,7 @@ type (
 
 		// cg   *consumergroup.ConsumerGroup
 		cg   *sc.Consumer
-		done chan gxsync.Empty
+		done chan struct{}
 		wg   sync.WaitGroup
 	}
 )
@@ -92,7 +91,7 @@ func NewConsumer(
 		msgCb:         msgCb,
 		errCb:         errCb,
 		ntfCb:         ntfCb,
-		done:          make(chan gxsync.Empty),
+		done:          make(chan struct{}),
 	}, nil
 }
 
