@@ -381,6 +381,7 @@ func (c *Client) GetMinZkPath(baseZkPath, prefix string) ([]string, string, erro
 	return children, baseZkPath + "/" + children[index], nil
 }
 
+// 找到仅次于当前 ID 的路径，则当前 goroutine 只关注这个路径，当这个路径被删掉的时候，只有当前 goroutine 收到通知，避免惊群效应
 func getLockPrefixPath(basePath, prefix, zkLockPath string, siblings []string) (string, error) {
 	// path := basePath + "/" + prefix
 	path := basePath + "/" + zkLockPrefix
