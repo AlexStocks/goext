@@ -59,8 +59,7 @@ func (w *Worker) work(k *Keeper) {
 
 					t(w.ID) // call fn and send result
 				}()
-				num := atomic.AddInt64(&k.finTaskNum, 1)
-				log.Debug("after worker %d finished its work, finTaskNum = %d", w.ID, num)
+				atomic.AddInt64(&k.finTaskNum, 1)
 				k.workerQ <- w // we've finished w request
 			} else {
 				log.Warn("worker %d done channel closed, so it exits now with {its taskQ len = %d, pending = %d}",

@@ -23,12 +23,13 @@ func (suite *KeeperTestSuite) SetupTest() {
 
 func (suite *KeeperTestSuite) TearDownTest() {
 	suite.keeper.Close()
+	pendingNum := suite.keeper.PendingTaskNum()
+	suite.T().Logf("pendingNum = %d", pendingNum)
 }
 
 func (suite *KeeperTestSuite) TearDownSuite() {
 }
 
-/*
 func (suite *KeeperTestSuite) TestKeeper() {
 	f := func(d time.Duration, req string) Task {
 		return func(id int) {
@@ -44,10 +45,10 @@ func (suite *KeeperTestSuite) TestKeeper() {
 		suite.Equalf(nil, err, "err != nil")
 	}
 	time.Sleep(10e9)
-	pendingNum := suite.keeper.PendingTaskNum()
-	suite.Equalf(0, pendingNum, "pendingNum = %d", pendingNum)
+	// pendingNum := suite.keeper.PendingTaskNum()
+	// suite.Equalf(0, pendingNum, "pendingNum = %d", pendingNum)
 }
-*/
+
 func (suite *KeeperTestSuite) TestPendingNum() {
 	f := func(d time.Duration, req string) Task {
 		return func(id int) {
@@ -68,7 +69,6 @@ func (suite *KeeperTestSuite) TestPendingNum() {
 	suite.Equalf(true, 1 <= pendingNum, "pendingNum = %d", pendingNum)
 }
 
-/*
 func (suite *KeeperTestSuite) TestPanic() {
 	f := func(d time.Duration, req string) Task {
 		return func(id int) {
@@ -87,10 +87,10 @@ func (suite *KeeperTestSuite) TestPanic() {
 		suite.Equalf(nil, err, "err != nil")
 	}
 	time.Sleep(10e9)
-	pendingNum := suite.keeper.PendingTaskNum()
-	suite.Equalf(0, pendingNum, "pendingNum = %d", pendingNum)
+	// pendingNum := suite.keeper.PendingTaskNum()
+	// suite.Equalf(0, pendingNum, "pendingNum = %d", pendingNum)
 }
-*/
+
 func TestKeeperTestSuite(t *testing.T) {
 	suite.Run(t, new(KeeperTestSuite))
 }
