@@ -24,13 +24,21 @@ type Task struct {
 	rspQ chan interface{} // result queue
 }
 
+func NewTask(do DoTask, req interface{}) *Task {
+	return &Task{
+		do:   do,
+		req:  req,
+		rspQ: make(chan interface{}, 1),
+	}
+}
+
 type Worker struct {
 	ID      int
 	taskQ   chan *Task
-	done    chan struct{}
 	pending int // count of pending tasks
-	fin     int // count of done tasks
+	fin     int // count of finished tasks
 	index   int // The index of the item in the heap.
+	done    chan struct{}
 	wg      sync.WaitGroup
 	once    sync.Once
 }
@@ -61,6 +69,7 @@ func (w *Worker) work(k *Keeper) {
 					w.ID, len(w.taskQ), w.pending)
 				return
 			}
+
 		case <-w.done:
 			log.Warn("worker %d done channel closed, so it exits now with {its taskQ len = %d, pending = %d}",
 				w.ID, len(w.taskQ), w.pending)
@@ -69,15 +78,21 @@ func (w *Worker) work(k *Keeper) {
 	}
 }
 
-func (w *Worker) stop(k *Keeper) {
+func (w *Worker) stop() {
 	select {
 	case <-w.done:
 		return
+
 	default:
 		w.once.Do(func() {
 			close(w.done)
 		})
 	}
+}
+
+func (w *Worker) close() {
+	w.stop()
+	w.wg.Wait()
 }
 
 type WorkerPool []*Worker
@@ -146,8 +161,13 @@ func NewKeeper(workerNum int) *Keeper {
 func (k *Keeper) run() {
 	defer k.wg.Done()
 	for {
+		log.Debug("keeper run start")
 		select {
-		case t := <-k.taskQ:
+		case t, ok := <-k.taskQ:
+			if !ok {
+				log.Warn("keeper taskQ has been closed")
+				return
+			}
 			if l := k.workers.Len(); l > 0 {
 				worker := heap.Pop(&k.workers).(*Worker)
 				worker.taskQ <- t
@@ -158,16 +178,26 @@ func (k *Keeper) run() {
 				t.rspQ <- TaskError{Code: err, Desc: err.String()}
 			}
 
-		case worker := <-k.workerQ:
+		case worker, ok := <-k.workerQ:
+			if !ok {
+				log.Warn("keeper workerQ has been closed")
+				return
+			}
+
 			worker.pending--
 			worker.fin++
 			heap.Remove(&k.workers, worker.index)
 			heap.Push(&k.workers, worker)
 
-		case <-k.done:
+		case _, ok := <-k.done:
+			if !ok {
+				log.Warn("keeper done has been closed")
+				return
+			}
 			log.Warn("keeper exit now while its task queue size = %d.", len(k.taskQ))
 			return
 		}
+		log.Debug("keeper run end")
 	}
 }
 
@@ -175,6 +205,8 @@ func (k *Keeper) PushTask(t *Task, timeout time.Duration) error {
 	select {
 	case k.taskQ <- t:
 		return nil
+	case <-k.done:
+		return jerrors.New("Keeper has stopped!")
 	case <-time.After(timeout):
 		return jerrors.New(TC_WaitTimeout.String())
 	}
@@ -186,7 +218,17 @@ func (k *Keeper) Stop() {
 		return
 	default:
 		k.once.Do(func() {
-			close(k.done)
+			log.Debug("Stop")
+			close(k.done)              // stop to get new task
+			for i := range k.workers { // stop all workers
+				k.workers[i].close()
+			}
 		})
 	}
+}
+
+func (k *Keeper) Close() {
+	log.Debug("Close")
+	k.Stop()
+	k.wg.Wait()
 }
