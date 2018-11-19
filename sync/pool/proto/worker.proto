@@ -1,0 +1,36 @@
+syntax = "proto2";
+
+package gxpool;
+
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.gostring_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.verbose_equal_all) = true;
+// option (gogoproto.goproto_stringer_all) = false;
+// option (gogoproto.stringer_all) =  true;
+// option (gogoproto.populate_all) = true;
+// option (gogoproto.testgen_all) = true;
+// option (gogoproto.benchgen_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+option (gogoproto.goproto_enum_prefix_all) = false;
+
+
+//////////////////////////////////////////
+// Request Header
+//////////////////////////////////////////
+
+enum TaskErrorCode {
+	TC_UNKOWN      = 0;
+	TC_ServerBusy  = 1;
+	TC_WaitTimeout = 2;
+}
+
+message TaskError {
+	optional TaskErrorCode Code = 1  [(gogoproto.nullable) = false];
+	optional string Desc = 2  [(gogoproto.nullable) = false];
+}
