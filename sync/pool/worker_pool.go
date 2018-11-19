@@ -7,6 +7,7 @@ package gxpool
 
 import (
 	"container/heap"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -49,9 +50,18 @@ func (w *Worker) work(k *Keeper) {
 		select {
 		case t, ok := <-w.taskQ: // get task from balancer
 			if ok {
-				t(w.ID)        // call fn and send result
+				func() {
+					defer func() { // panic执行之前会保证defer被执行
+						if r := recover(); r != nil {
+							log.Warn("worker ID:%d, panic error:%#v, debug stack:%s", w.ID, r, string(debug.Stack()))
+						}
+					}()
+
+					t(w.ID) // call fn and send result
+				}()
+				num := atomic.AddInt64(&k.finTaskNum, 1)
+				log.Debug("after worker %d finished its work, finTaskNum = %d", w.ID, num)
 				k.workerQ <- w // we've finished w request
-				atomic.AddInt64(&k.finTaskNum, 1)
 			} else {
 				log.Warn("worker %d done channel closed, so it exits now with {its taskQ len = %d, pending = %d}",
 					w.ID, len(w.taskQ), w.pending)
@@ -164,8 +174,9 @@ func (k *Keeper) run() {
 				worker.pending++
 				heap.Push(&k.workers, worker)
 			} else {
-				k.taskQ <- t
+				// because Push & Pop is just invoked here. It is impossible that the workers is empty
 				log.Warn("failed to run task, this is impossible")
+				k.taskQ <- t
 			}
 		case worker, ok := <-k.workerQ:
 			if !ok {
@@ -193,7 +204,7 @@ func (k *Keeper) PushTask(t Task, timeout time.Duration) error {
 	case <-k.done:
 		return jerrors.New("Keeper has stopped!")
 	case <-time.After(timeout):
-		return jerrors.New(TC_WaitTimeout.String())
+		return jerrors.New("Wait timeout")
 	}
 }
 
@@ -207,7 +218,6 @@ func (k *Keeper) Stop() {
 		return
 	default:
 		k.once.Do(func() {
-			log.Debug("Stop")
 			close(k.done)              // stop to get new task
 			for i := range k.workers { // stop all workers
 				k.workers[i].close()
@@ -217,7 +227,6 @@ func (k *Keeper) Stop() {
 }
 
 func (k *Keeper) Close() {
-	log.Debug("Close")
 	k.Stop()
 	k.wg.Wait()
 }
