@@ -8,6 +8,7 @@ package gxpool
 import (
 	"container/heap"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -16,25 +17,11 @@ import (
 	jerrors "github.com/juju/errors"
 )
 
-type DoTask func(workerID int, request interface{}) interface{}
-
-type Task struct {
-	do   DoTask
-	req  interface{}
-	rspQ chan interface{} // result queue
-}
-
-func NewTask(do DoTask, req interface{}) *Task {
-	return &Task{
-		do:   do,
-		req:  req,
-		rspQ: make(chan interface{}, 1),
-	}
-}
+type Task func(workerID int)
 
 type Worker struct {
 	ID      int
-	taskQ   chan *Task
+	taskQ   chan Task
 	pending int // count of pending tasks
 	fin     int // count of finished tasks
 	index   int // The index of the item in the heap.
@@ -46,7 +33,7 @@ type Worker struct {
 func NewWorker(id int, k *Keeper) *Worker {
 	w := &Worker{
 		ID:    id,
-		taskQ: make(chan *Task, 64),
+		taskQ: make(chan Task, 64),
 		done:  make(chan struct{}),
 	}
 
@@ -62,8 +49,9 @@ func (w *Worker) work(k *Keeper) {
 		select {
 		case t, ok := <-w.taskQ: // get task from balancer
 			if ok {
-				t.rspQ <- t.do(w.ID, t.req) // call fn and send result
-				k.workerQ <- w              // we've finished w request
+				t(w.ID)        // call fn and send result
+				k.workerQ <- w // we've finished w request
+				atomic.AddInt64(&k.finTaskNum, 1)
 			} else {
 				log.Warn("worker %d done channel closed, so it exits now with {its taskQ len = %d, pending = %d}",
 					w.ID, len(w.taskQ), w.pending)
@@ -129,13 +117,15 @@ func (p *WorkerPool) Pop() interface{} {
 }
 
 type Keeper struct {
-	workers   WorkerPool
-	workerNum int
-	workerQ   chan *Worker
-	taskQ     chan *Task
-	wg        sync.WaitGroup
-	done      chan struct{}
-	once      sync.Once
+	workers    WorkerPool
+	workerNum  int
+	workerQ    chan *Worker
+	taskQ      chan Task
+	inTaskNum  int64
+	finTaskNum int64
+	wg         sync.WaitGroup
+	done       chan struct{}
+	once       sync.Once
 }
 
 func NewKeeper(workerNum int) *Keeper {
@@ -143,7 +133,7 @@ func NewKeeper(workerNum int) *Keeper {
 		workers:   make(WorkerPool, 0, 32),
 		workerNum: workerNum,
 		workerQ:   make(chan *Worker, 128),
-		taskQ:     make(chan *Task, 1024),
+		taskQ:     make(chan Task, 1024),
 		done:      make(chan struct{}),
 	}
 
@@ -161,23 +151,22 @@ func NewKeeper(workerNum int) *Keeper {
 func (k *Keeper) run() {
 	defer k.wg.Done()
 	for {
-		log.Debug("keeper run start")
 		select {
 		case t, ok := <-k.taskQ:
 			if !ok {
 				log.Warn("keeper taskQ has been closed")
 				return
 			}
+
 			if l := k.workers.Len(); l > 0 {
 				worker := heap.Pop(&k.workers).(*Worker)
 				worker.taskQ <- t
 				worker.pending++
 				heap.Push(&k.workers, worker)
 			} else {
-				err := TaskErrorCode(TC_ServerBusy)
-				t.rspQ <- TaskError{Code: err, Desc: err.String()}
+				k.taskQ <- t
+				log.Warn("failed to run task, this is impossible")
 			}
-
 		case worker, ok := <-k.workerQ:
 			if !ok {
 				log.Warn("keeper workerQ has been closed")
@@ -189,27 +178,27 @@ func (k *Keeper) run() {
 			heap.Remove(&k.workers, worker.index)
 			heap.Push(&k.workers, worker)
 
-		case _, ok := <-k.done:
-			if !ok {
-				log.Warn("keeper done has been closed")
-				return
-			}
+		case <-k.done:
 			log.Warn("keeper exit now while its task queue size = %d.", len(k.taskQ))
 			return
 		}
-		log.Debug("keeper run end")
 	}
 }
 
-func (k *Keeper) PushTask(t *Task, timeout time.Duration) error {
+func (k *Keeper) PushTask(t Task, timeout time.Duration) error {
 	select {
 	case k.taskQ <- t:
+		atomic.AddInt64(&k.inTaskNum, 1)
 		return nil
 	case <-k.done:
 		return jerrors.New("Keeper has stopped!")
 	case <-time.After(timeout):
 		return jerrors.New(TC_WaitTimeout.String())
 	}
+}
+
+func (k *Keeper) PendingTaskNum() int {
+	return int(atomic.LoadInt64(&k.inTaskNum) - atomic.LoadInt64(&k.finTaskNum))
 }
 
 func (k *Keeper) Stop() {
