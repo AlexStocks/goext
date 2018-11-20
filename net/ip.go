@@ -101,7 +101,7 @@ func IPItoa(ip uint32) string {
 }
 
 // IPAtoi returns the integer format of ip string @s
-func IpAtoi(s string) uint32 {
+func IPAtoi(s string) uint32 {
 	ip := net.ParseIP(s)
 	if ip == nil {
 		return 0
