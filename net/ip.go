@@ -6,9 +6,11 @@
 
 package gxnet
 
-import "net"
-
 import (
+	"encoding/binary"
+	"fmt"
+	"net"
+
 	jerrors "github.com/juju/errors"
 )
 
@@ -91,4 +93,20 @@ func CheckIPValidity(IPString string) bool {
 	}
 
 	return true
+}
+
+// IPItoa returns the string representation of @ip
+func IPItoa(ip uint32) string {
+	return fmt.Sprintf("%d.%d.%d.%d", ip>>24, ip<<8>>24, ip<<16>>24, ip<<24>>24)
+}
+
+// IPAtoi returns the integer format of ip string @s
+func IpAtoi(s string) uint32 {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return 0
+	}
+
+	ip = ip.To4()
+	return binary.BigEndian.Uint32(ip)
 }
