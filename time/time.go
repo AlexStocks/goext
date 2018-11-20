@@ -84,3 +84,34 @@ func Time2Unix(t time.Time) int64 {
 func Time2UnixNano(t time.Time) int64 {
 	return t.UnixNano()
 }
+
+func GetEndtime(format string) time.Time {
+	timeNow := time.Now()
+	switch format {
+	case "day":
+		year, month, _ := timeNow.Date()
+		nextDay := timeNow.AddDate(0, 0, 1).Day()
+		t := time.Date(year, month, nextDay, 0, 0, 0, 0, time.Local)
+		return time.Unix(t.Unix()-1, 0)
+
+	case "week":
+		year, month, _ := timeNow.Date()
+		weekday := int(timeNow.Weekday())
+		weekendday := timeNow.AddDate(0, 0, 8-weekday).Day()
+		t := time.Date(year, month, weekendday, 0, 0, 0, 0, time.Local)
+		return time.Unix(t.Unix()-1, 0)
+
+	case "month":
+		year := timeNow.Year()
+		nextMonth := timeNow.AddDate(0, 1, 0).Month()
+		t := time.Date(year, nextMonth, 1, 0, 0, 0, 0, time.Local)
+		return time.Unix(t.Unix()-1, 0)
+
+	case "year":
+		nextYear := timeNow.AddDate(1, 0, 0).Year()
+		t := time.Date(nextYear, 1, 1, 0, 0, 0, 0, time.Local)
+		return time.Unix(t.Unix()-1, 0)
+	}
+
+	return timeNow
+}
