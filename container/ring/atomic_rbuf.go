@@ -1,6 +1,4 @@
 // package rbuf
-package gxring
-
 // AtomicFixedSizeRingBuf: Synchronized version of FixedSizeRingBuf,
 // safe for concurrent access.
 //
@@ -13,6 +11,8 @@ package gxring
 // are implemented here. Those descriptions (see
 // http://golang.org/pkg/io/#Reader for example) are
 // copyright 2010 The Go Authors.
+
+package gxring
 
 import (
 	"fmt"
