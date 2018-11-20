@@ -6,14 +6,9 @@
 package gxos
 
 import (
-	"io"
 	"os"
 	"reflect"
 	"strings"
-)
-
-import (
-	jerrors "github.com/juju/errors"
 )
 
 func CreateDir(dir string) error {
@@ -53,35 +48,4 @@ func GetPkgPath(v interface{}) string {
 	}
 
 	return path
-}
-
-func IsSameFile(filename1, filename2 string) bool {
-	file1, err := os.Stat(filename1)
-	if err != nil {
-		return false
-	}
-
-	file2, err := os.Stat(filename2)
-	if err != nil {
-		return false
-	}
-
-	return os.SameFile(file1, file2)
-}
-
-func CopyFile(dst, src string) error {
-	d, err := os.Create(dst)
-	if err != nil {
-		return jerrors.Trace(err)
-	}
-	defer d.Close()
-
-	s, err := os.Open(src)
-	if err != nil {
-		return jerrors.Trace(err)
-	}
-	defer s.Close()
-
-	_, err = io.Copy(d, s)
-	return jerrors.Trace(err)
 }
