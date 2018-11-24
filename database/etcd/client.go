@@ -16,8 +16,9 @@ import (
 	"github.com/AlexStocks/goext/runtime"
 	log "github.com/AlexStocks/log4go"
 	jerrors "github.com/juju/errors"
-	ecv3 "go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/clientv3/concurrency"
+	// ecv3 "go.etcd.io/etcd/clientv3"
+	ecv3 "github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/clientv3/concurrency"
 )
 
 var (

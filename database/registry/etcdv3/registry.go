@@ -15,7 +15,8 @@ import (
 import (
 	log "github.com/AlexStocks/log4go"
 	jerrors "github.com/juju/errors"
-	etcdv3 "go.etcd.io/etcd/clientv3"
+	// ecv3 "go.etcd.io/etcd/clientv3"
+	ecv3 "github.com/coreos/etcd/clientv3"
 )
 
 import (
@@ -25,7 +26,7 @@ import (
 )
 
 type Registry struct {
-	etcdClient *etcdv3.Client
+	etcdClient *ecv3.Client
 	client     *gxetcd.Client
 	options    gxregistry.Options
 
@@ -38,7 +39,7 @@ type Registry struct {
 }
 
 func NewRegistry(opts ...gxregistry.Option) (gxregistry.Registry, error) {
-	config := etcdv3.Config{
+	config := ecv3.Config{
 		Endpoints: []string{"127.0.0.1:2379"},
 	}
 
@@ -65,9 +66,9 @@ func NewRegistry(opts ...gxregistry.Option) (gxregistry.Registry, error) {
 	config.DialTimeout = options.Timeout
 	config.DialKeepAliveTimeout = options.Timeout
 
-	client, err := etcdv3.New(config)
+	client, err := ecv3.New(config)
 	if err != nil {
-		return nil, jerrors.Errorf("etcdv3.New(config:%+v) = error:%s", config, err)
+		return nil, jerrors.Errorf("ecv3.New(config:%+v) = error:%s", config, err)
 	}
 	gxClient, err := gxetcd.NewClient(client, gxetcd.WithTTL(options.Timeout))
 	if err != nil {
@@ -276,12 +277,12 @@ func (r *Registry) register(s gxregistry.Service) error {
 			ctx,
 			service.NodePath(r.options.Root, *node),
 			data,
-			etcdv3.WithLease(r.client.Lease()),
+			ecv3.WithLease(r.client.Lease()),
 		)
 		if err != nil {
 			service.Nodes = s.Nodes[:i]
 			r.unregister(service)
-			return jerrors.Annotatef(err, "etcdv3.Client.Put(path:%s, data:%s)",
+			return jerrors.Annotatef(err, "ecv3.Client.Put(path:%s, data:%s)",
 				service.NodePath(r.options.Root, *node), data)
 		}
 	}
@@ -318,7 +319,7 @@ func (r *Registry) unregister(s gxregistry.Service) error {
 	defer cancel()
 
 	for _, node := range s.Nodes {
-		_, err := r.client.EtcdClient().Delete(ctx, s.NodePath(r.options.Root, *node), etcdv3.WithIgnoreLease())
+		_, err := r.client.EtcdClient().Delete(ctx, s.NodePath(r.options.Root, *node), ecv3.WithIgnoreLease())
 		if err != nil {
 			return err
 		}
@@ -344,8 +345,8 @@ func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]gxregistry.Servic
 	rsp, err := r.client.EtcdClient().Get(
 		ctx,
 		path,
-		etcdv3.WithPrefix(),
-		etcdv3.WithSort(etcdv3.SortByKey, etcdv3.SortDescend),
+		ecv3.WithPrefix(),
+		ecv3.WithSort(ecv3.SortByKey, ecv3.SortDescend),
 	)
 	if err != nil {
 		return nil, err

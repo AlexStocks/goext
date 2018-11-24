@@ -13,27 +13,24 @@ import (
 )
 
 import (
-	log "github.com/AlexStocks/log4go"
-	jerrors "github.com/juju/errors"
-	"go.etcd.io/etcd/clientv3"
-)
-
-import (
-	etcd "github.com/AlexStocks/goext/database/etcd"
+	"github.com/AlexStocks/goext/database/etcd"
 	"github.com/AlexStocks/goext/database/registry"
+	log "github.com/AlexStocks/log4go"
+	ecv3 "github.com/coreos/etcd/clientv3"
+	jerrors "github.com/juju/errors"
 )
 
 // watcher的watch系列函数暴露给registry，而Next函数则暴露给selector
 type Watcher struct {
 	done      chan struct{}
 	cancel    context.CancelFunc
-	w         clientv3.WatchChan
+	w         ecv3.WatchChan
 	opts      gxregistry.WatchOptions
-	client    *etcd.Client
+	client    *gxetcd.Client
 	sync.Once // for Close
 }
 
-func NewWatcher(client *etcd.Client, opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
+func NewWatcher(client *gxetcd.Client, opts ...gxregistry.WatchOption) (gxregistry.Watcher, error) {
 	var options gxregistry.WatchOptions
 	for _, o := range opts {
 		o(&options)
@@ -58,7 +55,7 @@ func NewWatcher(client *etcd.Client, opts ...gxregistry.WatchOption) (gxregistry
 	if !strings.HasSuffix(watchPath, "/") {
 		watchPath += "/"
 	}
-	w := client.EtcdClient().Watch(ctx, watchPath, clientv3.WithPrefix(), clientv3.WithPrevKV())
+	w := client.EtcdClient().Watch(ctx, watchPath, ecv3.WithPrefix(), ecv3.WithPrevKV())
 
 	wc := &Watcher{
 		done:   make(chan struct{}),
@@ -89,7 +86,7 @@ func (w *Watcher) Notify() (*gxregistry.EventResult, error) {
 
 		for _, ev := range msg.Events {
 			switch ev.Type {
-			case clientv3.EventTypePut:
+			case ecv3.EventTypePut:
 				if ev.IsCreate() {
 					action = gxregistry.ServiceAdd
 				} else if ev.IsModify() {
@@ -103,7 +100,7 @@ func (w *Watcher) Notify() (*gxregistry.EventResult, error) {
 					continue
 				}
 
-			case clientv3.EventTypeDelete:
+			case ecv3.EventTypeDelete:
 				action = gxregistry.ServiceDel
 
 				// get service from prevKv
