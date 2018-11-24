@@ -340,7 +340,7 @@ func (r *Registry) GetServices(attr gxregistry.ServiceAttr) ([]gxregistry.Servic
 	// svc := gxregistry.Service{Attr: &attr}
 	path := r.options.Root
 	if !strings.HasPrefix(path, "/") {
-		path += "/"
+		path = "/" + path
 	}
 	rsp, err := r.client.EtcdClient().Get(
 		ctx,
