@@ -9,7 +9,9 @@ import (
 	"io"
 	"os"
 	"time"
+)
 
+import (
 	jerrors "github.com/juju/errors"
 )
 
