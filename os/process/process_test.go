@@ -5,15 +5,19 @@ import (
 	"testing"
 )
 
+import (
+	"github.com/alexstocks/goext/log"
+)
+
 func TestFindProcess(t *testing.T) {
-	p, err := NewLinuxProcess(os.Getpid())
+	p, err := FindProcess(os.Getpid())
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
 	if p == nil {
 		t.Fatal("should have process")
 	}
-	t.Logf("current pid:%d, linux process:%#v", os.Getpid(), *p)
+	t.Logf("current pid:%d, linux process:%#v", os.Getpid(), p)
 
 	if p.Pid() != os.Getpid() {
 		t.Fatalf("bad: %#v", p.Pid())
@@ -23,7 +27,7 @@ func TestFindProcess(t *testing.T) {
 func TestProcesses(t *testing.T) {
 	// This test works because there will always be SOME processes
 	// running.
-	p, err := ProcProcesses()
+	p, err := Processes()
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
@@ -39,7 +43,7 @@ func TestProcesses(t *testing.T) {
 			break
 		}
 	}
-	t.Logf("/proc processes:%#v", p)
+	t.Logf("/proc processes:%#v", gxlog.PrettyString(p))
 
 	if !found {
 		t.Fatal("should have Go")
