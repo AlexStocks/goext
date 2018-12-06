@@ -2,7 +2,7 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 
-// packaeg gxprocess is used to get process info of "/proc"
+// packaeg gxprocess is used to get all processes info.
 
 // +build darwin
 
