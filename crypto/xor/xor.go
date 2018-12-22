@@ -37,19 +37,23 @@ func (x *Xor) Encrypt(txt string) string {
 	return cryptTxt
 }
 
-func (x *Xor) Decrypt(cryptTxt string) string {
+func (x *Xor) Decrypt(cryptTxt string) (string, error) {
 	var (
 		i, j int
 		s    int64
 		txt  string
+		err  error
 	)
 
 	uCryptTxt := []rune(cryptTxt)
 	for i = 0; i < len(cryptTxt)/2; i++ {
-		s, _ = strconv.ParseInt(string(uCryptTxt[i*2:i*2+2]), 16, 0)
+		s, err = strconv.ParseInt(string(uCryptTxt[i*2:i*2+2]), 16, 0)
+		if err != nil {
+			return "", err
+		}
 		txt += string(byte(s) ^ x.key[j])
 		j = (j + 1) % len(x.key)
 	}
 
-	return txt
+	return txt, nil
 }
