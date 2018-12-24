@@ -5,7 +5,10 @@
 // Package gxxor implements the xor crypto alg.
 package gxxor
 
-import "strconv"
+import (
+	"encoding/base64"
+	"strconv"
+)
 
 type Xor struct {
 	key []byte
@@ -56,4 +59,41 @@ func (x *Xor) Decrypt(cryptTxt string) (string, error) {
 	}
 
 	return txt, nil
+}
+
+func (x *Xor) EncryptBytesInBase64(txt []byte) []byte {
+	byteArr := []byte(base64.StdEncoding.EncodeToString(txt))
+	// fmt.Println("base64 array len:", len(byteArr))
+	// fmt.Println("base64 array:", string(byteArr))
+	// fmt.Printf("base64 array hex:%x\n", byteArr)
+	txtLen := len(byteArr)
+	keyLen := len(x.key)
+	for i := 0; i < txtLen; i++ {
+		byteArr[i] ^= x.key[i%keyLen]
+	}
+	// fmt.Println("encrypt bytes len:", len(byteArr))
+
+	return byteArr
+}
+
+func (x *Xor) EncryptInBase64(txt string) string {
+	return string(x.EncryptBytesInBase64([]byte(txt)))
+}
+
+func (x *Xor) DecryptBytesInBase64(bytes []byte) ([]byte, error) {
+	keyLen := len(x.key)
+	bytesLen := len(bytes)
+	decBytes := make([]byte, len(bytes))
+	for i := 0; i < bytesLen; i++ {
+		decBytes[i] = x.key[i%keyLen] ^ bytes[i]
+	}
+
+	dbuf := make([]byte, base64.StdEncoding.DecodedLen(len(decBytes)))
+	n, err := base64.StdEncoding.Decode(dbuf, decBytes)
+	return dbuf[:n], err
+}
+
+func (x *Xor) DecryptInBase64(cryptTxt string) (string, error) {
+	txtBytes, err := x.DecryptBytesInBase64([]byte(cryptTxt))
+	return string(txtBytes), err
 }
