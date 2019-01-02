@@ -159,7 +159,10 @@ func TestAsyncKafkaProducer(t *testing.T) {
 	}
 
 	errCallback = func(err *sarama.ProducerError) {
-		log.Printf("send msg:%v failed. error:%v\n", err.Msg, err.Error())
+		errMsgKey, _ := err.Msg.Key.Encode()
+		errMsgValue, _ := err.Msg.Value.Encode()
+		log.Printf("send msg:{Topic:%s, Partition:%d, Offset:%d, Timestamp:%s, Key:%s, Value:%s} failed, fail num:%d. error:%v",
+			err.Msg.Topic, err.Msg.Partition, err.Msg.Offset, err.Msg.Timestamp, string(errMsgKey), string(errMsgValue), failures, err.Error())
 		failures++
 	}
 
