@@ -67,11 +67,11 @@ func IsSameAddr(a1, a2 net.Addr) bool {
 // licensed under GPL v2.1
 func GetListenerByFd(fd int) (*net.Listener, error) {
 	file := os.NewFile(uintptr(fd), "open one listenfd")
+	defer file.Close()
 	ln, err := net.FileListener(file)
 	if err != nil {
 		return nil, err
 	}
 
-	file.Close()
 	return &ln, nil
 }
