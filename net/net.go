@@ -7,6 +7,7 @@ package gxnet
 
 import (
 	"net"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -60,4 +61,17 @@ func IsSameAddr(a1, a2 net.Addr) bool {
 	a1s = strings.TrimPrefix(a1s, ipv4prefix)
 	a2s = strings.TrimPrefix(a2s, ipv4prefix)
 	return a1s == a2s
+}
+
+// !!!: this func is copied from [acl-dev/go-master](https://github.com/acl-dev/go-master/blob/master/service.go#L269)
+// licensed under GPL v2.1
+func GetListenerByFd(fd int) (*net.Listener, error) {
+	file := os.NewFile(uintptr(fd), "open one listenfd")
+	ln, err := net.FileListener(file)
+	if err != nil {
+		return nil, err
+	}
+
+	file.Close()
+	return &ln, nil
 }
