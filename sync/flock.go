@@ -26,6 +26,7 @@ package gxsync
 import (
 	"context"
 	"os"
+	"path"
 	"sync"
 	"time"
 )
@@ -42,8 +43,11 @@ type Flock struct {
 
 // NewFlock returns a new instance of *Flock. The only parameter
 // it takes is the path to the desired lockfile.
-func NewFlock(path string) *Flock {
-	return &Flock{path: path}
+func NewFlock(filePath string) *Flock {
+	basePath := path.Dir(filePath)
+	os.MkdirAll(basePath, 0766)
+
+	return &Flock{path: filePath}
 }
 
 // Close is equivalent to calling Unlock.

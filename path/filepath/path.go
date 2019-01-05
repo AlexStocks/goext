@@ -9,6 +9,7 @@ package gxfilepath
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Get the fiels in @dir, and then put @prefix as all filenames's prefix
@@ -34,4 +35,14 @@ func DirFiles(dir, prefix string) ([]string, error) {
 		return nil, err
 	}
 	return files, nil
+}
+
+func Mkdir(dir string) error {
+	// the owner perm must be 7
+	if err := os.MkdirAll(dir, 0766); err != nil &&
+		!strings.Contains(err.Error(), "file exists") {
+		return err
+	}
+
+	return nil
 }
