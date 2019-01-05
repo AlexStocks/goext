@@ -11,3 +11,16 @@ func TestDirFiles(t *testing.T) {
 	}
 	t.Logf("files:%v, err:%v", files, err)
 }
+
+func TestMkdirf(t *testing.T) {
+	// 创建成功
+	dir := "./d/b/c"
+	// if err := os.MkdirAll(dir, 0766); err != nil {
+	if err := Mkdirf(dir); err != nil {
+		t.Logf("create dir %s err:%s\n", dir, err)
+	}
+	dir = "./d/"
+	if err := Rmdirf(dir); err != nil {
+		t.Logf("remove dir %s err:%s\n", dir, err)
+	}
+}

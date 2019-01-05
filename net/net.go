@@ -6,6 +6,7 @@
 package gxnet
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"strconv"
@@ -67,6 +68,9 @@ func IsSameAddr(a1, a2 net.Addr) bool {
 // licensed under GPL v2.1
 func GetListenerByFd(fd int) (*net.Listener, error) {
 	file := os.NewFile(uintptr(fd), "open one listenfd")
+	if file == nil {
+		return nil, fmt.Errorf("failed to get net.Listener of %d which may be not a valid file descriptor", fd)
+	}
 	defer file.Close()
 	ln, err := net.FileListener(file)
 	if err != nil {

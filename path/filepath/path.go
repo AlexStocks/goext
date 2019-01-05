@@ -37,10 +37,19 @@ func DirFiles(dir, prefix string) ([]string, error) {
 	return files, nil
 }
 
-func Mkdir(dir string) error {
+func Mkdirf(dir string) error {
 	// the owner perm must be 7
 	if err := os.MkdirAll(dir, 0766); err != nil &&
 		!strings.Contains(err.Error(), "file exists") {
+		return err
+	}
+
+	return nil
+}
+
+func Rmdirf(dir string) error {
+	// the owner perm must be 7
+	if err := os.RemoveAll(dir); err != nil {
 		return err
 	}
 
