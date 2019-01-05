@@ -7,7 +7,7 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 //
-// refers to github.com/gofrs/flock
+// refers from github.com/gofrs/flock
 package gxsync
 
 import (

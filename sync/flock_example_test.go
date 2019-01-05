@@ -7,7 +7,7 @@
 // All rights reserved.  Use of this source code is
 // governed by Apache License 2.0.
 //
-// refers to github.com/gofrs/flock
+// refers from github.com/gofrs/flock
 
 package gxsync
 
@@ -74,3 +74,6 @@ func ExampleFlock_TryLockContext() {
 
 	fmt.Printf("path: %s; locked: %v\n", fileLock.Path(), fileLock.Locked())
 }
+
+// flock code example
+// https://github.com/alexstocks/go-practice/blob/master/sync/file_mutex_lock.go
