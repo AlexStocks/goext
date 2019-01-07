@@ -66,7 +66,7 @@ func IsSameAddr(a1, a2 net.Addr) bool {
 
 // !!!: this func is copied from [acl-dev/go-master](https://github.com/acl-dev/go-master/blob/master/service.go#L269)
 // licensed under GPL v2.1
-func GetListenerByFd(fd int) (*net.Listener, error) {
+func GetFileListenerByFd(fd int) (net.Listener, error) {
 	file := os.NewFile(uintptr(fd), "open one listenfd")
 	if file == nil {
 		return nil, fmt.Errorf("failed to get net.Listener of %d which may be not a valid file descriptor", fd)
@@ -77,5 +77,33 @@ func GetListenerByFd(fd int) (*net.Listener, error) {
 		return nil, err
 	}
 
-	return &ln, nil
+	return ln, nil
+}
+
+func GetFileConnByFd(fd int) (net.Conn, error) {
+	file := os.NewFile(uintptr(fd), "open one listenfd")
+	if file == nil {
+		return nil, fmt.Errorf("failed to get net.Listener of %d which may be not a valid file descriptor", fd)
+	}
+	defer file.Close()
+	conn, err := net.FileConn(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+func GetFilePacketConnByFd(fd int) (net.PacketConn, error) {
+	file := os.NewFile(uintptr(fd), "open one listenfd")
+	if file == nil {
+		return nil, fmt.Errorf("failed to get net.Listener of %d which may be not a valid file descriptor", fd)
+	}
+	defer file.Close()
+	conn, err := net.FilePacketConn(file)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
 }
