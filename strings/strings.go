@@ -39,7 +39,7 @@ func Contains(arr []interface{}, elem interface{}) bool {
 	return false
 }
 
-func StringsToIfs(arr []string) []interface{} {
+func Strings2Ifs(arr []string) []interface{} {
 	iArr := make([]interface{}, 0, len(arr))
 	for _, s := range arr {
 		iArr = append(iArr, s)
