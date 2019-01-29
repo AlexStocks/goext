@@ -20,6 +20,8 @@
 
 package gxatomic
 
+// ref: github.com/uber-go/atomic
+
 // String is an atomic type-safe wrapper around Value for strings.
 type String struct{ v Value }
 

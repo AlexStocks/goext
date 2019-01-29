@@ -22,6 +22,8 @@
 // access.
 package gxatomic
 
+// ref: github.com/uber-go/atomic
+
 import (
 	"math"
 	"sync/atomic"
