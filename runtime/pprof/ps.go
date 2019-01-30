@@ -7,13 +7,31 @@
 package gxpprof
 
 import (
+	"os"
+	"os/user"
+
 	"github.com/google/gops/agent"
 	"github.com/juju/errors"
 )
 
+func guessUnixHomeDir() string {
+	usr, err := user.Current()
+	if err == nil {
+		return usr.HomeDir
+	}
+
+	return os.Getenv("HOME")
+}
+
+// @addr: ":10001"
 func Gops(addr string) error {
-	if err := agent.Listen(agent.Options{Addr: addr}); err != nil {
-		return errors.Annotatef(err, "gops/agent.Listen()")
+	opts := agent.Options{
+		Addr:      addr,
+		ConfigDir: guessUnixHomeDir(),
+	}
+	err := agent.Listen(opts)
+	if err != nil {
+		return errors.Annotatef(err, "gops/agent.Listen(opts:%#v)", opts)
 	}
 
 	return nil

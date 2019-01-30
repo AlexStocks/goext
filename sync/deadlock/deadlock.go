@@ -46,6 +46,16 @@ var Opts = struct {
 	LogBuf:     os.Stderr,
 }
 
+func EnableDeadlock(enable bool) {
+	Opts.Disable = true
+	Opts.DisableLockOrderDetection = true
+
+	if enable {
+		Opts.Disable = false
+		Opts.DisableLockOrderDetection = false
+	}
+}
+
 // A Mutex is a drop-in replacement for sync.Mutex.
 // Performs deadlock detection unless disabled in Opts.
 type Mutex struct {
