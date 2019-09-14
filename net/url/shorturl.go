@@ -64,7 +64,7 @@ func GenSo985ShortURL(uri string) (string, error) {
 	c := http.Client{Transport: &http.Transport{Dial: httpDial}}
 	rsp, err := c.Get(So985ShortURL + uri)
 	if err != nil {
-		return "", errors.Annotatef(err, "http.Get(%s)", SinaShortURL+uri)
+		return "", errors.Annotatef(err, "http.Get(%s)", So985ShortURL+uri)
 	}
 
 	defer rsp.Body.Close()
