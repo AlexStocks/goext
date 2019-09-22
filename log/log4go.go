@@ -29,6 +29,7 @@ type Conf struct {
 	Level     string // minimum log level
 	Console   bool   // whether output log to console
 	Daily     bool   // whether rotate log file at mid-night every day
+	Hourly    bool   // whether rotate log file every one hour. If true, the Daily will be set false.
 	BackupNum int    // log file backup number. the oldest is deleted.
 	BufSize   int    // async logger buffer size
 	Json      bool   // whether output json log
@@ -83,6 +84,9 @@ func NewLogger(conf Conf) (Logger, error) {
 	fileLogger.SetFormat(log4go.FORMAT_DEFAULT)
 	if conf.Daily {
 		fileLogger.SetRotateDaily(true)
+	}
+	if conf.Hourly {
+		fileLogger.SetRotateHourly(1)
 	}
 	if 0 < conf.BackupNum {
 		fileLogger.SetRotateMaxBackup(conf.BackupNum)
