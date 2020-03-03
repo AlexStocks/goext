@@ -16,9 +16,9 @@ import (
 	"github.com/AlexStocks/goext/database/etcd"
 	"github.com/AlexStocks/goext/database/registry"
 	log "github.com/AlexStocks/log4go"
-	// ecv3 "github.com/coreos/etcd/clientv3"
+	ecv3 "github.com/coreos/etcd/clientv3"
 	jerrors "github.com/juju/errors"
-	ecv3 "go.etcd.io/etcd/clientv3"
+	// ecv3 "go.etcd.io/etcd/clientv3"
 )
 
 // watcher的watch系列函数暴露给registry，而Next函数则暴露给selector
