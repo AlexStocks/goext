@@ -27,11 +27,14 @@ func CalRedPacket(total int32, num int32) ([]int32, error) {
 		k       int32   = 0
 		min     int32   = 1
 		max     int32   = 0
-		balance int32   = total
+		balance = total
 		money   int32   = 0
-		packet  []int32 = make([]int32, num)
+		packet  = make([]int32, num)
 	)
 
+	if num > total {
+		num = total
+	}
 	rand.Seed(time.Now().Unix())
 	for i = 1; i < num; i++ {
 		max = balance - min*(num-i)
